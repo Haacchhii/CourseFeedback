@@ -1,0 +1,624 @@
+# Curriculum Analysis by Program and Categories
+
+## File 1: BSIT Curriculum (SY 2023-2024)
+
+**Program/Strand:** Bachelor of Science in Information Technology (BSIT)
+
+### First Year - First Semester
+**Subjects:**
+- Introduction to Computing (Major, Computer Science)
+- Computer Programming 1 (Major, Computer Science)
+- Understanding the Self (General Education, Humanities)
+- Mathematics in the Modern World (General Education, Mathematics)
+- The Contemporary World (General Education, Social Sciences)
+- Art Appreciation (General Education, Humanities)
+- Being Skills Course 1 (Minor, General Education)
+- Physical Fitness & Gymnastic (Minor, Physical Education)
+- National Service Training Program 1 (Minor, General Education)
+
+### First Year - Second Semester
+**Subjects:**
+- Computer Programming 2 (Major, Computer Science)
+- Computer Organization (Major, Computer Science)
+- Elective 1 (Major, Information Technology)
+- Purposive Communication (General Education, Communication)
+- Science, Technology and Society (General Education, Social Sciences)
+- English Proficiency (General Education, Communication)
+- College Algebra (Major, Mathematics)
+- Being Skills Course 2 (Minor, General Education)
+- Rhythmic Activities (Minor, Physical Education)
+- National Service Training Program 2 (Minor, General Education)
+
+### Second Year - First Semester
+**Subjects:**
+- Data Structures and Algorithms (Major, Computer Science)
+- Operating Systems (Major, Computer Science)
+- Trigonometry (Major, Mathematics)
+
+### Second Year - Second Semester
+**Subjects:**
+- Ethics (General Education, Humanities)
+- Accounting Principles (Major, Business)
+- Elective 2 (Major, Information Technology)
+- Networking 1 (Major, Information Technology)
+- Object-Oriented Programming (Major, Computer Science)
+- Web Systems and Technologies (Major, Information Technology)
+- Systems Analysis & Design (Major, Information Technology)
+- Analytic Geometry (Major, Mathematics)
+- Individual & Dual Sports (Minor, Physical Education)
+
+### Third Year - First Semester
+**Subjects:**
+- Information Management (Major, Information Technology)
+- Human Computer Interaction (Major, Information Technology)
+- Networking 2 (Major, Information Technology)
+- Elective 3 (Major, Information Technology)
+- Capstone Project 1 (Major, Information Technology)
+- Readings in Philippine History (General Education, Social Sciences)
+- Probability and Statistics (Major, Mathematics)
+- Differential Calculus (Major, Mathematics)
+- Team Sports & Recreation (Minor, Physical Education)
+
+### Third Year - Second Semester
+**Subjects:**
+- Elective 4 (Major, Information Technology)
+- Networking 3 (Major, Information Technology)
+- Integral Calculus (Major, Mathematics)
+
+### Fourth Year - First Semester
+**Subjects:**
+- Applications Development and Emerging Technologies (Major, Information Technology)
+- Discrete Structures (Major, Mathematics)
+- Computer Troubleshooting and Repair (Major, Information Technology)
+- Networking 4 (Major, Information Technology)
+- Capstone Project 2-Technopreneurship (Major, Information Technology)
+- Foreign Language (General Education, Communication)
+- The Life and Works of Rizal (General Education, Social Sciences)
+- Calculus-based Physics 1 (Major, Natural Sciences)
+
+### Fourth Year - Second Semester
+**Subjects:**
+- OJT/Internship (Major, Information Technology)
+- Seminars & Field Trip (Major, Information Technology)
+- Calculus-based Physics 2 (Major, Natural Sciences)
+
+---
+
+## File 2: BSCS with Data Science Specialization (SY 2023-2024)
+
+**Program/Strand:** Bachelor of Science in Computer Science - Data Science Specialization
+
+### First Year - First Semester
+**Subjects:**
+- Introduction to Computing (Major, Computer Science)
+- Computer Programming 1 (Major, Computer Science)
+- Digital Design (Major, Computer Science)
+- Understanding the Self (General Education, Humanities)
+- Mathematics in the Modern World (General Education, Mathematics)
+- College Algebra (Major, Mathematics)
+- Being Skills Course 1 (Minor, General Education)
+- Physical Fitness & Gymnastic (Minor, Physical Education)
+- National Service Training Program 1 (Minor, General Education)
+
+### First Year - Second Semester
+**Subjects:**
+- Computer Organization and Architecture (Major, Computer Science)
+- Operating Systems (Major, Computer Science)
+- Multimedia Technologies (Major, Computer Science)
+- Computer Programming 2 (Major, Computer Science)
+- Plane and Spherical Trigonometry (Major, Mathematics)
+- Analytic Geometry (Major, Mathematics)
+- Being Skills Course 2 (Minor, General Education)
+- English Proficiency (General Education, Communication)
+- Rhythmic Activities (Minor, Physical Education)
+- National Service Training Program 2 (Minor, General Education)
+
+### Second Year - Summer
+**Subjects:**
+- Networking 1 (Major, Computer Science)
+- Elective 1 (Major, Computer Science)
+- Data Structures & Algorithms (Major, Computer Science)
+- Individual & Dual Sports (Minor, Physical Education)
+
+### Second Year - First Semester
+**Subjects:**
+- Systems Analysis and Design (Major, Computer Science)
+- Object-Oriented Programming (Major, Computer Science)
+- Programming Languages (Major, Computer Science)
+- Networking 2 (Major, Computer Science)
+- Elective 2 (Major, Computer Science)
+- Differential Calculus (Major, Mathematics)
+- Probability and Statistics (Major, Mathematics)
+- Foreign Language (General Education, Communication)
+- Science, Technology & Society (General Education, Social Sciences)
+
+### Second Year - Second Semester
+**Subjects:**
+- Project Management (Major, Computer Science)
+- Computational Statistics (Specialization, Data Science)
+- Networking 3 (Major, Computer Science)
+- Software Engineering (Major, Computer Science)
+- Elective 3 (Major, Computer Science)
+- Artificial Intelligence and Machine Learning (Specialization, Data Science)
+- Information Management (Major, Computer Science)
+- Integral Calculus (Major, Mathematics)
+- The Contemporary World (General Education, Social Sciences)
+
+### Third Year - Summer
+**Subjects:**
+- Discrete Structures (Major, Computer Science)
+- CS Thesis Writing 1 (Major, Computer Science)
+- Calculus-based Physics 1 (Major, Natural Sciences)
+- Team Sports & Recreation (Minor, Physical Education)
+
+### Third Year - First Semester
+**Subjects:**
+- Automata Theory and Formal Languages (Major, Computer Science)
+- Elective 4 (Major, Computer Science)
+- Networking 4 (Major, Computer Science)
+- CS Thesis Writing 2 (Major, Computer Science)
+- Application Development & Emerging Technologies (Major, Computer Science)
+- Calculus-based Physics 2 (Major, Natural Sciences)
+- Readings in Philippine History (General Education, Social Sciences)
+- Art Appreciation (General Education, Humanities)
+- Purposive Communication (General Education, Communication)
+
+### Third Year - Second Semester
+**Subjects:**
+- Modeling and Simulation (Major, Computer Science)
+- The Life and Works of Rizal (General Education, Social Sciences)
+- Ethics (General Education, Humanities)
+- On-the-Job Training (Major, Computer Science)
+
+**Data Science Specialization Electives:**
+- Big Data (Elective 1)
+- Data Visualization (Elective 2)
+- Data Mining (Elective 3)
+- Data Analytics (Elective 4)
+
+---
+
+## File 3: BSCS General Program (SY 2023-2024)
+
+**Program/Strand:** Bachelor of Science in Computer Science - General Program
+
+### First Year - First Semester
+**Subjects:**
+- Introduction to Computing (Major, Computer Science)
+- Computer Programming 1 (Major, Computer Science)
+- Digital Design (Major, Computer Science)
+- Understanding the Self (General Education, Humanities)
+- Mathematics in the Modern World (General Education, Mathematics)
+- College Algebra (Major, Mathematics)
+- Being Skills Course 1 (Minor, General Education)
+- Physical Fitness & Gymnastic (Minor, Physical Education)
+- National Service Training Program 1 (Minor, General Education)
+
+### First Year - Second Semester
+**Subjects:**
+- Computer Organization and Architecture (Major, Computer Science)
+- Operating Systems (Major, Computer Science)
+- Multimedia Technologies (Major, Computer Science)
+- Computer Programming 2 (Major, Computer Science)
+- Plane and Spherical Trigonometry (Major, Mathematics)
+- Analytic Geometry (Major, Mathematics)
+- Being Skills Course 2 (Minor, General Education)
+- English Proficiency (General Education, Communication)
+- Rhythmic Activities (Minor, Physical Education)
+- National Service Training Program 2 (Minor, General Education)
+
+### Second Year - Summer
+**Subjects:**
+- Networking 1 (Major, Computer Science)
+- Elective 1 (Major, Computer Science)
+- Data Structures & Algorithms (Major, Computer Science)
+
+### Second Year - First Semester
+**Subjects:**
+- Systems Analysis and Design (Major, Computer Science)
+- Object-Oriented Programming (Major, Computer Science)
+- Programming Languages (Major, Computer Science)
+- Networking 2 (Major, Computer Science)
+- Elective 2 (Major, Computer Science)
+- Differential Calculus (Major, Mathematics)
+- Probability and Statistics (Major, Mathematics)
+- Foreign Language (General Education, Communication)
+- Individual & Dual Sports (Minor, Physical Education)
+
+### Second Year - Second Semester
+**Subjects:**
+- Project Management (Major, Computer Science)
+- Networking 3 (Major, Computer Science)
+- Software Engineering (Major, Computer Science)
+- Elective 3 (Major, Computer Science)
+- Information Management (Major, Computer Science)
+- Integral Calculus (Major, Mathematics)
+- The Contemporary World (General Education, Social Sciences)
+- Science, Technology & Society (General Education, Social Sciences)
+- Team Sports & Recreation (Minor, Physical Education)
+
+### Third Year - Summer
+**Subjects:**
+- Discrete Structures (Major, Computer Science)
+- CS Thesis Writing 1 (Major, Computer Science)
+- Calculus-based Physics 1 (Major, Natural Sciences)
+
+### Third Year - First Semester
+**Subjects:**
+- Automata Theory and Formal Languages (Major, Computer Science)
+- Elective 4 (Major, Computer Science)
+- Networking 4 (Major, Computer Science)
+- CS Thesis Writing 2 (Major, Computer Science)
+- Application Development & Emerging Technologies (Major, Computer Science)
+- Calculus-based Physics 2 (Major, Natural Sciences)
+- Readings in Philippine History (General Education, Social Sciences)
+- Art Appreciation (General Education, Humanities)
+- Purposive Communication (General Education, Communication)
+
+### Third Year - Second Semester
+**Subjects:**
+- Modeling and Simulation (Major, Computer Science)
+- The Life and Works of Rizal (General Education, Social Sciences)
+- Ethics (General Education, Humanities)
+- On-the-Job Training (Major, Computer Science)
+
+**Specialization Track Options:**
+
+**Game Development:**
+- Human Computer Interaction (Elective 1)
+- Game Development (Elective 2)
+- Gaming Platform Frameworks (Elective 3)
+- Advanced Game Development (Elective 4)
+
+**Mobile Application Development:**
+- Human Computer Interaction (Elective 1)
+- Mobile Application Development (Elective 2)
+- Android Application Development (Elective 3)
+- Advanced Mobile Application Development (Elective 4)
+
+**No Specialization Track:**
+- Current Trends & Issues in Computing (Elective 1)
+- IT Quality Assurance (Elective 2)
+- Mandarin (Elective 3)
+- Intelligent Systems (Elective 4)
+
+---
+
+## File 4: BS Cybersecurity (SY 2024-2025)
+
+**Program/Strand:** Bachelor of Science in Cybersecurity
+
+### First Year - First Semester
+**Subjects:**
+- Introduction to Computers and Networking (Major, Cybersecurity)
+- Introduction to Cybersecurity (Major, Cybersecurity)
+- Programming Fundamentals (Major, Computer Science)
+- Cybersecurity Elective 1 (Elective, Cybersecurity)
+- Understanding the Self (General Education, Humanities)
+- Mathematics in the Modern World (General Education, Mathematics)
+- Purposive Communication (General Education, Communication)
+- Being Skills Course 1 (Minor, General Education)
+- Physical Activities Towards Health and Fitness 1 (Minor, Physical Education)
+- National Service Training Program 1 (Minor, General Education)
+
+### First Year - Second Semester
+**Subjects:**
+- Computer Organization (Major, Computer Science)
+- Network Security (Major, Cybersecurity)
+- Cybersecurity and Digital Forensics (Major, Cybersecurity)
+- Cybersecurity Elective 2 (Elective, Cybersecurity)
+- Art Appreciation (General Education, Humanities)
+- Science, Technology and Society (General Education, Social Sciences)
+- College Algebra (Major, Mathematics)
+- Being Skills Course 2 (Minor, General Education)
+- Physical Activities Towards Health and Fitness 2 (Minor, Physical Education)
+- National Service Training Program 2 (Minor, General Education)
+
+### Second Year - Summer
+**Subjects:**
+- Ethics (General Education, Humanities)
+- Discrete Structures (Major, Mathematics)
+- Trigonometry (Major, Mathematics)
+
+### Second Year - First Semester
+**Subjects:**
+- CCNA 1 - Networking 1 (Major, Cybersecurity)
+- Operating Systems (Major, Computer Science)
+- Machine Learning and AI for Cybersecurity (Major, Cybersecurity)
+- Security-Oriented Systems Analysis and Design (Major, Cybersecurity)
+- IT Governance and Security Planning (Major, Cybersecurity)
+- Cryptography and Cryptanalysis (Major, Cybersecurity)
+- Ethical Hacking and Defense Strategy (Major, Cybersecurity)
+- Accounting Principles (Major, Business)
+- Analytic Geometry (Major, Mathematics)
+- Physical Activities Towards Health and Fitness 3 (Minor, Physical Education)
+
+### Second Year - Second Semester
+**Subjects:**
+- CCNA 2 - Networking 2 (Major, Cybersecurity)
+- Server Administration and Security (Major, Cybersecurity)
+- Capstone Project 1 (Major, Cybersecurity)
+- Information Security (Major, Cybersecurity)
+- The Contemporary World (General Education, Social Sciences)
+- English Proficiency (General Education, Communication)
+- Probability and Statistics (Major, Mathematics)
+- Differential Calculus (Major, Mathematics)
+- Physical Activities Towards Health and Fitness 4 (Minor, Physical Education)
+
+### Third Year - Summer
+**Subjects:**
+- CCNA 3 - Networking 3 (Major, Cybersecurity)
+- Cybersecurity Elective 3 (Elective, Cybersecurity)
+- Integral Calculus (Major, Mathematics)
+
+### Third Year - First Semester
+**Subjects:**
+- Legal Aspects and Issues of Cybersecurity (Major, Cybersecurity)
+- Cyber Incident Analysis and Response (Major, Cybersecurity)
+- Capstone Project 2 (Major, Cybersecurity)
+- Seminars and Field Trip (Major, Cybersecurity)
+- Cybersecurity Elective 4 (Elective, Cybersecurity)
+- Foreign Language (General Education, Communication)
+- The Life and Works of Rizal (General Education, Social Sciences)
+- Readings in Philippine History (General Education, Social Sciences)
+- Calculus-based Physics (Major, Natural Sciences)
+
+### Third Year - Second Semester
+**Subjects:**
+- OJT/Practicum for Cybersecurity (Major, Cybersecurity)
+
+**Cybersecurity Elective Options:**
+- Cloud and Mobile Computing Security
+- Web Application Security
+- Blockchain Technology
+- Malware Analysis Fundamentals
+- Internet of Things (IoT) Security
+- Intrusion Prevention and Penetration Testing
+
+---
+
+## File 5: Bachelor of Multimedia Arts (2021-2022)
+
+**Program/Strand:** Bachelor of Multimedia Arts (BMA)
+
+### First Year - First Semester
+**Subjects:**
+- Understanding the Self (General Education, Humanities)
+- Purposive Communication (General Education, Communication)
+- Introduction to Multimedia Arts (Major, Multimedia Arts)
+- Drawing 1 (Major, Multimedia Arts)
+- Color Theory (Major, Multimedia Arts)
+- Life and Works of Jose P. Laurel (General Education, Social Sciences)
+- Being Skills Course 1 (Minor, General Education)
+- National Service Training Program 1 (Minor, General Education)
+- Physical Fitness and Gymnastic (Minor, Physical Education)
+
+### First Year - Second Semester
+**Subjects:**
+- Readings in Philippine History (General Education, Social Sciences)
+- Mathematics in the Modern World (General Education, Mathematics)
+- Drawing 2 (Major, Multimedia Arts)
+- History of Graphic Design (Major, Multimedia Arts)
+- Elements and Principles of Design (Major, Multimedia Arts)
+- Being Skills Course 2 (Minor, General Education)
+- National Service Training Program 2 (Minor, General Education)
+- Rhythmic Activities (Minor, Physical Education)
+
+### Second Year - First Semester
+**Subjects:**
+- The Contemporary World (General Education, Social Sciences)
+- Art Appreciation (General Education, Humanities)
+- Writing for New Media (Major, Multimedia Arts)
+- Typography & Layout (Major, Multimedia Arts)
+- 2D Animation 1 (Major, Multimedia Arts)
+- Digital Photography (Major, Multimedia Arts)
+- English Proficiency Course (General Education, Communication)
+- Individual and Dual Sports (Minor, Physical Education)
+
+### Second Year - Second Semester
+**Subjects:**
+- Ethics (General Education, Humanities)
+- Science, Technology and Society (General Education, Social Sciences)
+- Great Books (General Education, Humanities)
+- Advanced Digital Photography (Major, Multimedia Arts)
+- 2D Animation 2 (Major, Multimedia Arts)
+- Multimedia Publishing (Major, Multimedia Arts)
+- Interactive Media Design (Major, Multimedia Arts)
+- Team Sports and Recreation (Minor, Physical Education)
+
+### Third Year - First Semester
+**Subjects:**
+- Facilitating Learner Centered Teaching (General Education, Education)
+- Life and Works of Rizal (General Education, Social Sciences)
+- Basic Statistics (Major, Mathematics)
+- Fundamentals in Film and Video Production (Major, Multimedia Arts)
+- Game Design: Art Production (Major, Multimedia Arts)
+- 3D Modeling (Major, Multimedia Arts)
+- Web Design 1 (Major, Multimedia Arts)
+- Research Methods (Major, Multimedia Arts)
+
+### Third Year - Second Semester
+**Subjects:**
+- Advertising Principles and Practices (Major, Multimedia Arts)
+- Post-Production Techniques (Major, Multimedia Arts)
+- 3D Animation (Major, Multimedia Arts)
+- Advanced Web Design (Major, Multimedia Arts)
+- Digital Sound Production (Major, Multimedia Arts)
+- Design Professions, Law, Regulation and Ethics (Major, Multimedia Arts)
+- Capstone Project 1 (Major, Multimedia Arts)
+
+### Fourth Year - First Semester
+**Subjects:**
+- Business Ventures in Multimedia (Major, Multimedia Arts)
+- Multimedia Seminars (Major, Multimedia Arts)
+- Brand Communications (Major, Multimedia Arts)
+- Portfolio Preparation and Exhibit Design (Major, Multimedia Arts)
+- Capstone Project 2 (Major, Multimedia Arts)
+- New Media Culture (Major, Multimedia Arts)
+- Foreign Language (General Education, Communication)
+
+### Fourth Year - Second Semester
+**Subjects:**
+- Practicum (Major, Multimedia Arts)
+
+---
+
+## File 6: BS Psychology (2021-2022)
+
+**Program/Strand:** Bachelor of Science in Psychology (BS-PSY)
+
+### First Year - First Semester
+**Subjects:**
+- Understanding the Self (General Education, Humanities)
+- Purposive Communication (General Education, Communication)
+- Life and Works of Jose P. Laurel (General Education, Social Sciences)
+- Introduction to Psychology (Major, Psychology)
+- The Child and Adolescent Learners and Learning Principles (Major, Education)
+- Physical Fitness and Gymnastic (Minor, Physical Education)
+- National Service Training Program 1 (Minor, General Education)
+- Being Skills Course 1 (Minor, General Education)
+
+### First Year - Second Semester
+**Subjects:**
+- Mathematics in the Modern World (General Education, Mathematics)
+- Readings in Philippine History (General Education, Social Sciences)
+- Psychological Statistics (Major, Psychology)
+- Developmental Psychology (Major, Psychology)
+- Rhythmic Activities (Minor, Physical Education)
+- National Service Training Program 2 (Minor, General Education)
+- Being Skills Course 2 (Minor, General Education)
+
+### Second Year - First Semester
+**Subjects:**
+- The Contemporary World (General Education, Social Sciences)
+- Art Appreciation (General Education, Humanities)
+- Sikolohiyang Pilipino (Major, Psychology)
+- Theories of Personality (Major, Psychology)
+- Social Psychology (Major, Psychology)
+- Anatomy and Physiology (Major, Natural Sciences)
+- English Proficiency Course (General Education, Communication)
+- Individual and Dual Sports (Minor, Physical Education)
+
+### Second Year - Second Semester
+**Subjects:**
+- Ethics (General Education, Humanities)
+- Science Technology & Society (General Education, Social Sciences)
+- Physiological Psychology (Major, Psychology)
+- Cognitive Psychology (Major, Psychology)
+- Experimental Psychology (Major, Psychology)
+- Zoology (Major, Natural Sciences)
+- Team Sports and Recreation (Minor, Physical Education)
+
+### Third Year - First Semester
+**Subjects:**
+- Field Methods in Psychology (Major, Psychology)
+- Abnormal Psychology (Major, Psychology)
+- Inorganic and Organic Chemistry (Major, Natural Sciences)
+- Facilitating Learner Centered Teaching (Major, Education)
+- Life, Works and Writings of Rizal (General Education, Social Sciences)
+
+### Third Year - Second Semester
+**Subjects:**
+- Values Education (General Education, Humanities)
+- General Physics (Major, Natural Sciences)
+- Psychological Assessment (Major, Psychology)
+- Industrial/Organizational Psychology (Major, Psychology)
+- Research in Psychology 1 (Major, Psychology)
+
+### Fourth Year - First Semester
+**Subjects:**
+- Positive Psychology (Elective, Psychology)
+- Special Education (Major, Education)
+- Educational Psychology (Elective, Psychology)
+- Research in Psychology 2 (Major, Psychology)
+- Introduction to Counseling (Elective, Psychology)
+- Foreign Language (General Education, Communication)
+
+### Fourth Year - Second Semester
+**Subjects:**
+- Special Topic in Psychology 1 (Major, Psychology)
+- Special Topic in Psychology 2 (Major, Psychology)
+- Practicum in Psychology (Major, Psychology)
+
+---
+
+## File 7: AB Psychology (2021-2022)
+
+**Program/Strand:** Bachelor of Arts in Psychology (AB-PSY)
+
+### First Year - First Semester
+**Subjects:**
+- Understanding the Self (General Education, Humanities)
+- Purposive Communication (General Education, Communication)
+- Life and Works of Jose P. Laurel (General Education, Social Sciences)
+- Introduction to Psychology (Major, Psychology)
+- The Child and Adolescent Learners and Learning Principles (Major, Education)
+- Being Skills Course 1 (Minor, General Education)
+- Physical Fitness and Gymnastic (Minor, Physical Education)
+- National Service Training Program 1 (Minor, General Education)
+
+### First Year - Second Semester
+**Subjects:**
+- Mathematics in the Modern World (General Education, Mathematics)
+- Readings in Philippine History (General Education, Social Sciences)
+- Psychological Statistics (Major, Psychology)
+- Developmental Psychology (Major, Psychology)
+- Being Skills Course 2 (Minor, General Education)
+- Rhythmic Activities (Minor, Physical Education)
+- National Service Training Program 2 (Minor, General Education)
+
+### Second Year - First Semester
+**Subjects:**
+- The Contemporary World (General Education, Social Sciences)
+- Art Appreciation (General Education, Humanities)
+- English Proficiency Course (General Education, Communication)
+- Sikolohiyang Pilipino (Major, Psychology)
+- Theories of Personality (Major, Psychology)
+- Social Psychology (Major, Psychology)
+- Individual and Dual Sports (Minor, Physical Education)
+
+### Second Year - Second Semester
+**Subjects:**
+- Ethics (General Education, Humanities)
+- Science Technology & Society (General Education, Social Sciences)
+- Physiological Psychology (Major, Psychology)
+- Cognitive Psychology (Major, Psychology)
+- Experimental Psychology (Major, Psychology)
+- Team Sports and Recreation (Minor, Physical Education)
+
+### Third Year - First Semester
+**Subjects:**
+- Field Methods in Psychology (Major, Psychology)
+- Abnormal Psychology (Major, Psychology)
+- Facilitating Learner Centered Teaching (Major, Education)
+- Life, Works and Writings of Rizal (General Education, Social Sciences)
+
+### Third Year - Second Semester
+**Subjects:**
+- Values Education (General Education, Humanities)
+- Psychological Assessment (Major, Psychology)
+- Industrial/Organizational Psychology (Major, Psychology)
+- Research in Psychology 1 (Major, Psychology)
+
+### Fourth Year - First Semester
+**Subjects:**
+- Positive Psychology (Elective, Psychology)
+- Special Education (Major, Education)
+- Educational Psychology (Elective, Psychology)
+- Research in Psychology 2 (Major, Psychology)
+- Introduction to Counseling (Elective, Psychology)
+- Foreign Language (General Education, Communication)
+
+### Fourth Year - Second Semester
+**Subjects:**
+- Special Topic in Psychology 1 (Major, Psychology)
+- Special Topic in Psychology 2 (Major, Psychology)
+- Practicum in Psychology (Major, Psychology)
+
+---
+
+## File 8: AB Communication (2024-2025)
+
+**Program/Strand:** Bachelor of Arts in Communication (AB-COMM)
+
+*Note: This file appears to be empty or corrupted in the provided documents.*
