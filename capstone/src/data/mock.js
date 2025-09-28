@@ -240,9 +240,58 @@ export const mockHeads = [
     email: 'melodydimaano@lpubatangas.edu.ph',
     name: 'Melody Dimaano',
     role: 'head',
-    password: 'changeme' // You can change this to a secure password
+    department: 'Information Technology',
+    assignedPrograms: ['BSIT'], // Only see BSIT courses
+    password: 'changeme'
+  },
+  {
+    email: 'dr.rivera@lpubatangas.edu.ph',
+    name: 'Dr. Ricardo Rivera',
+    role: 'head',
+    department: 'Computer Science',
+    assignedPrograms: ['BSCS', 'BSCS-DS'], // Only see BSCS and BSCS-DS courses
+    password: 'changeme'
+  },
+  {
+    email: 'prof.santos@lpubatangas.edu.ph',
+    name: 'Prof. Ana Santos',
+    role: 'head',
+    department: 'Cybersecurity',
+    assignedPrograms: ['BS-CY'], // Only see BS-CY courses
+    password: 'changeme'
+  },
+  {
+    email: 'dr.mendoza@lpubatangas.edu.ph',
+    name: 'Dr. Luis Mendoza',
+    role: 'head',
+    department: 'Multimedia Arts',
+    assignedPrograms: ['BMA'], // Only see BMA courses
+    password: 'changeme'
   }
 ];
+
+// Admins (Secretaries) have global access to ALL programs
+export const mockAdmins = [
+  {
+    email: 'admin@lpubatangas.edu.ph',
+    name: 'Ms. Patricia Cruz',
+    role: 'admin',
+    department: 'Academic Affairs',
+    assignedPrograms: ['BSIT', 'BSCS', 'BSCS-DS', 'BS-CY', 'BMA'], // Global access to ALL programs
+    password: 'admin123'
+  },
+  {
+    email: 'registrar.admin@lpubatangas.edu.ph',
+    name: 'Mrs. Carmen Rodriguez',
+    role: 'admin',
+    department: 'Registrar Office',
+    assignedPrograms: ['BSIT', 'BSCS', 'BSCS-DS', 'BS-CY', 'BMA'], // Global access to ALL programs
+    password: 'admin123'
+  }
+];
+
+// Legacy export for backward compatibility
+export const mockSecretaries = mockAdmins;
 
 export const mockEvaluations = [
   {

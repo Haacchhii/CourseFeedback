@@ -1,0 +1,89 @@
+Page Specifications for Course Insight Guardian Application
+1. Landing Page (/ - Index.tsx)
+Purpose: Login and introduction page Components:
+
+Hero section with application title "Course Insight Guardian"
+Description of SVM Sentiment Analysis and DBSCAN Anomaly Detection features
+Login form component on the right side
+University branding (LPUB - College of Computing, Arts, and Sciences) Layout: Split layout - information on left, login form on right No authentication required
+2. Dashboard Page (/dashboard - Dashboard.tsx)
+Purpose: Main overview for admins and department heads Access: Admin and Department Head roles only (students redirected to evaluation page) Components:
+
+Overview statistics cards (total courses, evaluations, sentiment scores)
+Sentiment analysis pie chart (filtered by user role)
+Anomaly detection summary widget
+Recent feedback table
+"Manage Evaluation Questions" button (department heads only) Layout: Sidebar + navbar + main content area with grid layout
+3. Sentiment Analysis Page (/sentiment - SentimentAnalysis.tsx)
+Purpose: Detailed sentiment analysis dashboard Access: Admin and Department Head roles only Components:
+
+Semester filter dropdown (format: "1st 2024", "2nd 2024")
+Sentiment overview with progress bars (positive, neutral, negative percentages)
+Admin view: Sentiment by department bar chart + evaluation criteria
+Department Head view: Sentiment by course bar chart + evaluation criteria
+Evaluation criteria component showing Content, Delivery, Assessment, Support ratings Features: Interactive charts with hover effects and tooltips
+4. Anomaly Detection Page (/anomalies - AnomalyDetection.tsx)
+Purpose: DBSCAN-based anomaly detection results Access: Admin and Department Head roles only Components:
+
+Anomaly overview statistics (total anomalies, severity levels)
+Anomaly list with detailed information
+Filter and search capabilities Data shown: Filtered based on user role (admin sees all, dept head sees department-specific)
+5. Courses Management Page (/courses - Courses.tsx)
+Purpose: Course management and overview Access: Admin and Department Head roles only Components:
+
+Courses overview statistics
+Course management tools (add/edit courses)
+Courses list with search and filter
+Course detail modal with:
+Overview tab (basic course info, enrollment stats)
+Sentiment Analysis tab (criteria breakdown with charts)
+Comments tab (student feedback with fallback message) Data: Based on Computer Science curriculum from LPUB (CS, Math, Comp subjects)
+6. Evaluations Page (/evaluations - Evaluations.tsx)
+Purpose: View and analyze course evaluations Access: Admin and Department Head roles only Components:
+
+Evaluations overview with statistics
+Evaluations list (no instructor field - removed as irrelevant)
+Filtering and search capabilities Data shown: Role-based filtering (admin sees all, dept head sees department data)
+7. Evaluation Questions Page (/evaluation-questions - EvaluationQuestions.tsx)
+Purpose: Manage evaluation question sets Access: Admin and Department Head roles only Components:
+
+Admin features:
+Export/Import questions buttons
+Question settings
+Global question templates
+Approval queue for dept head submissions
+Department Head features:
+Create question set button and modal
+Department-specific templates
+Status management (active/archived) - clickable status badges
+Evaluation questions overview and list Key difference: Admin has global control, dept heads have department-specific creation rights
+8. Student Evaluation Page (/student-evaluation - StudentEvaluation.tsx)
+Purpose: Course evaluation interface for students Access: Students only (other roles redirected to dashboard) Components:
+
+Course selection table with search and semester filter
+Evaluation form with 5-point Likert scale ratings for:
+Content Quality
+Delivery Method
+Assessment Fairness
+Support Provided
+Overall Rating
+Comments textarea for additional feedback
+Course status indicators (active/pending/inactive) Features: Only active courses can be evaluated
+9. Not Found Page (/404 - NotFound.tsx)
+Purpose: Handle invalid routes Components: Simple 404 error message with navigation back to main application
+
+Role Differences Summary
+Admin Role:
+Global access: Can see data from all departments
+Question management: Can import/export questions, manage global templates, approve dept head submissions
+Advanced controls: Access to system-wide settings and configurations
+Department view: Sees sentiment analysis by department
+Department Head Role:
+Department-scoped access: Only sees data from their specific department
+Question creation: Can create and manage question sets for their department
+Course-focused view: Sees sentiment analysis by individual courses
+Status management: Can change evaluation question statuses (active/archived)
+Student Role:
+Evaluation only: Access limited to course evaluation interface
+Course-specific: Can only evaluate courses they're enrolled in
+Single interface: No access to analytics or management features
