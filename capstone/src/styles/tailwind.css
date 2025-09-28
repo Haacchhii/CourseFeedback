@@ -1,3 +1,6 @@
+/* Import LPU Theme */
+@import './lpu-theme.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

@@ -1,0 +1,446 @@
+/* LPU Course Insight Guardian - Enhanced Theme System */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===== LPU BRAND IDENTITY ===== */
+:root {
+  /* Primary LPU Colors */
+  --lpu-crimson: #7a0000;
+  --lpu-crimson-light: #a31111;
+  --lpu-crimson-dark: #5a0000;
+  --lpu-crimson-gradient: linear-gradient(135deg, #7a0000 0%, #a31111 100%);
+  
+  /* Academic Excellence Colors */
+  --lpu-gold: #ffd700;
+  --lpu-gold-light: #ffef7a;
+  --lpu-gold-dark: #b8860b;
+  
+  /* Neutral Academic Palette */
+  --lpu-slate: #1e293b;
+  --lpu-slate-light: #334155;
+  --lpu-gray: #64748b;
+  --lpu-gray-light: #94a3b8;
+  --lpu-paper: #fefefe;
+  --lpu-soft-bg: #f8fafc;
+  
+  /* Sentiment Colors (Refined) */
+  --sentiment-positive: #059669;
+  --sentiment-positive-bg: #ecfdf5;
+  --sentiment-neutral: #0891b2;
+  --sentiment-neutral-bg: #ecfeff;
+  --sentiment-negative: #dc2626;
+  --sentiment-negative-bg: #fef2f2;
+  
+  /* Interactive States */
+  --interactive-primary: var(--lpu-crimson);
+  --interactive-secondary: var(--lpu-gold);
+  --interactive-hover: var(--lpu-crimson-light);
+  --interactive-focus: var(--lpu-gold);
+  
+  /* Shadows & Depth */
+  --shadow-soft: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-medium: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-strong: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-crimson: 0 4px 14px 0 rgb(122 0 0 / 0.25);
+  
+  /* Typography Scale */
+  --font-display: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* ===== BASE STYLES ===== */
+html, body, #root { 
+  height: 100%; 
+  font-family: var(--font-body);
+}
+
+body { 
+  @apply bg-[#f8fafc] text-[#1e293b] antialiased;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+/* ===== COMPONENT STYLES ===== */
+
+/* LPU Header Component */
+.lpu-header {
+  background: var(--lpu-crimson-gradient);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-crimson);
+  border-bottom: 2px solid var(--lpu-gold);
+}
+
+.lpu-header-title {
+  @apply text-white font-bold;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  letter-spacing: -0.025em;
+}
+
+.lpu-header-subtitle {
+  @apply text-[#ffd700] font-medium;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Academic Card System */
+.lpu-card {
+  @apply bg-white rounded-xl border border-gray-200;
+  box-shadow: var(--shadow-medium);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-left: 4px solid transparent;
+}
+
+.lpu-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-strong);
+  border-left-color: var(--lpu-crimson);
+}
+
+.lpu-card-crimson {
+  border-left-color: var(--lpu-crimson);
+  background: linear-gradient(135deg, white 0%, #fefefe 100%);
+}
+
+.lpu-card-gold {
+  border-left-color: var(--lpu-gold);
+  background: linear-gradient(135deg, white 0%, #fffef7 100%);
+}
+
+/* Statistics Cards */
+.stats-card {
+  @apply lpu-card p-6;
+  position: relative;
+  overflow: hidden;
+}
+
+.stats-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 100px;
+  height: 100px;
+  background: var(--lpu-crimson-gradient);
+  opacity: 0.05;
+  border-radius: 50%;
+  transform: translate(30px, -30px);
+}
+
+.stats-number {
+  @apply text-3xl font-bold;
+  background: var(--lpu-crimson-gradient);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.stats-label {
+  @apply text-sm font-medium text-[#64748b] uppercase tracking-wide;
+  letter-spacing: 0.05em;
+}
+
+/* LPU Button System */
+.lpu-btn-primary {
+  @apply px-6 py-3 rounded-lg font-semibold text-white;
+  background: var(--lpu-crimson-gradient);
+  box-shadow: var(--shadow-medium);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.lpu-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-crimson);
+}
+
+.lpu-btn-primary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 215, 0, 0.3), transparent);
+  transition: left 0.5s;
+}
+
+.lpu-btn-primary:hover::before {
+  left: 100%;
+}
+
+.lpu-btn-secondary {
+  @apply px-6 py-3 rounded-lg font-semibold;
+  background: white;
+  color: var(--lpu-crimson);
+  border: 2px solid var(--lpu-crimson);
+  transition: all 0.3s ease;
+}
+
+.lpu-btn-secondary:hover {
+  background: var(--lpu-crimson);
+  color: white;
+  transform: translateY(-1px);
+}
+
+/* Sentiment Indicators */
+.sentiment-positive {
+  @apply bg-[#ecfdf5] text-[#059669] border border-[#a7f3d0];
+}
+
+.sentiment-neutral {
+  @apply bg-[#ecfeff] text-[#0891b2] border border-[#a5f3fc];
+}
+
+.sentiment-negative {
+  @apply bg-[#fef2f2] text-[#dc2626] border border-[#fecaca];
+}
+
+/* Academic Navigation */
+.lpu-nav {
+  @apply bg-white border-b border-gray-200;
+  box-shadow: var(--shadow-soft);
+}
+
+.lpu-nav-item {
+  @apply px-4 py-2 rounded-lg font-medium transition-all duration-200;
+  position: relative;
+}
+
+.lpu-nav-item:hover {
+  @apply bg-[#f8fafc] text-[#7a0000];
+}
+
+.lpu-nav-item.active {
+  @apply bg-[#7a0000] text-white;
+  box-shadow: var(--shadow-crimson);
+}
+
+.lpu-nav-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid var(--lpu-crimson);
+}
+
+/* Form Elements */
+.lpu-input {
+  @apply w-full px-4 py-3 rounded-lg border border-gray-300 bg-white;
+  transition: all 0.3s ease;
+  font-family: var(--font-body);
+}
+
+.lpu-input:focus {
+  @apply outline-none border-[#7a0000] ring-2 ring-[#7a0000] ring-opacity-20;
+  box-shadow: 0 0 0 3px rgba(122, 0, 0, 0.1);
+}
+
+.lpu-select {
+  @apply lpu-input appearance-none bg-white;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 12px center;
+  background-repeat: no-repeat;
+  background-size: 16px;
+  padding-right: 48px;
+}
+
+/* Chart Container */
+.lpu-chart-container {
+  @apply lpu-card p-6;
+  background: linear-gradient(135deg, white 0%, #fefefe 100%);
+}
+
+.chart-title {
+  @apply text-xl font-bold text-[#1e293b] mb-2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.chart-title::before {
+  content: '';
+  width: 4px;
+  height: 24px;
+  background: var(--lpu-crimson-gradient);
+  border-radius: 2px;
+}
+
+/* Academic Badge System */
+.lpu-badge {
+  @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-medium;
+  border-width: 1px;
+}
+
+.badge-excellent {
+  @apply bg-green-50 text-green-700 border-green-200;
+}
+
+.badge-good {
+  @apply bg-blue-50 text-blue-700 border-blue-200;
+}
+
+.badge-needs-attention {
+  @apply bg-yellow-50 text-yellow-700 border-yellow-200;
+}
+
+.badge-critical {
+  @apply bg-red-50 text-red-700 border-red-200;
+}
+
+/* Modal System */
+.lpu-modal {
+  @apply fixed inset-0 z-50 flex items-center justify-center;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+}
+
+.lpu-modal-content {
+  @apply bg-white rounded-xl max-w-4xl w-full mx-4;
+  box-shadow: var(--shadow-strong);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.lpu-modal-header {
+  @apply px-6 py-4 border-b border-gray-200;
+  background: var(--lpu-crimson-gradient);
+  color: white;
+  border-radius: 12px 12px 0 0;
+}
+
+/* Participation Progress */
+.participation-progress {
+  @apply w-full bg-gray-200 rounded-full h-3;
+  overflow: hidden;
+  position: relative;
+}
+
+.participation-fill {
+  @apply h-full transition-all duration-1000 ease-out;
+  background: linear-gradient(90deg, var(--lpu-crimson) 0%, var(--lpu-gold) 100%);
+  border-radius: 9999px;
+  position: relative;
+}
+
+.participation-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Academic Year Tabs */
+.year-tabs {
+  @apply flex space-x-1 bg-[#f1f5f9] p-1 rounded-lg;
+}
+
+.year-tab {
+  @apply px-4 py-2 rounded-md font-medium transition-all duration-200;
+  background: transparent;
+  color: var(--lpu-gray);
+}
+
+.year-tab.active {
+  @apply bg-white text-[#7a0000] shadow-sm;
+  font-weight: 600;
+}
+
+/* Loading States */
+.lpu-loading {
+  @apply inline-block w-4 h-4 border-2 border-[#7a0000] border-t-transparent rounded-full;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .stats-card {
+    @apply p-4;
+  }
+  
+  .stats-number {
+    @apply text-2xl;
+  }
+  
+  .lpu-card {
+    @apply mx-2;
+  }
+  
+  .chart-title {
+    @apply text-lg;
+  }
+}
+
+/* Academic Excellence Indicators */
+.excellence-indicator {
+  position: relative;
+  display: inline-block;
+}
+
+.excellence-indicator::after {
+  content: '🎓';
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  font-size: 16px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.excellence-indicator.high-performance::after {
+  opacity: 1;
+}
+
+/* LPU Signature Elements */
+.lpu-signature {
+  background: var(--lpu-crimson-gradient);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.lpu-divider {
+  height: 2px;
+  background: linear-gradient(90deg, var(--lpu-crimson) 0%, var(--lpu-gold) 50%, var(--lpu-crimson) 100%);
+  border-radius: 1px;
+  margin: 24px 0;
+}
+
+/* Academic Status Indicators */
+.status-excellent { background: linear-gradient(135deg, #059669, #10b981); }
+.status-good { background: linear-gradient(135deg, #0891b2, #06b6d4); }
+.status-fair { background: linear-gradient(135deg, #f59e0b, #fbbf24); }
+.status-poor { background: linear-gradient(135deg, #dc2626, #ef4444); }
+
+/* Print Styles */
+@media print {
+  .lpu-card {
+    box-shadow: none;
+    border: 1px solid #e5e7eb;
+  }
+  
+  .lpu-btn-primary,
+  .lpu-btn-secondary {
+    display: none;
+  }
+}

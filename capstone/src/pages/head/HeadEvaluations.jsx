@@ -1,11 +1,10 @@
 import React, { useState, useMemo } from 'react'
 import { mockEvaluations, mockCourses } from '../../data/mock'
-import { getCurrentUser, filterEvaluationsByAccess, isSecretary } from '../../utils/roleUtils'
+import { getCurrentUser, filterEvaluationsByAccess } from '../../utils/roleUtils'
 
 export default function HeadEvaluations(){
   const currentUser = getCurrentUser()
   const [q, setQ] = useState('')
-  const [programFilter, setProgramFilter] = useState('')
   const [sentimentFilter, setSentimentFilter] = useState('')
   
   // Filter evaluations based on user's access level
@@ -13,33 +12,23 @@ export default function HeadEvaluations(){
     return filterEvaluationsByAccess(mockEvaluations, mockCourses, currentUser)
   }, [currentUser])
 
-  // Get available programs for filtering (for secretaries)
-  const availablePrograms = currentUser?.assignedPrograms || []
-
   const filteredEvaluations = useMemo(() => {
     return accessibleEvaluations.filter(d => {
       // Text search filter
       const matchesSearch = d.comment.toLowerCase().includes(q.toLowerCase())
       
-      // Program filter (for secretaries)
-      let matchesProgram = true
-      if (isSecretary(currentUser) && programFilter && programFilter !== 'All') {
-        const course = mockCourses.find(c => c.id === d.courseId)
-        matchesProgram = course && course.program === programFilter
-      }
-      
       // Sentiment filter
       const matchesSentiment = !sentimentFilter || sentimentFilter === 'All' || d.sentiment === sentimentFilter
       
-      return matchesSearch && matchesProgram && matchesSentiment
+      return matchesSearch && matchesSentiment
     })
-  }, [accessibleEvaluations, q, programFilter, sentimentFilter, currentUser])
+  }, [accessibleEvaluations, q, sentimentFilter])
 
   return (
     <div>
       <h1 className="text-2xl font-semibold mb-4">
         All Evaluations
-        {!isSecretary(currentUser) && currentUser?.assignedPrograms && 
+        {currentUser?.assignedPrograms && 
           ` - ${currentUser.assignedPrograms.join(', ')}`
         }
       </h1>
@@ -58,22 +47,17 @@ export default function HeadEvaluations(){
             />
           </div>
 
-          {/* Program Filter (for secretaries) */}
-          {isSecretary(currentUser) && (
-            <div>
-              <label className="block text-sm font-medium mb-1">Filter by Program</label>
-              <select 
-                className="border p-2 rounded w-full"
-                value={programFilter}
-                onChange={e => setProgramFilter(e.target.value)}
-              >
-                <option value="">All Programs</option>
-                {availablePrograms.map(program => (
-                  <option key={program} value={program}>{program}</option>
-                ))}
-              </select>
-            </div>
-          )}
+          {/* Program Filter (Read-only for Department Heads) */}
+          <div>
+            <label className="block text-sm font-medium mb-1">Program</label>
+            <input 
+              type="text"
+              value={currentUser?.assignedPrograms?.join(', ') || 'No programs assigned'}
+              readOnly
+              className="border p-2 rounded w-full bg-gray-100 text-gray-600 cursor-not-allowed"
+              title="Department heads can only view evaluations for their assigned programs"
+            />
+          </div>
 
           {/* Sentiment Filter */}
           <div>

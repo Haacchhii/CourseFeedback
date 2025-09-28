@@ -1,12 +1,11 @@
-import React, { useMemo } from 'react'
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, LineChart, Line } from 'recharts'
+import React, { useMemo, useState } from 'react'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { mockEvaluations, mockCourses } from '../../data/mock'
 import { getCurrentUser, filterCoursesByAccess, filterEvaluationsByAccess, isSecretary } from '../../utils/roleUtils'
 
-const COLORS = ['#4ade80','#fbbf24','#fb7185']
-
 export default function HeadSentiment(){
   const currentUser = getCurrentUser()
+  const [selectedYearLevel, setSelectedYearLevel] = useState('all')
   
   // Filter courses and evaluations based on user's access level
   const accessibleCourses = useMemo(() => {
@@ -17,27 +16,50 @@ export default function HeadSentiment(){
     return filterEvaluationsByAccess(mockEvaluations, mockCourses, currentUser)
   }, [currentUser])
 
-  // aggregate by course (only accessible courses)
-  const byCourse = accessibleCourses.map(c=>{
-    const ev = accessibleEvaluations.filter(e=>e.courseId===c.id)
-    const pos = ev.filter(e=>e.sentiment==='positive').length
-    const neg = ev.filter(e=>e.sentiment==='negative').length
-    const neu = ev.filter(e=>e.sentiment==='neutral').length
-    return { 
-      name: c.name, 
-      pos, 
-      neg, 
-      neu, 
-      total: ev.length,
-      program: c.program 
-    }
-  }).filter(c => c.total > 0) // Only show courses with evaluations
+  // Get year level options
+  const yearLevelOptions = useMemo(() => {
+    return [...new Set(accessibleCourses.map(course => course.yearLevel))].sort()
+  }, [accessibleCourses])
 
-  const lineData = accessibleCourses.map(c=>({ 
-    name: c.name, 
-    avg: (Math.random()*2+3).toFixed(2),
-    program: c.program 
-  }))
+  // Filter courses by year level
+  const filteredCourses = useMemo(() => {
+    return accessibleCourses.filter(course => {
+      const matchesYearLevel = selectedYearLevel === 'all' || course.yearLevel.toString() === selectedYearLevel
+      return matchesYearLevel
+    })
+  }, [accessibleCourses, selectedYearLevel])
+
+  // Filter evaluations based on filtered courses
+  const filteredEvaluations = useMemo(() => {
+    return accessibleEvaluations.filter(evaluation => 
+      filteredCourses.some(course => course.id === evaluation.courseId)
+    )
+  }, [accessibleEvaluations, filteredCourses])
+
+  // Year level-wise sentiment data for stacked bar chart
+  const yearLevelSentiment = useMemo(() => {
+    const yearData = {}
+    filteredCourses.forEach(course => {
+      const yearLevel = `Year ${course.yearLevel}`
+      if (!yearData[yearLevel]) {
+        yearData[yearLevel] = { positive: 0, neutral: 0, negative: 0 }
+      }
+      
+      const courseEvals = filteredEvaluations.filter(e => e.courseId === course.id)
+      courseEvals.forEach(evaluation => {
+        if (evaluation.sentiment === 'positive') yearData[yearLevel].positive++
+        else if (evaluation.sentiment === 'neutral') yearData[yearLevel].neutral++
+        else if (evaluation.sentiment === 'negative') yearData[yearLevel].negative++
+      })
+    })
+
+    return Object.keys(yearData).sort().map(yearLevel => ({
+      name: yearLevel,
+      positive: yearData[yearLevel].positive,
+      neutral: yearData[yearLevel].neutral,
+      negative: yearData[yearLevel].negative
+    }))
+  }, [filteredCourses, filteredEvaluations])
 
   return (
     <div>
@@ -58,59 +80,60 @@ export default function HeadSentiment(){
             }
           </div>
           <div className="text-sm text-gray-600 mt-1">
-            Total evaluations: {accessibleEvaluations.length}
+            Total evaluations: {filteredEvaluations.length}
           </div>
         </div>
       )}
 
-      {byCourse.length > 0 ? (
+      {/* Year Level Filter */}
+      <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+        <h3 className="text-lg font-semibold mb-3">Filters</h3>
         <div className="grid md:grid-cols-2 gap-4">
-          {byCourse.map((c,i)=> (
-            <div key={c.name} className="bg-white p-4 rounded shadow">
-              <h3 className="font-medium mb-2">
-                {c.name}
-                <span className="ml-2 px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
-                  {c.program}
-                </span>
-              </h3>
-              <div className="text-xs text-gray-500 mb-2">
-                {c.total} evaluations
-              </div>
-              <PieChart width={250} height={200}>
-                <Pie 
-                  data={[
-                    {name:'Positive',value:c.pos},
-                    {name:'Neutral',value:c.neu},
-                    {name:'Negative',value:c.neg}
-                  ]} 
-                  dataKey="value" 
-                  cx="50%" 
-                  cy="50%" 
-                  outerRadius={60}
-                >
-                  { [0,1,2].map((j)=> <Cell key={j} fill={COLORS[j]} />)}
-                </Pie>
-                <Tooltip />
-              </PieChart>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Year Level</label>
+            <select
+              value={selectedYearLevel}
+              onChange={(e) => setSelectedYearLevel(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
+            >
+              <option value="all">All Year Levels</option>
+              {yearLevelOptions.map(yearLevel => (
+                <option key={yearLevel} value={yearLevel}>Year {yearLevel}</option>
+              ))}
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Active Filters</label>
+            <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
+              {selectedYearLevel !== 'all' && (
+                <div>Year Level: {selectedYearLevel}</div>
+              )}
+              <div>Showing: {filteredCourses.length} courses, {filteredEvaluations.length} evaluations</div>
             </div>
-          ))}
+          </div>
+        </div>
+      </div>
 
-          {lineData.length > 0 && (
-            <div className="bg-white p-4 rounded shadow md:col-span-2">
-              <h3 className="font-medium mb-2">Average Rating Trend</h3>
-              <LineChart width={600} height={200} data={lineData}>
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Line type="monotone" dataKey="avg" stroke="#4f46e5" />
-              </LineChart>
-            </div>
-          )}
+      {/* Sentiment by Year Level Stacked Bar Chart */}
+      {yearLevelSentiment.length > 0 ? (
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <h3 className="text-xl font-semibold mb-4">Sentiment Analysis by Year Level</h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={yearLevelSentiment}>
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey="positive" stackId="a" fill="#10b981" name="Positive" />
+              <Bar dataKey="neutral" stackId="a" fill="#f59e0b" name="Neutral" />
+              <Bar dataKey="negative" stackId="a" fill="#ef4444" name="Negative" />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       ) : (
         <div className="bg-white p-4 rounded shadow text-center">
           <div className="text-gray-500">
-            No sentiment data available for your assigned programs
+            No sentiment data available for the selected filters
           </div>
           <div className="text-sm text-gray-400 mt-1">
             Evaluations will appear here once students submit feedback
