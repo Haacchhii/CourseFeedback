@@ -1,6 +1,38 @@
-# Models package initialization# Models package initialization
-from .base import Base
-from .user import User
-from .data import DataModel
+# Models package initialization
+from .enhanced_models import (
+    Base,
+    User,
+    Student,
+    DepartmentHead,
+    Secretary,
+    Course,
+    ClassSection,
+    Enrollment,
+    Evaluation,
+    EvaluationPeriod,
+    Program,
+    AnalysisResult,
+    FirebaseSyncLog,
+    NotificationQueue,
+    AuditLog,
+    SystemSettings
+)
 
-__all__ = ["Base", "User", "DataModel"]
+__all__ = [
+    "Base",
+    "User",
+    "Student",
+    "DepartmentHead",
+    "Secretary",
+    "Course",
+    "ClassSection",
+    "Enrollment",
+    "Evaluation",
+    "EvaluationPeriod",
+    "Program",
+    "AnalysisResult",
+    "FirebaseSyncLog",
+    "NotificationQueue",
+    "AuditLog",
+    "SystemSettings"
+]

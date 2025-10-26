@@ -169,6 +169,79 @@ class DepartmentHead(Base):
     # Relationships
     user = relationship("User", back_populates="department_heads")
 
+class Secretary(Base):
+    __tablename__ = "secretaries"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(255), nullable=False)
+    department = Column(String(255), nullable=True)
+    programs = Column(ARRAY(Integer), nullable=True)  # Array of program IDs they manage
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User")
+
+class EvaluationPeriod(Base):
+    __tablename__ = "evaluation_periods"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    semester = Column(String(50), nullable=False)  # "First Semester", "Second Semester"
+    academic_year = Column(String(20), nullable=False)  # "2024-2025"
+    start_date = Column(DateTime, nullable=False)
+    end_date = Column(DateTime, nullable=False)
+    status = Column(String(20), default='draft')  # draft, active, closed
+    total_students = Column(Integer, default=0)
+    completed_evaluations = Column(Integer, default=0)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    creator = relationship("User")
+    
+    # Indexes
+    __table_args__ = (
+        Index('idx_evaluation_periods_status', 'status', 'start_date', 'end_date'),
+    )
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    user_email = Column(String(255), nullable=True)
+    action = Column(String(100), nullable=False)  # USER_CREATED, LOGIN, SETTINGS_CHANGED, etc.
+    category = Column(String(50), nullable=False)  # User Management, Authentication, System Settings, etc.
+    severity = Column(String(20), default='Info')  # Info, Warning, Critical
+    status = Column(String(20), default='Success')  # Success, Failed, Blocked
+    ip_address = Column(String(45), nullable=True)
+    details = Column(JSONB, nullable=True)  # Additional context in JSON
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    
+    # Relationships
+    user = relationship("User")
+    
+    # Indexes
+    __table_args__ = (
+        Index('idx_audit_logs_action', 'action', 'created_at'),
+        Index('idx_audit_logs_user', 'user_id', 'created_at'),
+        Index('idx_audit_logs_severity', 'severity', 'status'),
+    )
+
+class SystemSettings(Base):
+    __tablename__ = "system_settings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    category = Column(String(50), nullable=False, unique=True)  # general, email, security, backup
+    settings = Column(JSONB, nullable=False)  # All settings for that category in JSON
+    updated_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    updater = relationship("User")
+
 # New tables for ML and analytics
 class AnalysisResult(Base):
     __tablename__ = "analysis_results"

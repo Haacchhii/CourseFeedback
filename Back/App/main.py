@@ -19,8 +19,11 @@ try:
     from routes.auth import router as auth_router
     from routes.student import router as student_router
     from routes.admin import router as admin_router
+    from routes.system_admin import router as system_admin_router
+    from routes.department_head import router as department_head_router
+    from routes.secretary import router as secretary_router
     ROUTES_AVAILABLE = True
-    print("🛣️ Routes loaded successfully")
+    print("🛣️ All routes loaded successfully")
 except ImportError as e:
     print(f"⚠️ Routes not available: {e}")
     ROUTES_AVAILABLE = False
@@ -34,14 +37,21 @@ app = FastAPI(
 # Include routes if available
 if ROUTES_AVAILABLE:
     app.include_router(auth_router, prefix="/api/auth", tags=["authentication"])
-    app.include_router(student_router, prefix="/api", tags=["student"])
-    app.include_router(admin_router, prefix="/api/admin", tags=["admin"])
-    print("✅ API routes registered")
+    app.include_router(student_router, prefix="/api/student", tags=["student"])
+    app.include_router(system_admin_router, prefix="/api/admin", tags=["system-admin"])
+    app.include_router(department_head_router, prefix="/api/dept-head", tags=["department-head"])
+    app.include_router(secretary_router, prefix="/api/secretary", tags=["secretary"])
+    print("✅ API routes registered: auth, student, system-admin, dept-head, secretary")
 
-# CORS middleware
+# CORS middleware - Updated to point to New/capstone frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5174", "http://localhost:5175"],
+    allow_origins=[
+        "http://localhost:5173",  # Vite default for New/capstone frontend
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",  # Alternate Vite port
+        "http://127.0.0.1:5174"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

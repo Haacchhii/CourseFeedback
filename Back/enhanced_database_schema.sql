@@ -645,3 +645,6 @@ CREATE INDEX IF NOT EXISTS idx_students_department ON students(department_id);
 
 -- Example 4: View all secretaries and their departments
 -- SELECT * FROM secretary_department_overview;
+
+show port
+select current_user

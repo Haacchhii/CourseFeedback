@@ -1,0 +1,26 @@
+Back/
+├── app/
+│   ├── main.py                 # FastAPI app entry
+│   ├── models/
+│   │   ├── database.py         # PostgreSQL models
+│   │   ├── user.py             # User models
+│   │   ├── course.py           # Course models
+│   │   └── evaluation.py       # Evaluation models
+│   ├── routers/
+│   │   ├── auth.py             # Authentication endpoints
+│   │   ├── dashboard.py        # Dashboard data endpoints
+│   │   ├── courses.py          # Course management
+│   │   ├── evaluations.py      # Evaluation endpoints
+│   │   └── analytics.py        # Sentiment & anomaly endpoints
+│   ├── services/
+│   │   ├── svm_sentiment.py    # SVM implementation
+│   │   ├── dbscan_anomaly.py   # DBSCAN implementation
+│   │   ├── firebase_service.py # Firebase integration
+│   │   └── auth_service.py     # Authentication logic
+│   ├── utils/
+│   │   ├── preprocessing.py    # Text preprocessing (spaCy)
+│   │   ├── database.py         # DB connection
+│   │   └── security.py         # Security utilities
+│   └── config.py               # Configuration settings
+├── requirements.txt
+└── .env                        # Environment variables
