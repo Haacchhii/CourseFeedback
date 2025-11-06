@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getCurrentUser, isSystemAdmin } from '../../utils/roleUtils'
-import { mockAdmins, mockSecretaries, mockHeads, mockStudents } from '../../data/mock'
+import { adminAPI } from '../../services/api'
 
 export default function AuditLogViewer() {
   const navigate = useNavigate()
@@ -16,30 +16,11 @@ export default function AuditLogViewer() {
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const logsPerPage = 15
-
-  // Mock audit log data
-  const [auditLogs] = useState([
-    { id: 1, timestamp: '2025-10-21 14:30:25', user: 'admin@lpubatangas.edu.ph', action: 'USER_CREATED', category: 'User Management', details: 'Created user: student001@lpubatangas.edu.ph', ipAddress: '192.168.1.100', status: 'Success', severity: 'Info' },
-    { id: 2, timestamp: '2025-10-21 14:15:10', user: 'admin@lpubatangas.edu.ph', action: 'USER_DELETED', category: 'User Management', details: 'Deleted user: olduser@lpubatangas.edu.ph', ipAddress: '192.168.1.100', status: 'Success', severity: 'Warning' },
-    { id: 3, timestamp: '2025-10-21 13:45:00', user: 'secretary@lpubatangas.edu.ph', action: 'LOGIN', category: 'Authentication', details: 'Successful login', ipAddress: '192.168.1.105', status: 'Success', severity: 'Info' },
-    { id: 4, timestamp: '2025-10-21 13:30:15', user: 'admin@lpubatangas.edu.ph', action: 'SETTINGS_CHANGED', category: 'System Settings', details: 'Updated email settings: SMTP configuration', ipAddress: '192.168.1.100', status: 'Success', severity: 'Info' },
-    { id: 5, timestamp: '2025-10-21 12:00:05', user: 'admin@lpubatangas.edu.ph', action: 'PERIOD_CLOSED', category: 'Evaluation Management', details: 'Closed evaluation period: Midterm 2024-2025', ipAddress: '192.168.1.100', status: 'Success', severity: 'Warning' },
-    { id: 6, timestamp: '2025-10-21 11:30:00', user: 'unknown@example.com', action: 'LOGIN_FAILED', category: 'Authentication', details: 'Failed login attempt - Invalid credentials', ipAddress: '203.177.45.89', status: 'Failed', severity: 'Critical' },
-    { id: 7, timestamp: '2025-10-21 10:15:30', user: 'head@lpubatangas.edu.ph', action: 'COURSE_CREATED', category: 'Course Management', details: 'Created course: Advanced Database Systems (CS301)', ipAddress: '192.168.1.110', status: 'Success', severity: 'Info' },
-    { id: 8, timestamp: '2025-10-21 09:45:20', user: 'admin@lpubatangas.edu.ph', action: 'BULK_IMPORT', category: 'Course Management', details: 'Imported 25 courses via CSV', ipAddress: '192.168.1.100', status: 'Success', severity: 'Info' },
-    { id: 9, timestamp: '2025-10-21 09:00:10', user: 'admin@lpubatangas.edu.ph', action: 'BACKUP_CREATED', category: 'System Maintenance', details: 'Automated daily backup completed', ipAddress: '192.168.1.100', status: 'Success', severity: 'Info' },
-    { id: 10, timestamp: '2025-10-20 18:30:00', user: 'admin@lpubatangas.edu.ph', action: 'PASSWORD_RESET', category: 'User Management', details: 'Reset password for: student123@lpubatangas.edu.ph', ipAddress: '192.168.1.100', status: 'Success', severity: 'Warning' },
-    { id: 11, timestamp: '2025-10-20 16:20:45', user: 'secretary@lpubatangas.edu.ph', action: 'DATA_EXPORT', category: 'Data Management', details: 'Exported evaluation data to CSV', ipAddress: '192.168.1.105', status: 'Success', severity: 'Info' },
-    { id: 12, timestamp: '2025-10-20 15:10:30', user: 'admin@lpubatangas.edu.ph', action: 'PERMISSIONS_CHANGED', category: 'User Management', details: 'Updated permissions for: secretary@lpubatangas.edu.ph', ipAddress: '192.168.1.100', status: 'Success', severity: 'Warning' },
-    { id: 13, timestamp: '2025-10-20 14:00:00', user: 'unknown@test.com', action: 'ACCESS_DENIED', category: 'Security', details: 'Unauthorized access attempt to /admin/settings', ipAddress: '45.123.78.200', status: 'Blocked', severity: 'Critical' },
-    { id: 14, timestamp: '2025-10-20 12:30:15', user: 'admin@lpubatangas.edu.ph', action: 'EVALUATION_DELETED', category: 'Evaluation Management', details: 'Deleted evaluation: Evaluation ID #455', ipAddress: '192.168.1.100', status: 'Success', severity: 'Warning' },
-    { id: 15, timestamp: '2025-10-20 11:00:00', user: 'admin@lpubatangas.edu.ph', action: 'SYSTEM_RESTART', category: 'System Maintenance', details: 'System maintenance restart', ipAddress: '192.168.1.100', status: 'Success', severity: 'Warning' },
-    { id: 16, timestamp: '2025-10-20 09:45:30', user: 'secretary@lpubatangas.edu.ph', action: 'REPORT_GENERATED', category: 'Reporting', details: 'Generated sentiment analysis report', ipAddress: '192.168.1.105', status: 'Success', severity: 'Info' },
-    { id: 17, timestamp: '2025-10-19 17:30:00', user: 'admin@lpubatangas.edu.ph', action: 'USER_BULK_DEACTIVATE', category: 'User Management', details: 'Bulk deactivated 12 inactive users', ipAddress: '192.168.1.100', status: 'Success', severity: 'Warning' },
-    { id: 18, timestamp: '2025-10-19 15:00:00', user: 'unknown@hacker.com', action: 'SQL_INJECTION_ATTEMPT', category: 'Security', details: 'Detected SQL injection attempt on login form', ipAddress: '185.220.101.50', status: 'Blocked', severity: 'Critical' },
-    { id: 19, timestamp: '2025-10-19 13:30:45', user: 'admin@lpubatangas.edu.ph', action: 'COURSE_ARCHIVED', category: 'Course Management', details: 'Archived old courses: 8 courses from AY 2022-2023', ipAddress: '192.168.1.100', status: 'Success', severity: 'Info' },
-    { id: 20, timestamp: '2025-10-19 10:00:00', user: 'admin@lpubatangas.edu.ph', action: 'NOTIFICATION_SENT', category: 'Communication', details: 'Sent reminder emails to 450 students', ipAddress: '192.168.1.100', status: 'Success', severity: 'Info' }
-  ])
+  
+  // API State
+  const [auditLogs, setAuditLogs] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   // Redirect if not system admin
   useEffect(() => {
@@ -47,8 +28,27 @@ export default function AuditLogViewer() {
       navigate('/admin/dashboard')
     }
   }, [currentUser, navigate])
-
-  // Get unique users and actions
+  
+  // Fetch audit logs
+  useEffect(() => {
+    const fetchLogs = async () => {
+      try {
+        setLoading(true)
+        const filters = {
+          action: actionFilter !== 'all' ? actionFilter : undefined,
+          user: userFilter !== 'all' ? userFilter : undefined,
+          date: dateFilter !== 'all' ? dateFilter : undefined
+        }
+        const data = await adminAPI.getAuditLogs(filters)
+        setAuditLogs(data || [])
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchLogs()
+  }, [actionFilter, userFilter, dateFilter])  // Get unique users and actions
   const users = useMemo(() => {
     return [...new Set(auditLogs.map(log => log.user))].sort()
   }, [auditLogs])
@@ -119,6 +119,41 @@ export default function AuditLogViewer() {
   }
 
   if (!currentUser || !isSystemAdmin(currentUser)) return null
+  
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
+          <p className="mt-4 text-gray-600">Loading audit logs...</p>
+        </div>
+      </div>
+    )
+  }
+  
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="bg-white p-8 rounded-lg shadow-lg max-w-md">
+          <div className="text-red-600 text-center">
+            <svg className="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <h3 className="text-xl font-bold mb-2">Error Loading Audit Logs</h3>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">

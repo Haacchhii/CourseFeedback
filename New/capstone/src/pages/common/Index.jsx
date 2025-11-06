@@ -1,58 +1,65 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { mockHeads, mockAdmins, mockStudents } from '../../data/mock'
+import { authAPI } from '../../services/api'
+import { useAuth } from '../../context/AuthContext'
 
 export default function Index() {
   const [id, setId] = useState('')
   const [pw, setPw] = useState('')
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const nav = useNavigate()
+  const { login } = useAuth()
 
-  function submit() {
+  async function submit() {
     setError('')
+    setLoading(true)
+    
     const lpuRe = /^[^@]+@(lpubatangas\.edu\.ph)$/i
     const lower = id.toLowerCase()
     
     // Block any access from lpu.edu.in domain
     if(lower.endsWith('@lpu.edu.in')){
       setError('Access denied. Use your registered LPU email.')
+      setLoading(false)
       return
     }
     
-    // Check if email matches an admin from mock data (exact match)
-    const admin = mockAdmins.find(a=>a.email.toLowerCase() === lower)
-    if(admin){
-      try{ 
-        localStorage.setItem('role','admin')
-        localStorage.setItem('currentUser', JSON.stringify(admin))
-      }catch(e){}
-      nav('/dashboard')
+    // Validate LPU email format
+    if(!lpuRe.test(lower)){
+      setError('Please use your LPU Batangas email address.')
+      setLoading(false)
       return
     }
     
-    // Check if email matches a department head from mock data (exact match)
-    const head = mockHeads.find(h=>h.email.toLowerCase() === lower)
-    if(head){
-      try{ 
-        localStorage.setItem('role','head')
-        localStorage.setItem('currentUser', JSON.stringify(head))
-      }catch(e){}
-      nav('/dashboard')
-      return
+    try {
+      // Call real authentication API
+      const response = await authAPI.login(id, pw)
+      
+      if (response.success) {
+        // Use AuthContext login to store token and user
+        login(response.token, response.user)
+        
+        // Navigate based on role
+        const role = response.user.role?.toLowerCase()
+        if (role === 'admin') {
+          nav('/admin/dashboard')
+        } else if (role === 'student') {
+          nav('/student-evaluation')
+        } else if (role === 'secretary' || role === 'department_head' || role === 'instructor') {
+          nav('/dashboard')
+        } else {
+          nav('/dashboard')
+        }
+      } else {
+        setError(response.message || 'Login failed. Please check your credentials.')
+      }
+    } catch (err) {
+      console.error('Login error:', err)
+      setError(err.message || 'An error occurred during login. Please try again.')
+    } finally {
+      setLoading(false)
     }
-    
-    // Check if email matches a student from mock data (exact match)
-    const student = mockStudents.find(s=>s.email.toLowerCase() === lower)
-    if(student){
-      try{ 
-        localStorage.setItem('role','student')
-        localStorage.setItem('currentUser', JSON.stringify(student))
-      }catch(e){}
-      nav('/student-evaluation')
-      return
-    }
-    
-    setError('Access denied. Use your registered LPU email.')
   }
 
   return (
@@ -164,10 +171,21 @@ export default function Index() {
               )}
 
               <button 
-                className="w-full bg-[#7a0000] hover:bg-[#8f0000] text-white py-3 rounded-lg font-semibold transition duration-200" 
+                className="w-full bg-[#7a0000] hover:bg-[#8f0000] text-white py-3 rounded-lg font-semibold transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2" 
                 onClick={submit}
+                disabled={loading}
               >
-                Login
+                {loading ? (
+                  <>
+                    <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Logging in...
+                  </>
+                ) : (
+                  'Login'
+                )}
               </button>
 
               <div className="text-center">

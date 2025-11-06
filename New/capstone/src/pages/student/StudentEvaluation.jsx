@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getCurrentUser } from '../../utils/roleUtils'
-import { mockCourses } from '../../data/mock'
+import { studentAPI } from '../../services/api'
 import { 
   questionnaireCategories, 
   ratingScale, 
@@ -21,6 +21,12 @@ export default function StudentEvaluation() {
     responses: initializeEmptyResponses(),
     comments: ''
   })
+  
+  // API State
+  const [courses, setCourses] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
 
   // Redirect non-students
   useEffect(() => {
@@ -34,20 +40,32 @@ export default function StudentEvaluation() {
       return
     }
   }, [currentUser, navigate])
+  
+  // Fetch student courses
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        setLoading(true)
+        const data = await studentAPI.getCourses(currentUser?.id)
+        setCourses(data || [])
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+    if (currentUser) {
+      fetchCourses()
+    }
+  }, [currentUser])
 
-  // Get courses available to the student (filter by program)
+  // Get courses available to the student
   const availableCourses = useMemo(() => {
-    if (!currentUser) return []
-    
-    return mockCourses.filter(course => 
-      course.program === currentUser.program &&
-      course.yearLevel <= currentUser.yearLevel
-    ).map(course => ({
+    return courses.map(course => ({
       ...course,
-      // Use the status from mock.js or default to 'active'
       status: course.status ? course.status.toLowerCase() : 'active'
     }))
-  }, [currentUser])
+  }, [courses])
 
   // Get unique semesters for filter
   const availableSemesters = useMemo(() => {
@@ -69,23 +87,50 @@ export default function StudentEvaluation() {
     })
   }, [availableCourses, searchTerm, semesterFilter])
 
-  const handleEvaluationSubmit = () => {
+  const handleEvaluationSubmit = async () => {
     if (!selectedCourse) return
 
-    // Calculate metrics
-    const categoryAverages = calculateCategoryAverages(evaluationData.responses)
-    const overallAverage = calculateOverallAverage(evaluationData.responses)
-    const sentiment = calculateSentiment(parseFloat(overallAverage))
+    // Validate all responses
+    const allAnswered = Object.values(evaluationData.responses).every(val => val > 0)
+    if (!allAnswered) {
+      alert('Please answer all questions before submitting.')
+      return
+    }
 
-    // In a real app, this would make an API call
-    // API call would go here: await api.submitEvaluation({ ... })
-    
-    alert(`Evaluation submitted successfully!\n\nOverall Rating: ${overallAverage}/4.0\nSentiment: ${sentiment.toUpperCase()}`)
-    setSelectedCourse(null)
-    setEvaluationData({
-      responses: initializeEmptyResponses(),
-      comments: ''
-    })
+    try {
+      setSubmitting(true)
+      
+      // Calculate metrics
+      const categoryAverages = calculateCategoryAverages(evaluationData.responses)
+      const overallAverage = calculateOverallAverage(evaluationData.responses)
+      const sentiment = calculateSentiment(parseFloat(overallAverage))
+
+      // Submit to API
+      await studentAPI.submitEvaluation({
+        courseId: selectedCourse.id,
+        studentId: currentUser.id,
+        responses: evaluationData.responses,
+        comments: evaluationData.comments,
+        categoryAverages,
+        overallAverage,
+        sentiment
+      })
+      
+      alert(`Evaluation submitted successfully!\n\nOverall Rating: ${overallAverage}/4.0\nSentiment: ${sentiment.toUpperCase()}`)
+      setSelectedCourse(null)
+      setEvaluationData({
+        responses: initializeEmptyResponses(),
+        comments: ''
+      })
+      
+      // Refresh courses
+      const updatedCourses = await studentAPI.getCourses(currentUser.id)
+      setCourses(updatedCourses || [])
+    } catch (err) {
+      alert(`Failed to submit evaluation: ${err.message}`)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handleRatingChange = (questionId, value) => {
@@ -112,6 +157,41 @@ export default function StudentEvaluation() {
   }
 
   if (!currentUser) return null
+  
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#7a0000]"></div>
+          <p className="mt-4 text-gray-600">Loading courses...</p>
+        </div>
+      </div>
+    )
+  }
+  
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] flex items-center justify-center">
+        <div className="bg-white p-8 rounded-lg shadow-lg max-w-md">
+          <div className="text-red-600 text-center">
+            <svg className="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <h3 className="text-xl font-bold mb-2">Error Loading Courses</h3>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="px-4 py-2 bg-[#7a0000] text-white rounded-lg hover:bg-[#8f0000]"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9]">
@@ -569,12 +649,22 @@ export default function StudentEvaluation() {
                   </button>
                   <button
                     onClick={handleEvaluationSubmit}
-                    className="px-8 py-3 bg-gradient-to-r from-[#7a0000] to-[#6a0000] hover:from-[#8f0000] hover:to-[#7a0000] text-white rounded-xl font-bold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all flex items-center"
+                    className="px-8 py-3 bg-gradient-to-r from-[#7a0000] to-[#6a0000] hover:from-[#8f0000] hover:to-[#7a0000] text-white rounded-xl font-bold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={submitting}
                   >
-                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    Submit Evaluation
+                    {submitting ? (
+                      <>
+                        <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        <span>Submitting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span>Submit Evaluation</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

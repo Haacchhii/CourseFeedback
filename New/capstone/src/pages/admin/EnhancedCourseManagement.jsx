@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend } from 'recharts'
 import { getCurrentUser, isSystemAdmin } from '../../utils/roleUtils'
-import { mockCourses, mockEvaluations, mockHeads } from '../../data/mock'
+import { adminAPI } from '../../services/api'
 
 export default function EnhancedCourseManagement() {
   const navigate = useNavigate()
@@ -20,6 +20,13 @@ export default function EnhancedCourseManagement() {
   const [selectedCourses, setSelectedCourses] = useState([])
   const [csvFile, setCsvFile] = useState(null)
   const [importPreview, setImportPreview] = useState([])
+  
+  // API State
+  const [courses, setCourses] = useState([])
+  const [instructors, setInstructors] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
 
   const [formData, setFormData] = useState({
     name: '',
@@ -39,37 +46,47 @@ export default function EnhancedCourseManagement() {
       navigate('/courses')
     }
   }, [currentUser, navigate])
+  
+  // Fetch data
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        const [coursesData, instructorsData] = await Promise.all([
+          adminAPI.getCourses(),
+          adminAPI.getInstructors()
+        ])
+        setCourses(coursesData || [])
+        setInstructors(instructorsData || [])
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
 
   // Get programs
   const programs = useMemo(() => {
-    const progs = [...new Set(mockCourses.map(c => c.program))].sort()
+    const progs = [...new Set(courses.map(c => c.program))].filter(Boolean).sort()
     return progs
-  }, [])
+  }, [courses])
 
-  // Get instructors
-  const instructors = useMemo(() => {
-    return mockHeads.map(h => h.name)
-  }, [])
+  // Get instructors - REMOVED (now fetched via API)
 
   // Enhanced courses with analytics
   const enhancedCourses = useMemo(() => {
-    return mockCourses.map(course => {
-      const courseEvals = mockEvaluations.filter(e => e.courseId === course.id)
-      const avgRating = courseEvals.length > 0 
-        ? (courseEvals.reduce((sum, e) => sum + (e.rating || 0), 0) / courseEvals.length).toFixed(2)
-        : 0
-      
+    return courses.map(course => {
       return {
         ...course,
-        evaluationCount: courseEvals.length,
-        avgRating: parseFloat(avgRating),
-        responseRate: course.enrolledStudents > 0 
-          ? Math.round((courseEvals.length / course.enrolledStudents) * 100)
-          : 0,
+        evaluationCount: course.evaluation_count || 0,
+        avgRating: parseFloat(course.avg_rating || 0),
+        responseRate: course.response_rate || 0,
         status: course.status || 'Active'
       }
     })
-  }, [])
+  }, [courses])
 
   // Filter courses
   const filteredCourses = useMemo(() => {
@@ -149,21 +166,31 @@ export default function EnhancedCourseManagement() {
   }, [filteredCourses])
 
   // Handlers
-  const handleAddCourse = (e) => {
+  const handleAddCourse = async (e) => {
     e.preventDefault()
-    alert(`Course "${formData.name}" created successfully!`)
-    setShowAddModal(false)
-    setFormData({
-      name: '',
-      classCode: '',
-      instructor: '',
-      program: 'BSIT',
-      yearLevel: 1,
-      semester: 'First Semester',
-      academicYear: '2024-2025',
-      enrolledStudents: 0,
-      status: 'Active'
-    })
+    try {
+      setSubmitting(true)
+      await adminAPI.createCourse(formData)
+      const updatedCourses = await adminAPI.getCourses()
+      setCourses(updatedCourses || [])
+      alert(`Course "${formData.name}" created successfully!`)
+      setShowAddModal(false)
+      setFormData({
+        name: '',
+        classCode: '',
+        instructor: '',
+        program: 'BSIT',
+        yearLevel: 1,
+        semester: 'First Semester',
+        academicYear: '2024-2025',
+        enrolledStudents: 0,
+        status: 'Active'
+      })
+    } catch (err) {
+      alert(`Failed to create course: ${err.message}`)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handleFileUpload = (e) => {
@@ -195,9 +222,16 @@ export default function EnhancedCourseManagement() {
     setSelectedCourses([])
   }
 
-  const handleArchiveCourse = (course) => {
+  const handleArchiveCourse = async (course) => {
     if (window.confirm(`Archive "${course.name}"?\n\nThis will hide the course from active listings but preserve all data.`)) {
-      alert(`Course "${course.name}" archived successfully!`)
+      try {
+        await adminAPI.updateCourse(course.id, { status: 'Archived' })
+        const updatedCourses = await adminAPI.getCourses()
+        setCourses(updatedCourses || [])
+        alert(`Course "${course.name}" archived successfully!`)
+      } catch (err) {
+        alert(`Failed to archive course: ${err.message}`)
+      }
     }
   }
 
@@ -210,6 +244,41 @@ export default function EnhancedCourseManagement() {
   }
 
   if (!currentUser || !isSystemAdmin(currentUser)) return null
+  
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+          <p className="mt-4 text-gray-600">Loading courses...</p>
+        </div>
+      </div>
+    )
+  }
+  
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="bg-white p-8 rounded-lg shadow-lg max-w-md">
+          <div className="text-red-600 text-center">
+            <svg className="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <h3 className="text-xl font-bold mb-2">Error Loading Courses</h3>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -747,14 +816,23 @@ export default function EnhancedCourseManagement() {
                   type="button"
                   onClick={() => setShowAddModal(false)}
                   className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold transition-all"
+                  disabled={submitting}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-all"
+                  className="flex-1 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  disabled={submitting}
                 >
-                  Create Course
+                  {submitting ? (
+                    <>
+                      <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      <span>Creating...</span>
+                    </>
+                  ) : (
+                    <span>Create Course</span>
+                  )}
                 </button>
               </div>
             </form>

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts'
-import { getCurrentUser, isSystemAdmin, canManageUsers, canManageCourses, canManageEvaluations, canConfigureSystem, canExportData, canViewAuditLogs, getRoleDisplayName } from '../../utils/roleUtils'
-import { mockCourses, mockEvaluations, mockStudents, mockHeads, mockSecretaries } from '../../data/mock'
+import { getCurrentUser, isAdmin, canManageUsers, canManageCourses, canManageEvaluations, canConfigureSystem, canExportData, canViewAuditLogs, getRoleDisplayName } from '../../utils/roleUtils'
+import { adminAPI } from '../../services/api'
 
 const COLORS = ['#7a0000', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6']
 
@@ -10,107 +10,111 @@ export default function AdminDashboard() {
   const navigate = useNavigate()
   const currentUser = getCurrentUser()
   const [activeTab, setActiveTab] = useState('overview')
+  const [stats, setStats] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  // Redirect if not a system admin
+  // Redirect if not an admin
   useEffect(() => {
     if (!currentUser) {
       navigate('/')
       return
     }
     
-    if (!isSystemAdmin(currentUser)) {
-      navigate('/dashboard') // Redirect to normal dashboard
+    if (!isAdmin(currentUser)) {
+      navigate('/dashboard') // Redirect to staff dashboard
       return
     }
   }, [currentUser, navigate])
 
-  // Calculate comprehensive statistics
-  const stats = useMemo(() => {
-    const totalUsers = mockStudents.length + mockHeads.length + mockSecretaries.length + 1 // +1 for current admin
-    const totalCourses = mockCourses.length
-    const totalEvaluations = mockEvaluations.length
-    const totalPrograms = [...new Set(mockCourses.map(c => c.program))].length
-    
-    // Program distribution
-    const programStats = {}
-    mockCourses.forEach(course => {
-      if (!programStats[course.program]) {
-        programStats[course.program] = {
-          courses: 0,
-          evaluations: 0,
-          students: 0
-        }
+  // Fetch dashboard statistics
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const response = await adminAPI.getDashboardStats()
+        // Backend returns {success: true, data: {...}}
+        setStats(response.data || response)
+      } catch (err) {
+        console.error('Error fetching dashboard:', err)
+        setError(err.message || 'Failed to load dashboard')
+      } finally {
+        setLoading(false)
       }
-      programStats[course.program].courses++
-      programStats[course.program].evaluations += mockEvaluations.filter(e => e.courseId === course.id).length
-    })
-    
-    mockStudents.forEach(student => {
-      if (programStats[student.program]) {
-        programStats[student.program].students++
-      }
-    })
-    
-    // User roles breakdown
-    const userRoles = {
-      students: mockStudents.length,
-      departmentHeads: mockHeads.length,
-      secretaries: mockSecretaries.length,
-      systemAdmins: 1 // Current admin
     }
     
-    // Evaluation sentiment breakdown
-    const sentimentStats = {
-      positive: mockEvaluations.filter(e => e.sentiment === 'positive').length,
-      neutral: mockEvaluations.filter(e => e.sentiment === 'neutral').length,
-      negative: mockEvaluations.filter(e => e.sentiment === 'negative').length
+    if (currentUser && isAdmin(currentUser)) {
+      fetchDashboard()
     }
-    
-    // Participation rate
-    const totalEnrolled = mockCourses.reduce((sum, c) => sum + (c.enrolledStudents || 0), 0)
-    const participationRate = totalEnrolled > 0 ? ((totalEvaluations / totalEnrolled) * 100).toFixed(1) : 0
-    
-    return {
-      totalUsers,
-      totalCourses,
-      totalEvaluations,
-      totalPrograms,
-      programStats,
-      userRoles,
-      sentimentStats,
-      participationRate,
-      totalEnrolled
-    }
-  }, [])
+  }, [currentUser])
 
   // Prepare chart data
   const programChartData = useMemo(() => {
+    if (!stats?.programStats) return []
     return Object.entries(stats.programStats).map(([program, data]) => ({
       name: program,
-      courses: data.courses,
-      students: data.students,
-      evaluations: data.evaluations
+      courses: data.courses || 0,
+      students: data.students || 0,
+      evaluations: data.evaluations || 0
     }))
   }, [stats])
 
   const userRolesData = useMemo(() => {
+    if (!stats?.userRoles) return []
     return [
-      { name: 'Students', value: stats.userRoles.students, color: '#10b981' },
-      { name: 'Dept. Heads', value: stats.userRoles.departmentHeads, color: '#3b82f6' },
-      { name: 'Secretaries', value: stats.userRoles.secretaries, color: '#f59e0b' },
-      { name: 'System Admins', value: stats.userRoles.systemAdmins, color: '#7a0000' }
+      { name: 'Students', value: stats.userRoles.students || 0, color: '#10b981' },
+      { name: 'Dept. Heads', value: stats.userRoles.departmentHeads || 0, color: '#3b82f6' },
+      { name: 'Secretaries', value: stats.userRoles.secretaries || 0, color: '#f59e0b' },
+      { name: 'Admins', value: stats.userRoles.admins || 0, color: '#7a0000' }
     ]
   }, [stats])
 
   const sentimentChartData = useMemo(() => {
+    if (!stats?.sentimentStats) return []
     return [
-      { name: 'Positive', value: stats.sentimentStats.positive, color: '#10b981' },
-      { name: 'Neutral', value: stats.sentimentStats.neutral, color: '#f59e0b' },
-      { name: 'Negative', value: stats.sentimentStats.negative, color: '#ef4444' }
+      { name: 'Positive', value: stats.sentimentStats.positive || 0, color: '#10b981' },
+      { name: 'Neutral', value: stats.sentimentStats.neutral || 0, color: '#f59e0b' },
+      { name: 'Negative', value: stats.sentimentStats.negative || 0, color: '#ef4444' }
     ]
   }, [stats])
 
-  if (!currentUser || !isSystemAdmin(currentUser)) return null
+  if (!currentUser || !isAdmin(currentUser)) return null
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#7a0000] mx-auto"></div>
+          <p className="mt-4 text-gray-600 font-medium">Loading dashboard...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center bg-white p-8 rounded-xl shadow-lg max-w-md">
+          <svg className="w-16 h-16 text-red-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <h2 className="mt-4 text-2xl font-bold text-gray-900">Error Loading Dashboard</h2>
+          <p className="mt-2 text-gray-600">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-6 py-2 bg-[#7a0000] text-white rounded-lg hover:bg-[#5a0000] transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!stats) return null
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">

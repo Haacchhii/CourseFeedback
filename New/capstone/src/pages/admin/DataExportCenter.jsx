@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getCurrentUser, isSystemAdmin } from '../../utils/roleUtils'
+import { adminAPI } from '../../services/api'
 
 export default function DataExportCenter() {
   const navigate = useNavigate()
@@ -25,15 +26,12 @@ export default function DataExportCenter() {
     format: 'csv',
     recipients: currentUser?.email || ''
   })
-
-  // Mock export history
-  const [exportHistory] = useState([
-    { id: 1, filename: 'full_export_2025-10-21.csv', type: 'Full Export', format: 'CSV', size: '45.2 MB', date: '2025-10-21 14:30:00', status: 'Completed' },
-    { id: 2, filename: 'evaluations_2025-10-20.xlsx', type: 'Evaluations Only', format: 'Excel', size: '12.8 MB', date: '2025-10-20 09:15:00', status: 'Completed' },
-    { id: 3, filename: 'users_report_2025-10-19.pdf', type: 'Users Report', format: 'PDF', size: '3.5 MB', date: '2025-10-19 16:45:00', status: 'Completed' },
-    { id: 4, filename: 'courses_data_2025-10-18.json', type: 'Courses Data', format: 'JSON', size: '1.2 MB', date: '2025-10-18 11:00:00', status: 'Completed' },
-    { id: 5, filename: 'analytics_2025-10-17.csv', type: 'Analytics', format: 'CSV', size: '8.7 MB', date: '2025-10-17 14:20:00', status: 'Completed' }
-  ])
+  
+  // API State
+  const [exportHistory, setExportHistory] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [exporting, setExporting] = useState(false)
 
   // Redirect if not system admin
   useEffect(() => {
@@ -41,14 +39,86 @@ export default function DataExportCenter() {
       navigate('/admin/dashboard')
     }
   }, [currentUser, navigate])
+  
+  // Fetch export history
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        setLoading(true)
+        const data = await adminAPI.getExportHistory()
+        setExportHistory(data || [])
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchHistory()
+  }, [])
 
-  const handleQuickExport = (type) => {
-    alert(`Exporting ${type} to ${exportFormat.toUpperCase()}...`)
+  const handleQuickExport = async (type) => {
+    try {
+      setExporting(true)
+      let blob
+      const timestamp = new Date().toISOString().split('T')[0]
+      
+      if (type === 'All Users') {
+        blob = await adminAPI.exportUsers({ format: exportFormat })
+        downloadBlob(blob, `users_export_${timestamp}.${exportFormat}`)
+      } else if (type === 'All Evaluations') {
+        blob = await adminAPI.exportEvaluations({ format: exportFormat, dateRange })
+        downloadBlob(blob, `evaluations_export_${timestamp}.${exportFormat}`)
+      } else if (type === 'All Courses') {
+        blob = await adminAPI.exportCourses({ format: exportFormat })
+        downloadBlob(blob, `courses_export_${timestamp}.${exportFormat}`)
+      } else if (type === 'Analytics Report') {
+        blob = await adminAPI.exportAnalytics({ format: exportFormat, dateRange })
+        downloadBlob(blob, `analytics_export_${timestamp}.${exportFormat}`)
+      }
+      
+      // Refresh history
+      const updatedHistory = await adminAPI.getExportHistory()
+      setExportHistory(updatedHistory || [])
+      alert(`${type} exported successfully!`)
+    } catch (err) {
+      alert(`Export failed: ${err.message}`)
+    } finally {
+      setExporting(false)
+    }
+  }
+  
+  const downloadBlob = (blob, filename) => {
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(url)
   }
 
-  const handleCustomExport = () => {
-    const selected = Object.entries(includeFilters).filter(([_, v]) => v).map(([k, _]) => k)
-    alert(`Exporting custom data (${selected.join(', ')}) to ${exportFormat.toUpperCase()}...`)
+  const handleCustomExport = async () => {
+    try {
+      setExporting(true)
+      const selected = Object.entries(includeFilters).filter(([_, v]) => v).map(([k, _]) => k)
+      const blob = await adminAPI.exportCustom({ 
+        categories: selected, 
+        format: exportFormat,
+        dateRange 
+      })
+      const timestamp = new Date().toISOString().split('T')[0]
+      downloadBlob(blob, `custom_export_${timestamp}.${exportFormat}`)
+      
+      // Refresh history
+      const updatedHistory = await adminAPI.getExportHistory()
+      setExportHistory(updatedHistory || [])
+      alert(`Custom data exported successfully!`)
+    } catch (err) {
+      alert(`Export failed: ${err.message}`)
+    } finally {
+      setExporting(false)
+    }
   }
 
   const handleScheduleExport = (e) => {
@@ -62,6 +132,41 @@ export default function DataExportCenter() {
   }
 
   if (!currentUser || !isSystemAdmin(currentUser)) return null
+  
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+          <p className="mt-4 text-gray-600">Loading export center...</p>
+        </div>
+      </div>
+    )
+  }
+  
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="bg-white p-8 rounded-lg shadow-lg max-w-md">
+          <div className="text-red-600 text-center">
+            <svg className="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <h3 className="text-xl font-bold mb-2">Error Loading Export Center</h3>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -176,9 +281,17 @@ export default function DataExportCenter() {
                 <p className="text-sm text-gray-600 mb-4">Export complete user database including students, heads, and administrators.</p>
                 <button
                   onClick={() => handleQuickExport('All Users')}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-all"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  disabled={exporting}
                 >
-                  Export Users →
+                  {exporting ? (
+                    <>
+                      <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      <span>Exporting...</span>
+                    </>
+                  ) : (
+                    <span>Export Users →</span>
+                  )}
                 </button>
               </div>
 

@@ -21,8 +21,11 @@ export function getCurrentRole() {
 export function filterCoursesByAccess(courses, user) {
   if (!user) return []
   
-  // System Admins, Secretaries, and Department Heads have department-wide access to all courses
-  if (isSystemAdmin(user) || isSecretary(user) || isDepartmentHead(user)) return courses
+  // Admin has full access
+  if (isAdmin(user)) return courses
+  
+  // Secretary/Dept Head/Instructor have department-wide access
+  if (isStaffMember(user)) return courses
   
   // Other roles (if any) are limited to their assigned programs
   if (!user.assignedPrograms) return []
@@ -36,8 +39,11 @@ export function filterCoursesByAccess(courses, user) {
 export function filterEvaluationsByAccess(evaluations, courses, user) {
   if (!user) return []
   
-  // System Admins, Secretaries, and Department Heads have department-wide access to all evaluations
-  if (isSystemAdmin(user) || isSecretary(user) || isDepartmentHead(user)) return evaluations
+  // Admin has full access
+  if (isAdmin(user)) return evaluations
+  
+  // Secretary/Dept Head/Instructor have department-wide access
+  if (isStaffMember(user)) return evaluations
   
   // Other roles (if any) are limited to their assigned programs
   if (!user.assignedPrograms) return []
@@ -52,24 +58,31 @@ export function filterEvaluationsByAccess(evaluations, courses, user) {
   )
 }
 
-// Check if user is a System Administrator (full system control)
-export function isSystemAdmin(user) {
-  return user && user.role === 'system-admin'
-}
-
-// Check if user is a legacy admin or secretary (view-only access)
+// Check if user is Admin (full system control)
 export function isAdmin(user) {
-  return user && (user.role === 'admin' || user.role === 'secretary')
+  return user && user.role === 'admin'
 }
 
-// Check if user is a secretary (department-wide view access)
+// Check if user is a staff member (Secretary/Dept Head/Instructor - same permissions)
+export function isStaffMember(user) {
+  if (!user) return false
+  const role = user.role?.toLowerCase()
+  return role === 'secretary' || 
+         role === 'department_head' || 
+         role === 'instructor'
+}
+
+// Legacy compatibility - kept for backward compatibility (no longer used)
+export function isSystemAdmin(user) {
+  return isAdmin(user)  // Redirect to isAdmin since system-admin role doesn't exist
+}
+
 export function isSecretary(user) {
-  return user && (user.role === 'secretary' || user.role === 'admin')
+  return isStaffMember(user)
 }
 
-// Check if user is a department head (department-wide access - same as secretary)
 export function isDepartmentHead(user) {
-  return user && user.role === 'head'
+  return isStaffMember(user)
 }
 
 // Get programs for filtering (used by secretaries)
@@ -134,12 +147,12 @@ export function canResetPasswords(user) {
 export function getRoleDisplayName(user) {
   if (!user) return 'Unknown'
   
-  switch(user.role) {
-    case 'system-admin': return 'System Administrator'
+  switch(user.role?.toLowerCase()) {
     case 'admin': return 'Administrator'
     case 'secretary': return 'Secretary'
-    case 'head': return 'Department Head'
+    case 'department_head': return 'Department Head'
+    case 'instructor': return 'Instructor'
     case 'student': return 'Student'
-    default: return 'User'
+    default: return user.role || 'User'
   }
 }

@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getCurrentUser, isSystemAdmin } from '../../utils/roleUtils'
+import { adminAPI } from '../../services/api'
 
 export default function SystemSettings() {
   const navigate = useNavigate()
   const currentUser = getCurrentUser()
   const [activeTab, setActiveTab] = useState('general')
   const [saved, setSaved] = useState(false)
+  
+  // API State
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
 
   // General Settings State
   const [generalSettings, setGeneralSettings] = useState({
@@ -63,14 +69,47 @@ export default function SystemSettings() {
   // Redirect if not system admin
   useEffect(() => {
     if (!currentUser || !isSystemAdmin(currentUser)) {
-      navigate('/admin/dashboard')
+      navigate('/login')
     }
   }, [currentUser, navigate])
+  
+  // Fetch settings
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        setLoading(true)
+        const data = await adminAPI.getSettings()
+        if (data.general) setGeneralSettings(data.general)
+        if (data.email) setEmailSettings(data.email)
+        if (data.security) setSecuritySettings(data.security)
+        if (data.backup) setBackupSettings(data.backup)
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchSettings()
+  }, [])
 
-  const handleSaveSettings = (section) => {
-    setSaved(true)
-    setTimeout(() => setSaved(false), 3000)
-    alert(`${section} settings saved successfully!`)
+  const handleSaveSettings = async (section) => {
+    try {
+      setSubmitting(true)
+      const settingsMap = {
+        'General': generalSettings,
+        'Email': emailSettings,
+        'Security': securitySettings,
+        'Backup': backupSettings
+      }
+      await adminAPI.updateSettings({ category: section, settings: settingsMap[section] })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+      alert(`${section} settings saved successfully!`)
+    } catch (err) {
+      alert(`Failed to save settings: ${err.message}`)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handleTestEmail = () => {
@@ -90,6 +129,41 @@ export default function SystemSettings() {
   }
 
   if (!currentUser || !isSystemAdmin(currentUser)) return null
+  
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-gray-600"></div>
+          <p className="mt-4 text-gray-600">Loading settings...</p>
+        </div>
+      </div>
+    )
+  }
+  
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="bg-white p-8 rounded-lg shadow-lg max-w-md">
+          <div className="text-red-600 text-center">
+            <svg className="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <h3 className="text-xl font-bold mb-2">Error Loading Settings</h3>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -275,9 +349,17 @@ export default function SystemSettings() {
 
               <button
                 onClick={() => handleSaveSettings('General')}
-                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition-all"
+                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                disabled={submitting}
               >
-                💾 Save General Settings
+                {submitting ? (
+                  <>
+                    <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <span>💾 Save General Settings</span>
+                )}
               </button>
             </div>
           </div>

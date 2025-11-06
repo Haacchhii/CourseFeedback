@@ -6,11 +6,19 @@ from pydantic import BaseModel
 from typing import Optional
 import bcrypt
 import logging
+import os
+from datetime import datetime, timedelta
+from jose import jwt, JWTError
 from database.connection import get_db
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# JWT Configuration
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-fallback-key-not-for-production")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_HOURS = 24
 
 class LoginRequest(BaseModel):
     email: str
@@ -18,66 +26,83 @@ class LoginRequest(BaseModel):
 
 class LoginResponse(BaseModel):
     success: bool
+    token: Optional[str] = None
     user: Optional[dict] = None
     message: Optional[str] = None
+
+def create_access_token(data: dict):
+    """Create JWT access token"""
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
 
 @router.post("/login", response_model=LoginResponse)
 async def login(request: LoginRequest, db = Depends(get_db)):
     """
     Authenticate user with email and password
-    Returns user data if authentication successful
+    Returns JWT token and user data if authentication successful
     """
     try:
-        # Query database for user
-        cursor = db.cursor()
+        # Query database for user using SQLAlchemy text query
+        from sqlalchemy import text
         
-        # Check in users table for secretary, department_head, or student
-        cursor.execute("""
-            SELECT u.id, u.email, u.role, u.password_hash,
-                   CASE 
-                       WHEN u.role = 'secretary' THEN s.name
-                       WHEN u.role = 'department_head' THEN dh.first_name || ' ' || dh.last_name
-                       WHEN u.role = 'student' THEN st.first_name || ' ' || st.last_name
-                   END as name,
-                   CASE 
-                       WHEN u.role = 'secretary' THEN s.department
-                       WHEN u.role = 'department_head' THEN dh.department
-                       WHEN u.role = 'student' THEN p.name
-                   END as department_or_program
-            FROM users u
-            LEFT JOIN secretaries s ON u.id = s.user_id AND u.role = 'secretary'
-            LEFT JOIN department_heads dh ON u.id = dh.user_id AND u.role = 'department_head'  
-            LEFT JOIN students st ON u.id = st.user_id AND u.role = 'student'
-            LEFT JOIN programs p ON st.program_id = p.id
-            WHERE LOWER(u.email) = %s
-        """, (request.email.lower(),))
+        # Get user from users table
+        query = text("""
+            SELECT id, email, role, password_hash, first_name, last_name, department, is_active
+            FROM users
+            WHERE LOWER(email) = :email
+        """)
         
-        user_data = cursor.fetchone()
+        result = db.execute(query, {"email": request.email.lower()})
+        user_data = result.fetchone()
         
         if not user_data:
-            return LoginResponse(success=False, message="User not found")
+            logger.warning(f"Login attempt for non-existent email: {request.email}")
+            return LoginResponse(success=False, message="Invalid email or password")
+        
+        # Check if user is active
+        if not user_data.is_active:
+            logger.warning(f"Login attempt for inactive user: {request.email}")
+            return LoginResponse(success=False, message="Account is inactive")
         
         # Verify password
-        stored_hash = user_data['password_hash']
-        if not bcrypt.checkpw(request.password.encode('utf-8'), stored_hash.encode('utf-8')):
-            return LoginResponse(success=False, message="Invalid password")
+        stored_hash = user_data.password_hash
+        try:
+            if not bcrypt.checkpw(request.password.encode('utf-8'), stored_hash.encode('utf-8')):
+                logger.warning(f"Invalid password for user: {request.email}")
+                return LoginResponse(success=False, message="Invalid email or password")
+        except Exception as pwd_error:
+            logger.error(f"Password verification error: {str(pwd_error)}")
+            return LoginResponse(success=False, message="Invalid email or password")
         
         # Build user object
+        full_name = f"{user_data.first_name or ''} {user_data.last_name or ''}".strip()
         user = {
-            'id': user_data['id'],
-            'email': user_data['email'], 
-            'role': user_data['role'],
-            'name': user_data['name'],
-            'department': user_data['department_or_program'] if user_data['role'] != 'student' else None,
-            'program': user_data['department_or_program'] if user_data['role'] == 'student' else None
+            'id': user_data.id,
+            'email': user_data.email, 
+            'role': user_data.role,
+            'name': full_name or user_data.email.split('@')[0],
+            'department': user_data.department,
+            'firstName': user_data.first_name,
+            'lastName': user_data.last_name
         }
         
-        logger.info(f"User {request.email} logged in successfully with role {user['role']}")
-        return LoginResponse(success=True, user=user)
+        # Generate JWT token
+        token_data = {
+            "user_id": user['id'],
+            "email": user['email'],
+            "role": user['role']
+        }
+        access_token = create_access_token(token_data)
+        
+        logger.info(f"✅ User {request.email} logged in successfully with role {user['role']}")
+        return LoginResponse(success=True, token=access_token, user=user)
         
     except Exception as e:
-        logger.error(f"Login error for {request.email}: {str(e)}")
+        logger.error(f"❌ Login error for {request.email}: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Authentication failed"
+            detail=f"Authentication failed: {str(e)}"
         )

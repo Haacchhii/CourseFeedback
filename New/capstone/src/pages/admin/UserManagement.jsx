@@ -1,13 +1,16 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getCurrentUser, isSystemAdmin, getRoleDisplayName } from '../../utils/roleUtils'
-import { mockStudents, mockHeads, mockSecretaries, mockAdmins } from '../../data/mock'
+import { adminAPI } from '../../services/api'
 
 export default function UserManagement() {
   const navigate = useNavigate()
   const currentUser = getCurrentUser()
   
   // State
+  const [allUsers, setAllUsers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -17,6 +20,7 @@ export default function UserManagement() {
   const [selectedUser, setSelectedUser] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedUsers, setSelectedUsers] = useState([])
+  const [submitting, setSubmitting] = useState(false)
   const usersPerPage = 10
 
   // Form state
@@ -38,16 +42,26 @@ export default function UserManagement() {
     }
   }, [currentUser, navigate])
 
-  // Combine all users
-  const allUsers = useMemo(() => {
-    const users = [
-      ...mockStudents.map(u => ({ ...u, status: 'Active', userType: 'Student' })),
-      ...mockHeads.map(u => ({ ...u, status: 'Active', userType: 'Department Head' })),
-      ...mockSecretaries.map(u => ({ ...u, status: 'Active', userType: 'Secretary' })),
-      ...mockAdmins.map(u => ({ ...u, status: 'Active', userType: 'System Admin' }))
-    ]
-    return users
-  }, [])
+  // Fetch users from API
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const response = await adminAPI.getUsers()
+        setAllUsers(response || [])
+      } catch (err) {
+        console.error('Error fetching users:', err)
+        setError(err.message || 'Failed to load users')
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    if (currentUser && isSystemAdmin(currentUser)) {
+      fetchUsers()
+    }
+  }, [currentUser])
 
   // Get unique programs
   const programs = useMemo(() => {
@@ -116,32 +130,73 @@ export default function UserManagement() {
     setShowEditModal(true)
   }
 
-  const handleDeleteUser = (user) => {
+  const handleDeleteUser = async (user) => {
     if (window.confirm(`Are you sure you want to delete ${user.name}?\n\nThis action cannot be undone. All evaluation data will be anonymized and preserved.`)) {
-      // In real app: await api.deleteUser(user.email)
-      alert(`User ${user.name} deleted successfully!`)
+      try {
+        setSubmitting(true)
+        await adminAPI.deleteUser(user.id)
+        // Refresh users list
+        const response = await adminAPI.getUsers()
+        setAllUsers(response || [])
+        alert(`User ${user.name} deleted successfully!`)
+      } catch (err) {
+        console.error('Error deleting user:', err)
+        alert(`Failed to delete user: ${err.message}`)
+      } finally {
+        setSubmitting(false)
+      }
     }
   }
 
-  const handleResetPassword = (user) => {
+  const handleResetPassword = async (user) => {
     if (window.confirm(`Reset password for ${user.name}?`)) {
-      // In real app: await api.resetPassword(user.email)
-      alert(`Password reset email sent to ${user.email}`)
+      try {
+        setSubmitting(true)
+        await adminAPI.resetPassword(user.id)
+        alert(`Password reset email sent to ${user.email}`)
+      } catch (err) {
+        console.error('Error resetting password:', err)
+        alert(`Failed to reset password: ${err.message}`)
+      } finally {
+        setSubmitting(false)
+      }
     }
   }
 
-  const handleSubmitAdd = (e) => {
+  const handleSubmitAdd = async (e) => {
     e.preventDefault()
-    // In real app: await api.createUser(formData)
-    alert(`User ${formData.name} created successfully!`)
-    setShowAddModal(false)
+    try {
+      setSubmitting(true)
+      await adminAPI.createUser(formData)
+      // Refresh users list
+      const response = await adminAPI.getUsers()
+      setAllUsers(response || [])
+      alert(`User ${formData.name} created successfully!`)
+      setShowAddModal(false)
+    } catch (err) {
+      console.error('Error creating user:', err)
+      alert(`Failed to create user: ${err.message}`)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  const handleSubmitEdit = (e) => {
+  const handleSubmitEdit = async (e) => {
     e.preventDefault()
-    // In real app: await api.updateUser(selectedUser.email, formData)
-    alert(`User ${formData.name} updated successfully!`)
-    setShowEditModal(false)
+    try {
+      setSubmitting(true)
+      await adminAPI.updateUser(selectedUser.id, formData)
+      // Refresh users list
+      const response = await adminAPI.getUsers()
+      setAllUsers(response || [])
+      alert(`User ${formData.name} updated successfully!`)
+      setShowEditModal(false)
+    } catch (err) {
+      console.error('Error updating user:', err)
+      alert(`Failed to update user: ${err.message}`)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handleBulkAction = (action) => {
@@ -174,6 +229,39 @@ export default function UserManagement() {
   }
 
   if (!currentUser || !isSystemAdmin(currentUser)) return null
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600 font-medium">Loading users...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center bg-white p-8 rounded-xl shadow-lg max-w-md">
+          <svg className="w-16 h-16 text-red-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <h2 className="mt-4 text-2xl font-bold text-gray-900">Error Loading Users</h2>
+          <p className="mt-2 text-gray-600">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -223,7 +311,7 @@ export default function UserManagement() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Students</p>
-                <p className="text-3xl font-bold text-green-600">{mockStudents.length}</p>
+                <p className="text-3xl font-bold text-green-600">{allUsers.filter(u => u.role === 'student').length}</p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                 <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -237,7 +325,7 @@ export default function UserManagement() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Dept Heads</p>
-                <p className="text-3xl font-bold text-purple-600">{mockHeads.length}</p>
+                <p className="text-3xl font-bold text-purple-600">{allUsers.filter(u => u.role === 'department-head').length}</p>
               </div>
               <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
                 <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -250,8 +338,8 @@ export default function UserManagement() {
           <div className="bg-white rounded-xl shadow-md p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Admins</p>
-                <p className="text-3xl font-bold text-red-600">{mockSecretaries.length + mockAdmins.length}</p>
+                <p className="text-sm text-gray-600">Staff Members</p>
+                <p className="text-3xl font-bold text-red-600">{allUsers.filter(u => u.role === 'secretary' || u.role === 'instructor' || u.role === 'department_head' || u.role === 'admin').length}</p>
               </div>
               <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
                 <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -284,9 +372,10 @@ export default function UserManagement() {
               >
                 <option value="all">All Roles</option>
                 <option value="student">Student</option>
-                <option value="head">Department Head</option>
+                <option value="instructor">Instructor</option>
+                <option value="department_head">Department Head</option>
                 <option value="secretary">Secretary</option>
-                <option value="system-admin">System Admin</option>
+                <option value="admin">Administrator</option>
               </select>
             </div>
             <div>
@@ -380,9 +469,11 @@ export default function UserManagement() {
                     <td className="px-6 py-4">
                       <span className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
                         user.role === 'student' ? 'bg-green-100 text-green-800' :
-                        user.role === 'head' ? 'bg-purple-100 text-purple-800' :
+                        user.role === 'instructor' ? 'bg-indigo-100 text-indigo-800' :
+                        user.role === 'department_head' ? 'bg-purple-100 text-purple-800' :
                         user.role === 'secretary' ? 'bg-blue-100 text-blue-800' :
-                        'bg-red-100 text-red-800'
+                        user.role === 'admin' ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-800'
                       }`}>
                         {user.userType}
                       </span>
@@ -516,9 +607,10 @@ export default function UserManagement() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="student">Student</option>
-                  <option value="head">Department Head</option>
+                  <option value="instructor">Instructor</option>
+                  <option value="department_head">Department Head</option>
                   <option value="secretary">Secretary</option>
-                  <option value="system-admin">System Administrator</option>
+                  <option value="admin">Administrator</option>
                 </select>
               </div>
 
@@ -574,9 +666,20 @@ export default function UserManagement() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all"
+                  disabled={submitting}
+                  className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                 >
-                  Create User
+                  {submitting ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Creating...</span>
+                    </>
+                  ) : (
+                    <span>Create User</span>
+                  )}
                 </button>
               </div>
             </form>
@@ -630,9 +733,10 @@ export default function UserManagement() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 >
                   <option value="student">Student</option>
-                  <option value="head">Department Head</option>
+                  <option value="instructor">Instructor</option>
+                  <option value="department_head">Department Head</option>
                   <option value="secretary">Secretary</option>
-                  <option value="system-admin">System Administrator</option>
+                  <option value="admin">Administrator</option>
                 </select>
               </div>
 
@@ -722,9 +826,20 @@ export default function UserManagement() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-all"
+                  disabled={submitting}
+                  className="flex-1 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                 >
-                  Save Changes
+                  {submitting ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <span>Save Changes</span>
+                  )}
                 </button>
               </div>
             </form>

@@ -1,46 +1,18 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getCurrentUser, isSystemAdmin } from '../../utils/roleUtils'
+import { adminAPI } from '../../services/api'
 
 export default function EvaluationPeriodManagement() {
   const navigate = useNavigate()
   const currentUser = getCurrentUser()
   
-  // Mock current period data
-  const [currentPeriod, setCurrentPeriod] = useState({
-    id: 1,
-    name: 'Midterm Evaluation - AY 2024-2025',
-    startDate: '2025-10-01',
-    endDate: '2025-10-31',
-    status: 'Open',
-    totalEvaluations: 1200,
-    completedEvaluations: 756,
-    participationRate: 63,
-    daysRemaining: 11
-  })
-
-  const [pastPeriods] = useState([
-    {
-      id: 0,
-      name: 'Prelim Evaluation - AY 2024-2025',
-      startDate: '2025-08-15',
-      endDate: '2025-09-15',
-      status: 'Closed',
-      participationRate: 89,
-      completedEvaluations: 1068,
-      totalEvaluations: 1200
-    },
-    {
-      id: -1,
-      name: 'Finals Evaluation - AY 2023-2024',
-      startDate: '2024-05-01',
-      endDate: '2024-05-31',
-      status: 'Closed',
-      participationRate: 92,
-      completedEvaluations: 1104,
-      totalEvaluations: 1200
-    }
-  ])
+  // State
+  const [currentPeriod, setCurrentPeriod] = useState(null)
+  const [pastPeriods, setPastPeriods] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
 
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showExtendModal, setShowExtendModal] = useState(false)
@@ -58,45 +30,179 @@ export default function EvaluationPeriodManagement() {
     }
   }, [currentUser, navigate])
 
-  const handleClosePeriod = () => {
+  // Fetch periods from API
+  useEffect(() => {
+    const fetchPeriods = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const periods = await adminAPI.getPeriods()
+        
+        // Separate current and past periods
+        const current = periods.find(p => p.status === 'Open') || null
+        const past = periods.filter(p => p.status === 'Closed')
+        
+        setCurrentPeriod(current)
+        setPastPeriods(past)
+      } catch (err) {
+        console.error('Error fetching periods:', err)
+        setError(err.message || 'Failed to load evaluation periods')
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    if (currentUser && isSystemAdmin(currentUser)) {
+      fetchPeriods()
+    }
+  }, [currentUser])
+
+  const handleClosePeriod = async () => {
+    if (!currentPeriod) return
+    
     if (window.confirm(`Close "${currentPeriod.name}"?\n\nThis will prevent any further evaluations from being submitted. This action cannot be undone.`)) {
-      setCurrentPeriod({ ...currentPeriod, status: 'Closed' })
-      alert('Evaluation period closed successfully!')
+      try {
+        setSubmitting(true)
+        await adminAPI.updatePeriodStatus(currentPeriod.id, 'Closed')
+        
+        // Refresh periods
+        const periods = await adminAPI.getPeriods()
+        const current = periods.find(p => p.status === 'Open') || null
+        const past = periods.filter(p => p.status === 'Closed')
+        setCurrentPeriod(current)
+        setPastPeriods(past)
+        
+        alert('Evaluation period closed successfully!')
+      } catch (err) {
+        alert(`Failed to close period: ${err.message}`)
+      } finally {
+        setSubmitting(false)
+      }
     }
   }
 
-  const handleOpenPeriod = () => {
+  const handleOpenPeriod = async () => {
+    if (!currentPeriod) return
+    
     if (window.confirm(`Reopen "${currentPeriod.name}"?\n\nStudents will be able to submit evaluations again.`)) {
-      setCurrentPeriod({ ...currentPeriod, status: 'Open' })
-      alert('Evaluation period reopened successfully!')
+      try {
+        setSubmitting(true)
+        await adminAPI.updatePeriodStatus(currentPeriod.id, 'Open')
+        
+        // Refresh periods
+        const periods = await adminAPI.getPeriods()
+        const current = periods.find(p => p.status === 'Open') || null
+        const past = periods.filter(p => p.status === 'Closed')
+        setCurrentPeriod(current)
+        setPastPeriods(past)
+        
+        alert('Evaluation period reopened successfully!')
+      } catch (err) {
+        alert(`Failed to reopen period: ${err.message}`)
+      } finally {
+        setSubmitting(false)
+      }
     }
   }
 
-  const handleExtendPeriod = (e) => {
+  const handleExtendPeriod = async (e) => {
     e.preventDefault()
-    alert(`Period extended to ${formData.endDate}. Email notifications sent to all users.`)
-    setCurrentPeriod({ ...currentPeriod, endDate: formData.endDate })
-    setShowExtendModal(false)
+    try {
+      setSubmitting(true)
+      await adminAPI.updatePeriod(currentPeriod.id, { endDate: formData.endDate })
+      
+      // Refresh periods
+      const periods = await adminAPI.getPeriods()
+      const current = periods.find(p => p.status === 'Open') || null
+      setCurrentPeriod(current)
+      
+      alert(`Period extended to ${formData.endDate}. Email notifications sent to all users.`)
+      setShowExtendModal(false)
+    } catch (err) {
+      alert(`Failed to extend period: ${err.message}`)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  const handleCreatePeriod = (e) => {
+  const handleCreatePeriod = async (e) => {
     e.preventDefault()
-    if (currentPeriod.status === 'Open') {
+    if (currentPeriod && currentPeriod.status === 'Open') {
       alert('Please close the current period before creating a new one.')
       return
     }
-    alert(`New evaluation period "${formData.name}" created successfully!`)
-    setShowCreateModal(false)
+    
+    try {
+      setSubmitting(true)
+      await adminAPI.createPeriod(formData)
+      
+      // Refresh periods
+      const periods = await adminAPI.getPeriods()
+      const current = periods.find(p => p.status === 'Open') || null
+      const past = periods.filter(p => p.status === 'Closed')
+      setCurrentPeriod(current)
+      setPastPeriods(past)
+      
+      alert(`New evaluation period "${formData.name}" created successfully!`)
+      setShowCreateModal(false)
+    } catch (err) {
+      alert(`Failed to create period: ${err.message}`)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  const handleSendReminder = () => {
+  const handleSendReminder = async () => {
+    if (!currentPeriod) return
+    
     const pending = currentPeriod.totalEvaluations - currentPeriod.completedEvaluations
     if (window.confirm(`Send reminder email to ${pending} students who haven't completed their evaluations?`)) {
-      alert(`Reminder emails sent to ${pending} students!`)
+      try {
+        setSubmitting(true)
+        await adminAPI.sendEvaluationReminders(currentPeriod.id)
+        alert(`Reminder emails sent to ${pending} students!`)
+      } catch (err) {
+        alert(`Failed to send reminders: ${err.message}`)
+      } finally {
+        setSubmitting(false)
+      }
     }
   }
 
   if (!currentUser || !isSystemAdmin(currentUser)) return null
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600 font-medium">Loading evaluation periods...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center bg-white p-8 rounded-xl shadow-lg max-w-md">
+          <svg className="w-16 h-16 text-red-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <h2 className="mt-4 text-2xl font-bold text-gray-900">Error Loading Periods</h2>
+          <p className="mt-2 text-gray-600">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
