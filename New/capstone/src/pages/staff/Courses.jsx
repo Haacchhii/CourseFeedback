@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
-import { getCurrentUser, isAdmin } from '../../utils/roleUtils'
-import { adminAPI, deptHeadAPI } from '../../services/api'
+import { getCurrentUser, isAdmin, isStaffMember } from '../../utils/roleUtils'
+import { adminAPI, deptHeadAPI, secretaryAPI, instructorAPI } from '../../services/api'
 
 export default function Courses() {
   const currentUser = getCurrentUser()
@@ -41,16 +41,46 @@ export default function Courses() {
         if (selectedProgram !== 'all') filters.program = selectedProgram
         
         let coursesData, evaluationsData
+        
+        // Use appropriate API based on user role
         if (isAdmin(currentUser)) {
           coursesData = await adminAPI.getCourses(filters)
           evaluationsData = await adminAPI.getEvaluations(filters)
-        } else {
+        } else if (currentUser.role === 'secretary') {
+          coursesData = await secretaryAPI.getCourses(filters)
+          evaluationsData = await secretaryAPI.getEvaluations(filters)
+        } else if (currentUser.role === 'department_head') {
           coursesData = await deptHeadAPI.getCourses(filters)
           evaluationsData = await deptHeadAPI.getEvaluations(filters)
+        } else if (currentUser.role === 'instructor') {
+          coursesData = await instructorAPI.getCourses(filters)
+          evaluationsData = await instructorAPI.getEvaluations(filters)
+        } else {
+          throw new Error(`Unsupported role: ${currentUser.role}`)
         }
         
-        setCourses(coursesData || [])
-        setEvaluations(evaluationsData || [])
+        // Extract data from response (handle both direct arrays and {success, data} format)
+        const courses = Array.isArray(coursesData) ? coursesData : (coursesData?.data || [])
+        const evaluations = Array.isArray(evaluationsData) ? evaluationsData : (evaluationsData?.data || [])
+        
+        // Normalize course data (handle different backend formats)
+        const normalizedCourses = courses.map(course => ({
+          id: course.id || course.section_id,
+          name: course.name || course.course_name || '',
+          code: course.code || course.course_code || '',
+          classCode: course.classCode || course.class_code || '',
+          instructor: course.instructor || course.instructor_name || 'N/A',
+          program: course.program || 'N/A',
+          yearLevel: course.yearLevel || course.year_level,
+          enrolledStudents: course.enrolledStudents || course.enrolled_students || 0,
+          semester: course.semester || '',
+          academic_year: course.academic_year || course.academicYear || '',
+          status: course.status || 'active',
+          evaluations_count: course.evaluations_count || course.evaluationCount || 0
+        }))
+        
+        setCourses(normalizedCourses)
+        setEvaluations(evaluations)
       } catch (err) {
         console.error('Error fetching courses:', err)
         setError(err.message || 'Failed to load courses')
@@ -125,14 +155,14 @@ export default function Courses() {
   }
 
   const filteredCourses = enhancedCourses.filter(course => {
-    const matchesSearch = course.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         course.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         course.instructor.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesSearch = (course.name || course.course_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (course.code || course.course_code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (course.instructor || course.instructor_name || '').toLowerCase().includes(searchTerm.toLowerCase())
     const matchesProgram = selectedProgram === 'all' || course.program === selectedProgram
     return matchesSearch && matchesProgram
   })
 
-  const programs = [...new Set(courses.map(course => course.program))]
+  const programs = [...new Set(courses.map(course => course.program).filter(p => p))].filter(p => p !== 'N/A')
 
   const handleCourseClick = async (courseId) => {
     setSubmitting(true)
@@ -148,7 +178,7 @@ export default function Courses() {
         throw new Error('Course not found')
       }
       
-      const courseEvals = accessibleEvaluations.filter(e => e.courseId === courseId)
+      const courseEvals = evaluations.filter(e => e.courseId === courseId)
       
       // Calculate criteria ratings from categoryRatings
       const criteriaRatings = {}

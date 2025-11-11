@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getCurrentUser, isAdmin, isDepartmentHead } from '../../utils/roleUtils'
-import { adminAPI, deptHeadAPI } from '../../services/api'
+import { getCurrentUser, isAdmin, isStaffMember } from '../../utils/roleUtils'
+import { adminAPI, deptHeadAPI, secretaryAPI, instructorAPI } from '../../services/api'
 
 export default function EvaluationQuestions() {
   const navigate = useNavigate()
@@ -37,7 +37,7 @@ export default function EvaluationQuestions() {
       return
     }
     
-    if (!isAdmin(currentUser) && !isDepartmentHead(currentUser)) {
+    if (!isAdmin(currentUser) && !isStaffMember(currentUser)) {
       navigate('/')
       return
     }
@@ -51,12 +51,23 @@ export default function EvaluationQuestions() {
       try {
         setLoading(true)
         let data
+        
+        // Use appropriate API based on user role
         if (isAdmin(currentUser)) {
           data = await adminAPI.getQuestionSets()
-        } else if (isDepartmentHead(currentUser)) {
+        } else if (currentUser.role === 'secretary') {
+          data = await secretaryAPI.getQuestions()
+        } else if (currentUser.role === 'department_head') {
           data = await deptHeadAPI.getQuestions()
+        } else if (currentUser.role === 'instructor') {
+          data = await instructorAPI.getQuestions()
+        } else {
+          throw new Error(`Unsupported role: ${currentUser.role}`)
         }
-        setQuestionSets(data || [])
+        
+        // Extract data from response (handle both direct array and {success, data} format)
+        const questionSets = Array.isArray(data) ? data : (data?.data?.questionSets || data?.data || [])
+        setQuestionSets(questionSets)
       } catch (err) {
         console.error('Error fetching question sets:', err)
         setError(err.message || 'Failed to load question sets')
@@ -73,8 +84,8 @@ export default function EvaluationQuestions() {
     let sets = questionSets
 
     // Filter by user role
-    if (isDepartmentHead(currentUser)) {
-      // Department heads can see global templates and their own department's sets
+    if (isStaffMember(currentUser)) {
+      // Staff can see global templates and their own department's sets
       sets = sets.filter(set => 
         set.type === 'global' || 
         (set.type === 'department' && set.department === currentUser.department)
@@ -84,15 +95,15 @@ export default function EvaluationQuestions() {
     // Apply search and status filters
     return sets.filter(set => {
       const matchesSearch = searchTerm === '' || 
-        set.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        set.description.toLowerCase().includes(searchTerm.toLowerCase())
+        set.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        set.description?.toLowerCase().includes(searchTerm.toLowerCase())
       
       const matchesStatus = statusFilter === 'all' || set.status === statusFilter
       const matchesType = typeFilter === 'all' || set.type === typeFilter
       
       return matchesSearch && matchesStatus && matchesType
     })
-  }, [currentUser, searchTerm, statusFilter, typeFilter])
+  }, [questionSets, currentUser, searchTerm, statusFilter, typeFilter])
 
   // Question set statistics
   const questionSetStats = useMemo(() => {
@@ -239,7 +250,7 @@ export default function EvaluationQuestions() {
                 </>
               )}
               
-              {isDepartmentHead(currentUser) && (
+              {isStaffMember(currentUser) && (
                 <button
                   onClick={() => setShowCreateModal(true)}
                   className="lpu-btn-primary inline-flex items-center"
@@ -531,7 +542,7 @@ export default function EvaluationQuestions() {
                         Preview Questions
                       </button>
                       {(isAdmin(currentUser) || 
-                        (isDepartmentHead(currentUser) && questionSet.department === currentUser.department)) && (
+                        (isStaffMember(currentUser) && questionSet.department === currentUser.department)) && (
                         <>
                           <button className="text-blue-600 hover:text-blue-800 text-sm font-semibold hover:underline transition-colors duration-200">
                             Edit Template
@@ -589,7 +600,7 @@ export default function EvaluationQuestions() {
                     : 'No question sets are available yet. Create your first template to get started.'
                   }
                 </p>
-                {isDepartmentHead(currentUser) && !searchTerm && statusFilter === 'all' && typeFilter === 'all' && (
+                {isStaffMember(currentUser) && !searchTerm && statusFilter === 'all' && typeFilter === 'all' && (
                   <button
                     onClick={() => setShowCreateModal(true)}
                     className="lpu-btn-primary"

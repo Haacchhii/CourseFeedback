@@ -1,38 +1,23 @@
 # Models package initialization
-from .enhanced_models import (
+# Updated to use thesis_models.py (simplified schema for ML thesis)
+from .thesis_models import (
     Base,
     User,
     Student,
-    DepartmentHead,
-    Secretary,
     Course,
     ClassSection,
     Enrollment,
     Evaluation,
-    EvaluationPeriod,
-    Program,
-    AnalysisResult,
-    FirebaseSyncLog,
-    NotificationQueue,
-    AuditLog,
-    SystemSettings
+    Program
 )
 
 __all__ = [
     "Base",
     "User",
     "Student",
-    "DepartmentHead",
-    "Secretary",
     "Course",
     "ClassSection",
     "Enrollment",
     "Evaluation",
-    "EvaluationPeriod",
-    "Program",
-    "AnalysisResult",
-    "FirebaseSyncLog",
-    "NotificationQueue",
-    "AuditLog",
-    "SystemSettings"
+    "Program"
 ]

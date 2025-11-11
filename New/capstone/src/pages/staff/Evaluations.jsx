@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
-import { getCurrentUser, isAdmin, isDepartmentHead } from '../../utils/roleUtils'
-import { adminAPI, deptHeadAPI } from '../../services/api'
+import { getCurrentUser, isAdmin, isStaffMember } from '../../utils/roleUtils'
+import { adminAPI, deptHeadAPI, secretaryAPI, instructorAPI } from '../../services/api'
 
 export default function Evaluations() {
   const navigate = useNavigate()
@@ -29,7 +29,7 @@ export default function Evaluations() {
       return
     }
     
-    if (!isAdmin(currentUser) && !isDepartmentHead(currentUser)) {
+    if (!isAdmin(currentUser) && !isStaffMember(currentUser)) {
       navigate('/')
       return
     }
@@ -49,16 +49,30 @@ export default function Evaluations() {
         if (yearLevelFilter !== 'all') filters.yearLevel = yearLevelFilter
         
         let evaluationsData, coursesData
+        
+        // Use appropriate API based on user role
         if (isAdmin(currentUser)) {
           evaluationsData = await adminAPI.getEvaluations(filters)
           coursesData = await adminAPI.getCourses()
-        } else if (isDepartmentHead(currentUser)) {
+        } else if (currentUser.role === 'secretary') {
+          evaluationsData = await secretaryAPI.getEvaluations(filters)
+          coursesData = await secretaryAPI.getCourses()
+        } else if (currentUser.role === 'department_head') {
           evaluationsData = await deptHeadAPI.getEvaluations(filters)
           coursesData = await deptHeadAPI.getCourses()
+        } else if (currentUser.role === 'instructor') {
+          evaluationsData = await instructorAPI.getEvaluations(filters)
+          coursesData = await instructorAPI.getCourses()
+        } else {
+          throw new Error(`Unsupported role: ${currentUser.role}`)
         }
         
-        setEvaluations(evaluationsData || [])
-        setCourses(coursesData || [])
+        // Extract data from response (handle both direct arrays and {success, data} format)
+        const evaluations = Array.isArray(evaluationsData) ? evaluationsData : (evaluationsData?.data || [])
+        const courses = Array.isArray(coursesData) ? coursesData : (coursesData?.data || [])
+        
+        setEvaluations(evaluations)
+        setCourses(courses)
       } catch (err) {
         console.error('Error fetching evaluations:', err)
         setError(err.message || 'Failed to load evaluations')
@@ -116,7 +130,7 @@ export default function Evaluations() {
         submittedDate
       }
     })
-  }, [accessibleEvaluations, accessibleCourses])
+  }, [evaluations, courses])
 
   // Filter evaluations based on search and filters
   const filteredEvaluations = useMemo(() => {
@@ -145,7 +159,7 @@ export default function Evaluations() {
     const anomalies = enhancedEvaluations.filter(e => e.anomaly).length
 
     // Calculate total enrolled students and participation rate
-    const totalEnrolledStudents = accessibleCourses.reduce((sum, course) => sum + (course.enrolledStudents || 0), 0)
+    const totalEnrolledStudents = courses.reduce((sum, course) => sum + (course.enrolledStudents || 0), 0)
     const participationRate = totalEnrolledStudents > 0 ? Math.round((total / totalEnrolledStudents) * 100) : 0
 
     // Calculate average rating across all evaluations
@@ -167,7 +181,7 @@ export default function Evaluations() {
       totalEnrolledStudents,
       participationRate
     }
-  }, [enhancedEvaluations, accessibleCourses])
+  }, [enhancedEvaluations, courses])
 
   // Sentiment trend data for chart - adapts based on user role
   const sentimentTrendData = useMemo(() => {
@@ -191,7 +205,7 @@ export default function Evaluations() {
     } else {
       // Department Head: Sentiment by Subject/Course
       // Get unique courses for department head's assigned programs
-      const departmentCourses = accessibleCourses
+      const departmentCourses = courses
         .filter(course => currentUser?.assignedPrograms?.includes(course.program))
         .slice(0, 8) // Limit to 8 courses for better visualization
       
@@ -211,7 +225,7 @@ export default function Evaluations() {
         }
       })
     }
-  }, [enhancedEvaluations, filterOptions.programs, accessibleCourses, currentUser])
+  }, [enhancedEvaluations, filterOptions.programs, courses, currentUser])
 
   const getSentimentColor = (sentiment) => {
     switch (sentiment) {

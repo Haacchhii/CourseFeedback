@@ -49,7 +49,7 @@ export default function UserManagement() {
         setLoading(true)
         setError(null)
         const response = await adminAPI.getUsers()
-        setAllUsers(response || [])
+        setAllUsers(response?.data || [])
       } catch (err) {
         console.error('Error fetching users:', err)
         setError(err.message || 'Failed to load users')
@@ -76,8 +76,9 @@ export default function UserManagement() {
   // Filter users
   const filteredUsers = useMemo(() => {
     return allUsers.filter(user => {
+      const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim()
       const matchesSearch = searchTerm === '' || 
-        user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.email.toLowerCase().includes(searchTerm.toLowerCase())
       
       const matchesRole = roleFilter === 'all' || user.role === roleFilter
@@ -118,7 +119,7 @@ export default function UserManagement() {
   const handleEditUser = (user) => {
     setSelectedUser(user)
     setFormData({
-      name: user.name,
+      name: `${user.first_name || ''} ${user.last_name || ''}`.trim(),
       email: user.email,
       role: user.role,
       program: user.program || 'BSIT',
@@ -131,14 +132,15 @@ export default function UserManagement() {
   }
 
   const handleDeleteUser = async (user) => {
-    if (window.confirm(`Are you sure you want to delete ${user.name}?\n\nThis action cannot be undone. All evaluation data will be anonymized and preserved.`)) {
+    const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim()
+    if (window.confirm(`Are you sure you want to delete ${fullName}?\n\nThis action cannot be undone. All evaluation data will be anonymized and preserved.`)) {
       try {
         setSubmitting(true)
         await adminAPI.deleteUser(user.id)
         // Refresh users list
         const response = await adminAPI.getUsers()
-        setAllUsers(response || [])
-        alert(`User ${user.name} deleted successfully!`)
+        setAllUsers(response?.data || [])
+        alert(`User ${fullName} deleted successfully!`)
       } catch (err) {
         console.error('Error deleting user:', err)
         alert(`Failed to delete user: ${err.message}`)
@@ -149,7 +151,8 @@ export default function UserManagement() {
   }
 
   const handleResetPassword = async (user) => {
-    if (window.confirm(`Reset password for ${user.name}?`)) {
+    const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim()
+    if (window.confirm(`Reset password for ${fullName}?`)) {
       try {
         setSubmitting(true)
         await adminAPI.resetPassword(user.id)
@@ -170,7 +173,7 @@ export default function UserManagement() {
       await adminAPI.createUser(formData)
       // Refresh users list
       const response = await adminAPI.getUsers()
-      setAllUsers(response || [])
+      setAllUsers(response?.data || [])
       alert(`User ${formData.name} created successfully!`)
       setShowAddModal(false)
     } catch (err) {
@@ -188,7 +191,7 @@ export default function UserManagement() {
       await adminAPI.updateUser(selectedUser.id, formData)
       // Refresh users list
       const response = await adminAPI.getUsers()
-      setAllUsers(response || [])
+      setAllUsers(response?.data || [])
       alert(`User ${formData.name} updated successfully!`)
       setShowEditModal(false)
     } catch (err) {
@@ -460,9 +463,9 @@ export default function UserManagement() {
                     <td className="px-6 py-4">
                       <div className="flex items-center">
                         <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold mr-3">
-                          {user.name.charAt(0)}
+                          {(user.first_name?.[0] || user.email?.[0] || '?').toUpperCase()}
                         </div>
-                        <span className="font-medium text-gray-900">{user.name}</span>
+                        <span className="font-medium text-gray-900">{`${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">{user.email}</td>
@@ -693,7 +696,7 @@ export default function UserManagement() {
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="bg-gradient-to-r from-purple-600 to-purple-700 p-6 border-b-4 border-purple-800">
               <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-white">✏️ Edit User: {selectedUser.name}</h2>
+                <h2 className="text-2xl font-bold text-white">✏️ Edit User: {`${selectedUser.first_name || ''} ${selectedUser.last_name || ''}`.trim() || selectedUser.email}</h2>
                 <button onClick={() => setShowEditModal(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
                   <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>

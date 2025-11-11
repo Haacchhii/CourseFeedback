@@ -156,3 +156,25 @@ export function getRoleDisplayName(user) {
     default: return user.role || 'User'
   }
 }
+
+// Get the appropriate API object based on user role
+export function getRoleBasedAPI(user, apiModule) {
+  if (!user || !apiModule) return null
+  
+  const role = user.role?.toLowerCase()
+  
+  switch(role) {
+    case 'admin':
+      return apiModule.adminAPI
+    case 'secretary':
+      return apiModule.secretaryAPI
+    case 'department_head':
+      return apiModule.deptHeadAPI
+    case 'instructor':
+      return apiModule.instructorAPI
+    case 'student':
+      return apiModule.studentAPI
+    default:
+      return null
+  }
+}

@@ -579,8 +579,8 @@ async def get_all_courses(
             search_filter = f"%{search}%"
             query = query.filter(
                 or_(
-                    Course.course_code.ilike(search_filter),
-                    Course.course_name.ilike(search_filter)
+                    Course.subject_code.ilike(search_filter),
+                    Course.subject_name.ilike(search_filter)
                 )
             )
         
@@ -596,12 +596,11 @@ async def get_all_courses(
         
         courses_data = [{
             "id": c.id,
-            "course_code": c.course_code,
-            "course_name": c.course_name,
+            "course_code": c.subject_code,  # Map to frontend expectation
+            "course_name": c.subject_name,  # Map to frontend expectation
             "program_id": c.program_id,
             "year_level": c.year_level,
             "semester": c.semester,
-            "units": c.units,
             "created_at": c.created_at.isoformat() if c.created_at else None
         } for c in courses]
         

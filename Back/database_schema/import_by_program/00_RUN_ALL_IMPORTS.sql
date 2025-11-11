@@ -1,0 +1,34 @@
+-- ===============================================
+-- MASTER IMPORT SCRIPT - RUN ALL PROGRAMS & COURSES
+-- Generated: 2025-11-07 00:37:40
+-- Total Programs: 7
+-- Total Courses: 367
+-- ===============================================
+
+-- INSTRUCTIONS:
+-- Copy and paste the contents of each file below in order
+-- OR run each file separately in Supabase SQL Editor
+
+-- Files to run in order:
+-- 1. 01_insert_programs.sql
+-- 2. 02_courses_BSCS-DS.sql
+-- 3. 03_courses_BS-CYBER.sql
+-- 4. 04_courses_BSIT.sql
+-- 5. 05_courses_BSPSY.sql
+-- 6. 06_courses_BAPSY.sql
+-- 7. 07_courses_BMA.sql
+-- 8. 08_courses_ABCOMM.sql
+-- 9. 09_reset_sequences.sql
+
+-- ===============================================
+-- If running in psql or can use \i command:
+-- ===============================================
+-- \i import_by_program/01_insert_programs.sql
+-- \i import_by_program/02_courses_BSCS-DS.sql
+-- \i import_by_program/03_courses_BS-CYBER.sql
+-- \i import_by_program/04_courses_BSIT.sql
+-- \i import_by_program/05_courses_BSPSY.sql
+-- \i import_by_program/06_courses_BAPSY.sql
+-- \i import_by_program/07_courses_BMA.sql
+-- \i import_by_program/08_courses_ABCOMM.sql
+-- \i import_by_program/09_reset_sequences.sql

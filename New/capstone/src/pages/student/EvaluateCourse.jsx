@@ -9,7 +9,12 @@ export default function EvaluateCourse(){
   const [course, setCourse] = useState(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [ratings, setRatings] = useState({ content: null, delivery: null, assessment: null, support: null, overall: null })
+  const [ratings, setRatings] = useState({ 
+    content: null, 
+    teaching: null, 
+    engagement: null, 
+    overall: null 
+  })
   const [comment, setComment] = useState('')
   const [error, setError] = useState('')
   const nav = useNavigate()
@@ -32,11 +37,10 @@ export default function EvaluateCourse(){
   }, [courseId])
 
   const questions = [
-    { key: 'content', title: 'Content Quality', help: 'How would you rate the quality of course materials?' },
-    { key: 'delivery', title: 'Delivery Method', help: 'How effective was the teaching approach?' },
-    { key: 'assessment', title: 'Assessment Fairness', help: 'How fair and appropriate were the assessments?' },
-    { key: 'support', title: 'Support Provided', help: 'How would you rate the support provided during the course?' },
-    { key: 'overall', title: 'Overall Rating', help: 'How would you rate the overall course experience?' }
+    { key: 'content', title: 'Content Quality', help: 'How would you rate the quality and relevance of course materials?' },
+    { key: 'teaching', title: 'Teaching Effectiveness', help: 'How effective was the instructor\'s teaching approach?' },
+    { key: 'engagement', title: 'Student Engagement', help: 'How engaging was the course overall?' },
+    { key: 'overall', title: 'Overall Satisfaction', help: 'How would you rate your overall course experience?' }
   ]
 
   function setRating(k, v){ setRatings(prev => ({...prev, [k]: Number(v)})) }
@@ -112,8 +116,9 @@ export default function EvaluateCourse(){
                 <div className="text-xs text-gray-500">{q.help}</div>
               </div>
               <div className="flex items-center gap-6 mt-2">
+                <span className="text-xs text-gray-500 w-24">Strongly Disagree</span>
                 <div className="flex items-center gap-3">
-                  {[1,2,3,4,5].map(n => (
+                  {[1,2,3,4].map(n => (
                     <label key={n} className="flex flex-col items-center text-center text-xs">
                       <input
                         type="radio"
@@ -123,10 +128,14 @@ export default function EvaluateCourse(){
                         onChange={e=>setRating(q.key, e.target.value)}
                         className="sr-only"
                       />
-                      <span className={`w-8 h-8 flex items-center justify-center rounded-full border ${ratings[q.key]===n ? 'bg-[#7a0000] text-white border-[#7a0000]' : 'bg-white text-gray-700 border-gray-300'}`}>{n}</span>
+                      <span className={`w-10 h-10 flex items-center justify-center rounded-full border-2 font-semibold ${ratings[q.key]===n ? 'bg-[#7a0000] text-white border-[#7a0000]' : 'bg-white text-gray-700 border-gray-300 hover:border-[#7a0000]'}`}>{n}</span>
+                      <span className="mt-1 text-[10px] text-gray-500">
+                        {n === 1 ? 'Strongly\nDisagree' : n === 2 ? 'Disagree' : n === 3 ? 'Agree' : 'Strongly\nAgree'}
+                      </span>
                     </label>
                   ))}
                 </div>
+                <span className="text-xs text-gray-500 w-24">Strongly Agree</span>
               </div>
             </div>
           ))}

@@ -56,8 +56,8 @@ export default function EnhancedCourseManagement() {
           adminAPI.getCourses(),
           adminAPI.getInstructors()
         ])
-        setCourses(coursesData || [])
-        setInstructors(instructorsData || [])
+        setCourses(coursesData?.data || [])
+        setInstructors(instructorsData?.data || [])
       } catch (err) {
         setError(err.message)
       } finally {
@@ -172,7 +172,7 @@ export default function EnhancedCourseManagement() {
       setSubmitting(true)
       await adminAPI.createCourse(formData)
       const updatedCourses = await adminAPI.getCourses()
-      setCourses(updatedCourses || [])
+      setCourses(updatedCourses?.data || [])
       alert(`Course "${formData.name}" created successfully!`)
       setShowAddModal(false)
       setFormData({
@@ -227,7 +227,7 @@ export default function EnhancedCourseManagement() {
       try {
         await adminAPI.updateCourse(course.id, { status: 'Archived' })
         const updatedCourses = await adminAPI.getCourses()
-        setCourses(updatedCourses || [])
+        setCourses(updatedCourses?.data || [])
         alert(`Course "${course.name}" archived successfully!`)
       } catch (err) {
         alert(`Failed to archive course: ${err.message}`)

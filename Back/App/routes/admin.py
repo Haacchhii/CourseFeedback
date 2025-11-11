@@ -13,6 +13,133 @@ import logging
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+@router.get("/dashboard-stats")
+async def get_dashboard_stats(db: Session = Depends(get_db)):
+    """Get comprehensive dashboard statistics for admin"""
+    print("🔍 DEBUG: /dashboard-stats endpoint hit!")
+    try:
+        # Get overall counts
+        counts_query = text("""
+            SELECT 
+                (SELECT COUNT(*) FROM users) as total_users,
+                (SELECT COUNT(*) FROM users WHERE role = 'student') as total_students,
+                (SELECT COUNT(*) FROM users WHERE role = 'instructor') as total_instructors,
+                (SELECT COUNT(*) FROM users WHERE role = 'secretary') as total_secretaries,
+                (SELECT COUNT(*) FROM users WHERE role = 'admin') as total_admins,
+                (SELECT COUNT(*) FROM courses) as total_courses,
+                (SELECT COUNT(*) FROM evaluations) as total_evaluations,
+                (SELECT COUNT(*) FROM programs) as total_programs,
+                (SELECT COUNT(*) FROM class_sections) as total_class_sections
+        """)
+        
+        counts_result = db.execute(counts_query).fetchone()
+        
+        # Get program statistics
+        program_stats_query = text("""
+            SELECT 
+                p.program_code,
+                p.program_name,
+                COUNT(DISTINCT c.id) as courses,
+                COUNT(DISTINCT s.id) as students,
+                COUNT(DISTINCT e.id) as evaluations
+            FROM programs p
+            LEFT JOIN courses c ON p.id = c.program_id
+            LEFT JOIN students s ON p.id = s.program_id
+            LEFT JOIN enrollments en ON s.id = en.student_id
+            LEFT JOIN evaluations e ON en.class_section_id = e.class_section_id AND en.student_id = e.student_id
+            GROUP BY p.id, p.program_code, p.program_name
+            ORDER BY p.program_code
+        """)
+        
+        program_results = db.execute(program_stats_query)
+        program_stats = {}
+        for row in program_results:
+            program_stats[row[0]] = {
+                "name": row[1],
+                "courses": row[2] or 0,
+                "students": row[3] or 0,
+                "evaluations": row[4] or 0
+            }
+        
+        # Get sentiment statistics (if sentiment field exists)
+        sentiment_query = text("""
+            SELECT 
+                sentiment,
+                COUNT(*) as count
+            FROM evaluations
+            WHERE sentiment IS NOT NULL
+            GROUP BY sentiment
+        """)
+        
+        try:
+            sentiment_results = db.execute(sentiment_query)
+            sentiment_stats = {
+                "positive": 0,
+                "neutral": 0,
+                "negative": 0
+            }
+            for row in sentiment_results:
+                sentiment = row[0].lower() if row[0] else "neutral"
+                if sentiment in sentiment_stats:
+                    sentiment_stats[sentiment] = row[1]
+        except:
+            # If sentiment column doesn't exist, return zeros
+            sentiment_stats = {"positive": 0, "neutral": 0, "negative": 0}
+        
+        # Get recent evaluations
+        recent_query = text("""
+            SELECT 
+                e.id,
+                e.submitted_at,
+                u.email as student_email,
+                c.subject_name,
+                e.rating_overall
+            FROM evaluations e
+            JOIN students s ON e.student_id = s.id
+            JOIN users u ON s.user_id = u.id
+            JOIN class_sections cs ON e.class_section_id = cs.id
+            JOIN courses c ON cs.course_id = c.id
+            ORDER BY e.submitted_at DESC
+            LIMIT 10
+        """)
+        
+        recent_results = db.execute(recent_query)
+        recent_evaluations = [
+            {
+                "id": row[0],
+                "submitted_at": str(row[1]) if row[1] else None,
+                "student_email": row[2],
+                "course_name": row[3],
+                "rating": row[4]
+            }
+            for row in recent_results
+        ]
+        
+        return {
+            "success": True,
+            "data": {
+                "totalUsers": counts_result[0] if counts_result else 0,
+                "totalCourses": counts_result[5] if counts_result else 0,
+                "totalEvaluations": counts_result[6] if counts_result else 0,
+                "totalPrograms": counts_result[7] if counts_result else 0,
+                "userRoles": {
+                    "students": counts_result[1] if counts_result else 0,
+                    "instructors": counts_result[2] if counts_result else 0,
+                    "secretaries": counts_result[3] if counts_result else 0,
+                    "admins": counts_result[4] if counts_result else 0,
+                    "departmentHeads": 0  # Legacy field
+                },
+                "programStats": program_stats,
+                "sentimentStats": sentiment_stats,
+                "recentEvaluations": recent_evaluations,
+                "classSections": counts_result[8] if counts_result else 0
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting dashboard stats: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to fetch dashboard statistics: {str(e)}")
+
 @router.get("/department-overview")
 async def get_department_overview(db: Session = Depends(get_db)):
     """Get overview statistics for all departments"""

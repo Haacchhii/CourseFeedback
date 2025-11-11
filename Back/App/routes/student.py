@@ -15,41 +15,52 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 class EvaluationSubmission(BaseModel):
-    course_id: int
+    class_section_id: int
+    student_id: int
     ratings: Dict[str, Any]
     comment: Optional[str] = None
 
-@router.get("/student/{student_id}/courses")
+@router.get("/{student_id}/courses")
 async def get_student_courses(student_id: int, db: Session = Depends(get_db)):
     """Get all courses available to a specific student"""
     try:
-        # First verify student exists
-        student_result = db.execute(text("""
-            SELECT s.id, s.program, s.year_level, s.first_name, s.last_name
+        # First get student record to find user_id
+        student_query = text("""
+            SELECT s.id, s.student_number, s.program_id, s.year_level, s.user_id
             FROM students s
-            WHERE s.id = :student_id
-        """), {"student_id": student_id})
+            WHERE s.id = :student_id OR s.user_id = :student_id
+        """)
         
+        student_result = db.execute(student_query, {"student_id": student_id})
         student_data = student_result.fetchone()
+        
         if not student_data:
             raise HTTPException(status_code=404, detail="Student not found")
         
-        # Get courses for this student's program and year level
+        actual_student_id = student_data[0]  # Get the actual student table ID
+        
+        # Get enrolled courses for this student
         courses_result = db.execute(text("""
-            SELECT 
-                c.id, c.code, c.name, c.description, c.credits,
-                c.semester, c.academic_year,
-                d.name as department_name,
+            SELECT DISTINCT
+                c.id, c.subject_code, c.subject_name,
+                cs.id as class_section_id, cs.class_code,
+                cs.semester, cs.academic_year,
+                p.program_name,
+                u.first_name || ' ' || u.last_name as instructor_name,
                 CASE 
                     WHEN e.id IS NOT NULL THEN true 
                     ELSE false 
                 END as already_evaluated
-            FROM courses c
-            LEFT JOIN departments d ON c.department_id = d.id
-            LEFT JOIN evaluations e ON c.id = e.course_id AND e.student_id = :student_id
-            WHERE c.semester = '1st Semester' AND c.academic_year = '2024-2025'
-            ORDER BY c.name
-        """), {"student_id": student_id})
+            FROM enrollments enr
+            JOIN class_sections cs ON enr.class_section_id = cs.id
+            JOIN courses c ON cs.course_id = c.id
+            LEFT JOIN programs p ON c.program_id = p.id
+            LEFT JOIN users u ON cs.instructor_id = u.id
+            LEFT JOIN evaluations e ON cs.id = e.class_section_id AND e.student_id = :student_id
+            WHERE enr.student_id = :student_id
+            AND enr.status = 'active'
+            ORDER BY c.subject_name
+        """), {"student_id": actual_student_id})
         
         courses = []
         for row in courses_result:
@@ -57,102 +68,121 @@ async def get_student_courses(student_id: int, db: Session = Depends(get_db)):
                 "id": row[0],
                 "code": row[1], 
                 "name": row[2],
-                "description": row[3] or "",
-                "credits": row[4],
+                "class_section_id": row[3],
+                "class_code": row[4],
                 "semester": row[5],
                 "academic_year": row[6],
-                "department_name": row[7] or "Unknown",
-                "already_evaluated": row[8],
-                "instructor": "TBA",  # Will be enhanced later
-                "program": student_data[1],
-                "yearLevel": student_data[2]
+                "program_name": row[7] or "Unknown",
+                "instructor_name": row[8] or "TBA",
+                "already_evaluated": row[9]
             })
         
         return {
             "success": True,
             "data": courses,
             "student_info": {
-                "name": f"{student_data[3]} {student_data[4]}",
-                "program": student_data[1],
-                "year_level": student_data[2]
+                "student_number": student_data[1],
+                "program_id": student_data[2],
+                "year_level": student_data[3]
             }
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting student courses: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch student courses")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to fetch student courses: {str(e)}")
 
-@router.post("/student/evaluations")
+@router.post("/evaluations")
 async def submit_evaluation(evaluation: EvaluationSubmission, db: Session = Depends(get_db)):
-    """Submit a course evaluation"""
+    """
+    Submit a course evaluation
+    Rating Scale: 1 = Strongly Disagree, 2 = Disagree, 3 = Agree, 4 = Strongly Agree
+    """
     try:
-        # Verify course exists
-        course_result = db.execute(text("""
-            SELECT id, name FROM courses WHERE id = :course_id
-        """), {"course_id": evaluation.course_id})
+        # Verify class section exists
+        class_section_result = db.execute(text("""
+            SELECT cs.id, cs.class_code, c.subject_name
+            FROM class_sections cs
+            JOIN courses c ON cs.course_id = c.id
+            WHERE cs.id = :class_section_id
+        """), {"class_section_id": evaluation.class_section_id})
         
-        course_data = course_result.fetchone()
-        if not course_data:
-            raise HTTPException(status_code=404, detail="Course not found")
+        class_section_data = class_section_result.fetchone()
+        if not class_section_data:
+            raise HTTPException(status_code=404, detail="Class section not found")
         
-        # For now, we'll use a default student ID of 1
-        # In a real application, this would come from authentication
-        student_id = 1
+        # Verify student exists
+        student_result = db.execute(text("""
+            SELECT id FROM students WHERE id = :student_id
+        """), {"student_id": evaluation.student_id})
         
-        # Check if student has already evaluated this course
+        if not student_result.fetchone():
+            raise HTTPException(status_code=404, detail="Student not found")
+        
+        # Check if student has already evaluated this class section
         existing_eval = db.execute(text("""
             SELECT id FROM evaluations 
-            WHERE course_id = :course_id AND student_id = :student_id
+            WHERE class_section_id = :class_section_id AND student_id = :student_id
         """), {
-            "course_id": evaluation.course_id,
-            "student_id": student_id
+            "class_section_id": evaluation.class_section_id,
+            "student_id": evaluation.student_id
         }).fetchone()
         
         if existing_eval:
-            raise HTTPException(status_code=400, detail="Course already evaluated")
+            raise HTTPException(status_code=400, detail="Class section already evaluated")
         
-        # Calculate overall rating from individual ratings
+        # Extract ratings (1-4 scale)
         ratings = evaluation.ratings
-        total_rating = sum([
-            int(ratings.get('teaching_effectiveness', 0)),
-            int(ratings.get('course_content', 0)), 
-            int(ratings.get('learning_environment', 0)),
-            int(ratings.get('assessment_methods', 0)),
-            int(ratings.get('instructor_knowledge', 0))
-        ])
-        average_rating = round(total_rating / 5, 1) if total_rating > 0 else 0
+        rating_teaching = int(ratings.get('teaching', 0))
+        rating_content = int(ratings.get('content', 0))
+        rating_engagement = int(ratings.get('engagement', 0))
+        rating_overall = int(ratings.get('overall', 0))
         
-        # Insert evaluation
+        # Validate ratings are in 1-4 range
+        for rating in [rating_teaching, rating_content, rating_engagement, rating_overall]:
+            if not (1 <= rating <= 4):
+                raise HTTPException(status_code=400, detail="Ratings must be between 1 and 4")
+        
+        # Insert evaluation (ML processing will be done separately)
         db.execute(text("""
             INSERT INTO evaluations (
-                student_id, course_id, rating, comment, 
-                teaching_effectiveness, course_content, learning_environment,
-                assessment_methods, instructor_knowledge, created_at
+                student_id, class_section_id,
+                rating_teaching, rating_content, rating_engagement, rating_overall,
+                text_feedback, suggestions,
+                processing_status, submission_date
             ) VALUES (
-                :student_id, :course_id, :rating, :comment,
-                :teaching_effectiveness, :course_content, :learning_environment,
-                :assessment_methods, :instructor_knowledge, NOW()
+                :student_id, :class_section_id,
+                :rating_teaching, :rating_content, :rating_engagement, :rating_overall,
+                :text_feedback, :suggestions,
+                'pending', NOW()
             )
         """), {
-            "student_id": student_id,
-            "course_id": evaluation.course_id,
-            "rating": average_rating,
-            "comment": evaluation.comment or "",
-            "teaching_effectiveness": int(ratings.get('teaching_effectiveness', 0)),
-            "course_content": int(ratings.get('course_content', 0)),
-            "learning_environment": int(ratings.get('learning_environment', 0)),
-            "assessment_methods": int(ratings.get('assessment_methods', 0)),
-            "instructor_knowledge": int(ratings.get('instructor_knowledge', 0))
+            "student_id": evaluation.student_id,
+            "class_section_id": evaluation.class_section_id,
+            "rating_teaching": rating_teaching,
+            "rating_content": rating_content,
+            "rating_engagement": rating_engagement,
+            "rating_overall": rating_overall,
+            "text_feedback": evaluation.comment or "",
+            "suggestions": ""
         })
         
         db.commit()
         
         return {
             "success": True,
-            "message": f"Evaluation submitted successfully for {course_data[1]}",
+            "message": f"Evaluation submitted successfully for {class_section_data.subject_name}",
             "data": {
-                "course_id": evaluation.course_id,
-                "overall_rating": average_rating,
+                "class_section_id": evaluation.class_section_id,
+                "ratings": {
+                    "teaching": rating_teaching,
+                    "content": rating_content,
+                    "engagement": rating_engagement,
+                    "overall": rating_overall
+                },
                 "submitted_at": "now"
             }
         }
@@ -164,38 +194,44 @@ async def submit_evaluation(evaluation: EvaluationSubmission, db: Session = Depe
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to submit evaluation")
 
-@router.get("/student/{student_id}/evaluations")  
+@router.get("/{student_id}/evaluations")  
 async def get_student_evaluations(student_id: int, db: Session = Depends(get_db)):
     """Get all evaluations submitted by a student"""
     try:
         result = db.execute(text("""
             SELECT 
-                e.id, e.rating, e.comment, e.created_at,
-                c.name as course_name, c.code as course_code,
-                e.teaching_effectiveness, e.course_content, 
-                e.learning_environment, e.assessment_methods, e.instructor_knowledge
+                e.id, e.rating_teaching, e.rating_content, e.rating_engagement, e.rating_overall,
+                e.text_feedback, e.submission_date,
+                e.sentiment, e.sentiment_score, e.is_anomaly,
+                c.subject_name, c.subject_code, cs.class_code,
+                u.first_name || ' ' || u.last_name as instructor_name
             FROM evaluations e
-            LEFT JOIN courses c ON e.course_id = c.id
+            JOIN class_sections cs ON e.class_section_id = cs.id
+            JOIN courses c ON cs.course_id = c.id
+            LEFT JOIN users u ON cs.instructor_id = u.id
             WHERE e.student_id = :student_id
-            ORDER BY e.created_at DESC
+            ORDER BY e.submission_date DESC
         """), {"student_id": student_id})
         
         evaluations = []
         for row in result:
             evaluations.append({
                 "id": row[0],
-                "overall_rating": row[1],
-                "comment": row[2],
-                "created_at": row[3].isoformat() if row[3] else None,
-                "course_name": row[4],
-                "course_code": row[5], 
-                "detailed_ratings": {
-                    "teaching_effectiveness": row[6],
-                    "course_content": row[7],
-                    "learning_environment": row[8],
-                    "assessment_methods": row[9],
-                    "instructor_knowledge": row[10]
-                }
+                "ratings": {
+                    "teaching": row[1],
+                    "content": row[2],
+                    "engagement": row[3],
+                    "overall": row[4]
+                },
+                "text_feedback": row[5],
+                "submission_date": row[6].isoformat() if row[6] else None,
+                "sentiment": row[7],
+                "sentiment_score": row[8],
+                "is_anomaly": row[9],
+                "course_name": row[10],
+                "course_code": row[11],
+                "class_code": row[12],
+                "instructor_name": row[13] or "TBA"
             })
         
         return {

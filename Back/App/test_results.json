@@ -1,0 +1,353 @@
+{
+  "timestamp": "2025-11-11T10:43:25.411419",
+  "total": 43,
+  "passed": 0,
+  "failed": 43,
+  "pass_rate": 0.0,
+  "results": [
+    {
+      "method": "GET",
+      "path": "/",
+      "status_code": 0,
+      "description": "Root endpoint",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: / (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684A96F90>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "status_code": 0,
+      "description": "Health check",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /health (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684A5B610>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "status_code": 0,
+      "description": "Login endpoint",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/auth/login (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684A5BED0>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/student/1/courses",
+      "status_code": 0,
+      "description": "Get student courses",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/student/1/courses (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684A6B820>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/student/1/evaluations",
+      "status_code": 0,
+      "description": "Get student evaluations",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/student/1/evaluations (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684A6AEA0>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/student/courses/1",
+      "status_code": 0,
+      "description": "Get course details",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/student/courses/1 (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684AFE210>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "POST",
+      "path": "/api/student/evaluations",
+      "status_code": 0,
+      "description": "Submit evaluation",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/student/evaluations (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B11040>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/dashboard-stats",
+      "status_code": 0,
+      "description": "Dashboard statistics",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/admin/dashboard-stats (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B12140>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/department-overview",
+      "status_code": 0,
+      "description": "Department overview",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/admin/department-overview (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B12360>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/departments",
+      "status_code": 0,
+      "description": "List departments",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/admin/departments (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B12580>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/students",
+      "status_code": 0,
+      "description": "List students",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/admin/students (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B127A0>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/instructors",
+      "status_code": 0,
+      "description": "List instructors",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/admin/instructors (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B129C0>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/evaluations",
+      "status_code": 0,
+      "description": "List evaluations",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/admin/evaluations (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B12BE0>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/courses",
+      "status_code": 0,
+      "description": "List courses",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/admin/courses (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B12E00>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/users",
+      "status_code": 0,
+      "description": "List all users",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/admin/users (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B13020>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/users",
+      "status_code": 0,
+      "description": "List users with pagination",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/admin/users?page=1&page_size=10 (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B13240>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/users/stats",
+      "status_code": 0,
+      "description": "User statistics",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/admin/users/stats (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B13460>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/evaluation-periods",
+      "status_code": 0,
+      "description": "List evaluation periods",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/admin/evaluation-periods (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B13680>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/evaluation-periods/active",
+      "status_code": 0,
+      "description": "Get active period",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/admin/evaluation-periods/active (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B13570>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/settings/general",
+      "status_code": 0,
+      "description": "Get general settings",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/admin/settings/general (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B13350>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/settings/email",
+      "status_code": 0,
+      "description": "Get email settings",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/admin/settings/email (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B13130>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/settings/security",
+      "status_code": 0,
+      "description": "Get security settings",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/admin/settings/security (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B12F10>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/audit-logs",
+      "status_code": 0,
+      "description": "Get audit logs",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/admin/audit-logs (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B12CF0>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/audit-logs/stats",
+      "status_code": 0,
+      "description": "Audit log statistics",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/admin/audit-logs/stats (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B12AD0>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/export/users",
+      "status_code": 0,
+      "description": "Export users",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/admin/export/users (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B128B0>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/export/evaluations",
+      "status_code": 0,
+      "description": "Export evaluations",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/admin/export/evaluations (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B12690>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/instructor/dashboard",
+      "status_code": 0,
+      "description": "Instructor dashboard",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/instructor/dashboard?user_id=1 (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B12470>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/instructor/courses",
+      "status_code": 0,
+      "description": "Instructor courses",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/instructor/courses?user_id=1 (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B108D0>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/instructor/evaluations",
+      "status_code": 0,
+      "description": "Instructor evaluations",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/instructor/evaluations?user_id=1 (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B10270>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/instructor/sentiment-analysis",
+      "status_code": 0,
+      "description": "Sentiment analysis",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/instructor/sentiment-analysis?user_id=1 (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B12250>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/instructor/anomalies",
+      "status_code": 0,
+      "description": "Anomaly detection",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/instructor/anomalies?user_id=1 (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B118C0>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/instructor/questions",
+      "status_code": 0,
+      "description": "Evaluation questions",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/instructor/questions?user_id=1 (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B116A0>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/secretary/dashboard",
+      "status_code": 0,
+      "description": "Secretary dashboard",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/secretary/dashboard?user_id=1 (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B11040>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/secretary/courses",
+      "status_code": 0,
+      "description": "List courses",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/secretary/courses?user_id=1 (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B11040>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/secretary/programs",
+      "status_code": 0,
+      "description": "List programs",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/secretary/programs?user_id=1 (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B116A0>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/secretary/reports/evaluations-summary",
+      "status_code": 0,
+      "description": "Evaluations summary",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/secretary/reports/evaluations-summary?user_id=1 (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B118C0>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/dept-head/dashboard",
+      "status_code": 0,
+      "description": "Dept head dashboard",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/dept-head/dashboard?user_id=1 (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B12250>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/dept-head/evaluations",
+      "status_code": 0,
+      "description": "Department evaluations",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/dept-head/evaluations?user_id=1 (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B10270>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/dept-head/sentiment-analysis",
+      "status_code": 0,
+      "description": "Sentiment analysis",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/dept-head/sentiment-analysis?user_id=1 (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B108D0>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/dept-head/courses",
+      "status_code": 0,
+      "description": "Department courses",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/dept-head/courses?user_id=1 (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B12470>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/dept-head/instructors",
+      "status_code": 0,
+      "description": "Department instructors",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/dept-head/instructors?user_id=1 (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B12690>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/dept-head/anomalies",
+      "status_code": 0,
+      "description": "Anomaly detection",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/dept-head/anomalies?user_id=1 (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B128B0>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    },
+    {
+      "method": "GET",
+      "path": "/api/dept-head/trends",
+      "status_code": 0,
+      "description": "Trend analysis",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/dept-head/trends?user_id=1 (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x0000016684B12AD0>: Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it'))"
+    }
+  ]
+}

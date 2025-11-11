@@ -2,7 +2,7 @@ import React, { useMemo, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { getCurrentUser, isAdmin, isStaffMember } from '../../utils/roleUtils'
-import { adminAPI, deptHeadAPI } from '../../services/api'
+import { adminAPI, deptHeadAPI, secretaryAPI, instructorAPI } from '../../services/api'
 import CategoryMetricsDisplay, { CategoryComparisonWidget } from '../../components/CategoryMetricsDisplay'
 
 const SENTIMENT_COLORS = ['#10b981', '#f59e0b', '#ef4444'] // Green, Yellow, Red
@@ -53,13 +53,23 @@ export default function Dashboard() {
       
       try {
         setLoading(true)
+        // Filters not currently supported by API
         const filters = {}
-        if (selectedProgram !== 'all') filters.program = selectedProgram
-        if (selectedYearLevel !== 'all') filters.yearLevel = selectedYearLevel
         
-        // All staff members use the same dashboard endpoint
-        const data = await deptHeadAPI.getDashboard(filters)
+        // Use appropriate API based on user role
+        let response
+        if (currentUser.role === 'secretary') {
+          response = await secretaryAPI.getDashboard(filters)
+        } else if (currentUser.role === 'department_head') {
+          response = await deptHeadAPI.getDashboard(filters)
+        } else if (currentUser.role === 'instructor') {
+          response = await instructorAPI.getDashboard(filters)
+        } else {
+          throw new Error(`Unsupported staff role: ${currentUser.role}`)
+        }
         
+        // Extract data from response (handle both direct object and {success, data} format)
+        const data = response?.data || response
         setDashboardData(data)
       } catch (err) {
         console.error('Error fetching dashboard:', err)
@@ -70,104 +80,48 @@ export default function Dashboard() {
     }
     
     fetchDashboard()
-  }, [currentUser, selectedProgram, selectedYearLevel])
+  }, [currentUser]) // Removed filter dependencies since API doesn't support them yet
 
-  // Get filter options from dashboard data
-  const filterOptions = useMemo(() => {
-    if (!dashboardData?.courses) return { programs: [], yearLevels: [] }
-    
-    const programs = [...new Set(dashboardData.courses.map(course => course.program))].filter(Boolean).sort()
-    const yearLevels = [...new Set(dashboardData.courses.map(course => course.yearLevel))].filter(Boolean).sort()
-    
-    return { programs, yearLevels }
-  }, [dashboardData])
-
-  // Get accessible courses and evaluations from dashboard data
-  const accessibleCourses = useMemo(() => {
-    return dashboardData?.courses || []
-  }, [dashboardData])
-  
-  const accessibleEvaluations = useMemo(() => {
-    return dashboardData?.evaluations || []
-  }, [dashboardData])
-
-  // Filter courses based on selected filters
-  const filteredCourses = useMemo(() => {
-    return accessibleCourses.filter(course => {
-      const matchesProgram = selectedProgram === 'all' || course.program === selectedProgram
-      const matchesYearLevel = selectedYearLevel === 'all' || course.yearLevel.toString() === selectedYearLevel
-      return matchesProgram && matchesYearLevel
-    })
-  }, [accessibleCourses, selectedProgram, selectedYearLevel])
-
-  // Filter evaluations based on filtered courses
-  const filteredEvaluations = useMemo(() => {
-    return accessibleEvaluations.filter(evaluation => 
-      filteredCourses.some(course => course.id === evaluation.courseId)
-    )
-  }, [accessibleEvaluations, filteredCourses])
-
-  // Calculate statistics
+  // Calculate statistics from dashboard API data (not from course/evaluation lists)
   const stats = useMemo(() => {
-    const totalCourses = filteredCourses.length
-    const totalEvaluations = filteredEvaluations.length
-    
-    // Calculate total enrolled students and participation
-    const totalEnrolledStudents = filteredCourses.reduce((sum, course) => sum + (course.enrolledStudents || 0), 0)
-    const participationRate = totalEnrolledStudents > 0 ? Math.round((totalEvaluations / totalEnrolledStudents) * 100) : 0
-    
-    const positiveCount = filteredEvaluations.filter(e => e.sentiment === 'positive').length
-    const neutralCount = filteredEvaluations.filter(e => e.sentiment === 'neutral').length
-    const negativeCount = filteredEvaluations.filter(e => e.sentiment === 'negative').length
-    const anomalies = filteredEvaluations.filter(e => e.anomaly).length
-    
-    const avgRating = totalEvaluations > 0 
-      ? (filteredEvaluations.reduce((acc, e) => {
-          const ratings = Object.values(e.ratings || {})
-          const avgRating = ratings.length > 0 ? ratings.reduce((a, b) => a + b) / ratings.length : 0
-          return acc + avgRating
-        }, 0) / totalEvaluations).toFixed(1)
-      : '0.0'
-
-    return {
-      totalCourses,
-      totalEvaluations,
-      totalEnrolledStudents,
-      participationRate,
-      avgRating,
-      sentimentData: [
-        { name: 'Positive', value: positiveCount, color: '#10b981' },
-        { name: 'Neutral', value: neutralCount, color: '#f59e0b' },
-        { name: 'Negative', value: negativeCount, color: '#ef4444' }
-      ],
-      anomalies
-    }
-  }, [filteredCourses, filteredEvaluations])
-
-  // Year level-wise sentiment data for stacked bar chart
-  const yearLevelSentiment = useMemo(() => {
-    const yearData = {}
-    filteredCourses.forEach(course => {
-      const yearLevel = `Year ${course.yearLevel}`
-      if (!yearData[yearLevel]) {
-        yearData[yearLevel] = { positive: 0, neutral: 0, negative: 0 }
+    if (!dashboardData) {
+      return {
+        totalCourses: 0,
+        totalEvaluations: 0,
+        totalEnrolledStudents: 0,
+        participationRate: 0,
+        avgRating: '0.0',
+        sentimentData: [
+          { name: 'Positive', value: 0, color: '#10b981' },
+          { name: 'Neutral', value: 0, color: '#f59e0b' },
+          { name: 'Negative', value: 0, color: '#ef4444' }
+        ],
+        anomalies: 0
       }
-      
-      const courseEvals = filteredEvaluations.filter(e => e.courseId === course.id)
-      courseEvals.forEach(evaluation => {
-        if (evaluation.sentiment === 'positive') yearData[yearLevel].positive++
-        else if (evaluation.sentiment === 'neutral') yearData[yearLevel].neutral++
-        else if (evaluation.sentiment === 'negative') yearData[yearLevel].negative++
-      })
-    })
+    }
 
-    return Object.keys(yearData).sort().map(yearLevel => ({
-      name: yearLevel,
-      positive: yearData[yearLevel].positive,
-      neutral: yearData[yearLevel].neutral,
-      negative: yearData[yearLevel].negative
-    }))
-  }, [filteredCourses, filteredEvaluations])
+    const sentiment = dashboardData.sentiment || {}
+    
+    return {
+      totalCourses: dashboardData.total_courses || dashboardData.total_sections || 0,
+      totalEvaluations: dashboardData.total_evaluations || 0,
+      totalEnrolledStudents: dashboardData.total_enrolled_students || 0,
+      participationRate: 0, // Not provided by API
+      avgRating: (dashboardData.avg_rating || dashboardData.average_rating || 0).toFixed(1),
+      sentimentData: [
+        { name: 'Positive', value: sentiment.positive || 0, color: '#10b981' },
+        { name: 'Neutral', value: sentiment.neutral || 0, color: '#f59e0b' },
+        { name: 'Negative', value: sentiment.negative || 0, color: '#ef4444' }
+      ],
+      anomalies: dashboardData.anomalies || 0
+    }
+  }, [dashboardData])
+
+  // Year level sentiment data - placeholder for now since API doesn't provide this
+  const yearLevelSentiment = useMemo(() => {
+    // Return empty array for now - this would need a separate API endpoint
+    return []
+  }, [])
 
   if (!currentUser) return null
 
@@ -344,58 +298,8 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Filters Section */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
-          <h3 className="text-lg font-semibold mb-4">Sentiment Analysis Filters</h3>
+        {/* Note: Filters temporarily hidden - API doesn't support filtering yet */}
         
-          <div className="grid md:grid-cols-3 gap-6">
-            {/* Program Filter - Available for both Admin and Department Head */}
-            <div>
-              <label className="block text-sm font-semibold text-[#1e293b] mb-3">Academic Program</label>
-              <select
-                value={selectedProgram}
-                onChange={(e) => setSelectedProgram(e.target.value)}
-                className="lpu-select"
-              >
-                <option value="all">All Programs</option>
-                {filterOptions.programs.map(program => (
-                  <option key={program} value={program}>{program}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Year Level Filter */}
-            <div>
-              <label className="block text-sm font-semibold text-[#1e293b] mb-3">Year Level</label>
-              <select
-                value={selectedYearLevel}
-                onChange={(e) => setSelectedYearLevel(e.target.value)}
-                className="lpu-select"
-              >
-                <option value="all">All Year Levels</option>
-                {filterOptions.yearLevels.map(yearLevel => (
-                  <option key={yearLevel} value={yearLevel}>Year {yearLevel}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Course Focus Filter */}
-            <div>
-              <label className="block text-sm font-semibold text-[#1e293b] mb-3">Course Focus</label>
-              <select 
-                className="lpu-select"
-                value={selectedCourses} 
-                onChange={e => setSelectedCourses(e.target.value)}
-              >
-                <option value="all">All Courses</option>
-                {filteredCourses.map(course => (
-                  <option key={course.id} value={course.id}>{course.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
         {/* Enhanced Charts Grid */}
         <div className="grid lg:grid-cols-2 gap-8 mb-8">
           {/* Sentiment Analysis Chart */}
@@ -513,7 +417,7 @@ export default function Dashboard() {
         {/* Category-based Performance Metrics */}
         <div className="mb-8">
           <CategoryMetricsDisplay 
-            evaluations={filteredEvaluations}
+            evaluations={[]}
             title="Detailed Evaluation Category Performance"
             description="Comprehensive breakdown of student evaluations across all questionnaire categories"
           />
@@ -522,7 +426,7 @@ export default function Dashboard() {
         {/* Performance Highlights Widget */}
         <div className="mb-8">
           <CategoryComparisonWidget 
-            evaluations={filteredEvaluations}
+            evaluations={[]}
             title="Performance Highlights & Areas for Improvement"
           />
         </div>
@@ -537,97 +441,28 @@ export default function Dashboard() {
               <h3 className="text-xl font-bold text-gray-900">Recent Student Feedback</h3>
             </div>
             <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-              Latest {accessibleEvaluations.slice(0, 10).length} responses
+              No recent responses (API limitation)
             </span>
           </div>
           
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white">
-                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">
-                    Course
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">
-                    Student
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">
-                    Sentiment
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">
-                    Comment
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">
-                    Status
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {accessibleEvaluations.slice(0, 10).map((evaluation, index) => {
-                  const course = accessibleCourses.find(c => c.id === evaluation.courseId)
-                  return (
-                    <tr key={evaluation.id || index} className="hover:bg-gray-50 transition-colors duration-200">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="font-medium text-gray-900">{course?.name || 'Unknown Course'}</div>
-                        <div className="text-sm text-gray-500">{course?.classCode || course?.id || 'N/A'}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {evaluation.student}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full ${
-                          evaluation.sentiment === 'positive' ? 'bg-green-100 text-green-800' :
-                          evaluation.sentiment === 'neutral' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {evaluation.sentiment === 'positive' && '😊'}
-                          {evaluation.sentiment === 'neutral' && '😐'}
-                          {evaluation.sentiment === 'negative' && '😔'}
-                          <span className="ml-1 capitalize">{evaluation.sentiment}</span>
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
-                        <div className="truncate" title={evaluation.comment}>
-                          {evaluation.comment}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {evaluation.anomaly ? (
-                          <span className="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-                            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path>
-                            </svg>
-                            Anomaly
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
-                            </svg>
-                            Normal
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-            
-            {accessibleEvaluations.length === 0 && (
-              <div className="text-center py-12">
-                <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-                </svg>
-                <h4 className="text-lg font-medium text-gray-900 mb-2">No Recent Feedback</h4>
-                <p className="text-gray-500">Student evaluations will appear here once submitted.</p>
-              </div>
-            )}
+          {/* Note: Recent evaluations table hidden - API doesn't provide this data */}
+          <div className="text-center py-12">
+            <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+            </svg>
+            <h4 className="text-lg font-medium text-gray-900 mb-2">Recent Feedback</h4>
+            <p className="text-gray-500">View detailed evaluations in the Evaluations page.</p>
+            <button 
+              onClick={() => navigate('/evaluations')}
+              className="mt-4 px-6 py-2 bg-[#7a0000] text-white rounded-lg hover:bg-[#5a0000] transition-colors"
+            >
+              View All Evaluations
+            </button>
           </div>
         </div>
 
-        {/* Manage Evaluation Questions Button (Department Heads only) */}
-        {isDepartmentHead(currentUser) && (
+        {/* Manage Evaluation Questions Button (Staff only) */}
+        {isStaffMember(currentUser) && (
           <div className="mt-8 text-center">
             <button 
               onClick={() => navigate('/evaluation-questions')}

@@ -16,7 +16,6 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)  # Matches your existing column
     role = Column(String(50), nullable=False)  # student, instructor, department_head, admin
-    firebase_uid = Column(String(255), unique=True, nullable=True)
     first_name = Column(String(100), nullable=True)  # Enhanced field
     last_name = Column(String(100), nullable=True)   # Enhanced field
     department = Column(String(100), nullable=True)  # Enhanced field
@@ -34,9 +33,11 @@ class Program(Base):
     __tablename__ = "programs"
     
     id = Column(Integer, primary_key=True, index=True)
-    code = Column(String(20), unique=True, nullable=False)  # BSIT, BSCS, etc.
-    name = Column(String(255), nullable=False)
-    duration_years = Column(Integer, nullable=False)
+    program_code = Column(String(50), unique=True, nullable=False)  # BSIT, BSCS, etc.
+    program_name = Column(String(255), nullable=False)
+    department = Column(String(100), nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
     students = relationship("Student", back_populates="program")
@@ -47,11 +48,10 @@ class Student(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    student_id = Column(String(50), unique=True, nullable=False)
-    first_name = Column(String(100), nullable=False)
-    last_name = Column(String(100), nullable=False)
+    student_number = Column(String(50), unique=True, nullable=False)  # Fixed: was student_id
     program_id = Column(Integer, ForeignKey("programs.id"), nullable=True)
     year_level = Column(Integer, nullable=False)
+    is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
@@ -64,12 +64,12 @@ class Course(Base):
     __tablename__ = "courses"
     
     id = Column(Integer, primary_key=True, index=True)
-    course_code = Column(String(20), unique=True, nullable=False)
-    course_name = Column(String(255), nullable=False)
+    subject_code = Column(String(50), unique=False, nullable=False)  # Changed to 50 to match DB
+    subject_name = Column(String(255), nullable=False)
     program_id = Column(Integer, ForeignKey("programs.id"), nullable=True)
-    year_level = Column(Integer, nullable=False)
-    semester = Column(Integer, nullable=False)  # 1 or 2
-    units = Column(Integer, default=3)
+    year_level = Column(Integer, nullable=True)  # Made nullable to match DB
+    semester = Column(String(20), nullable=True)  # FIXED: Changed from Integer to String(20) to match DB
+    is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
@@ -81,15 +81,11 @@ class ClassSection(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=False)
-    class_code = Column(String(50), unique=True, nullable=False)  # ITCO-1001-A
-    instructor_name = Column(String(255), nullable=True)  # Legacy field from your schema
-    instructor_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Enhanced FK
-    schedule = Column(String(255), nullable=True)
-    room = Column(String(100), nullable=True)
-    max_students = Column(Integer, default=40)
-    semester = Column(String(20), nullable=False)  # "First Semester 2025"
+    instructor_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    class_code = Column(String(50), nullable=False)
+    semester = Column(String(20), nullable=False)  # Fixed: matches database VARCHAR(20)
     academic_year = Column(String(20), nullable=False)  # "2024-2025"
-    firebase_sync_id = Column(String(255), nullable=True)  # Firebase real-time sync
+    max_students = Column(Integer, default=40)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
@@ -119,28 +115,28 @@ class Evaluation(Base):
     student_id = Column(Integer, ForeignKey("students.id"), nullable=False)
     class_section_id = Column(Integer, ForeignKey("class_sections.id"), nullable=False)
     
-    # Your existing rating fields
+    # Rating fields (matching database)
     rating_teaching = Column(Integer, nullable=False)  # 1-5
     rating_content = Column(Integer, nullable=False)   # 1-5
     rating_engagement = Column(Integer, nullable=False) # 1-5
     rating_overall = Column(Integer, nullable=False)    # 1-5
-    comments = Column(Text, nullable=True)  # Your existing field
     
-    # Enhanced ML fields
-    text_feedback = Column(Text, nullable=True)      # Additional feedback for sentiment analysis
+    # Text feedback fields (matching database)
+    text_feedback = Column(Text, nullable=True)      # Main feedback text
     suggestions = Column(Text, nullable=True)        # Improvement suggestions
+    
+    # ML/Sentiment analysis fields (matching database)
     sentiment = Column(String(20), nullable=True)    # positive, neutral, negative
-    sentiment_score = Column(Float, nullable=True)   # 0.0 to 1.0 confidence
+    sentiment_score = Column(Float, nullable=True)   # Sentiment confidence score
+    sentiment_confidence = Column(Float, nullable=True)  # Added from database
     is_anomaly = Column(Boolean, default=False)      # Anomaly detection flag
     anomaly_score = Column(Float, nullable=True)     # Anomaly confidence score
+    anomaly_reason = Column(Text, nullable=True)     # Added from database
     
-    # Firebase and processing fields
-    firebase_doc_id = Column(String(255), nullable=True)  # Firebase real-time sync ID
+    # Processing and audit fields (matching database)
     submission_ip = Column(String(45), nullable=True)     # Audit trail
     processing_status = Column(String(20), default='pending')  # pending, processed, flagged
     processed_at = Column(DateTime, nullable=True)
-    
-    # Timestamps
     submission_date = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
@@ -178,6 +174,20 @@ class Secretary(Base):
     department = Column(String(255), nullable=True)
     programs = Column(ARRAY(Integer), nullable=True)  # Array of program IDs they manage
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User")
+
+class Instructor(Base):
+    __tablename__ = "instructors"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(255), nullable=False)
+    department = Column(String(255), nullable=True)
+    specialization = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
     user = relationship("User")
@@ -279,24 +289,6 @@ class AnalysisResult(Base):
         Index('idx_analysis_results_date', 'analysis_date'),
     )
 
-class FirebaseSyncLog(Base):
-    __tablename__ = "firebase_sync_log"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    table_name = Column(String(50), nullable=False)
-    record_id = Column(Integer, nullable=False)
-    firebase_doc_id = Column(String(255), nullable=True)
-    sync_type = Column(String(20), nullable=False)  # create, update, delete
-    sync_status = Column(String(20), default='pending')  # pending, synced, failed
-    sync_timestamp = Column(DateTime, default=datetime.utcnow)
-    error_message = Column(Text, nullable=True)
-    retry_count = Column(Integer, default=0)
-    
-    # Indexes
-    __table_args__ = (
-        Index('idx_firebase_sync', 'table_name', 'record_id', 'sync_status'),
-    )
-
 class NotificationQueue(Base):
     __tablename__ = "notification_queue"
     
@@ -306,7 +298,6 @@ class NotificationQueue(Base):
     title = Column(String(255), nullable=False)
     message = Column(Text, nullable=False)
     data = Column(JSONB, nullable=True)  # Additional notification data
-    firebase_token = Column(String(500), nullable=True)  # FCM token
     status = Column(String(20), default='pending')  # pending, sent, failed
     scheduled_for = Column(DateTime, default=datetime.utcnow)
     sent_at = Column(DateTime, nullable=True)

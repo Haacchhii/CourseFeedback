@@ -36,7 +36,8 @@ export default function EvaluationPeriodManagement() {
       try {
         setLoading(true)
         setError(null)
-        const periods = await adminAPI.getPeriods()
+        const response = await adminAPI.getPeriods()
+        const periods = response?.data || []
         
         // Separate current and past periods
         const current = periods.find(p => p.status === 'Open') || null
@@ -66,7 +67,8 @@ export default function EvaluationPeriodManagement() {
         await adminAPI.updatePeriodStatus(currentPeriod.id, 'Closed')
         
         // Refresh periods
-        const periods = await adminAPI.getPeriods()
+        const response = await adminAPI.getPeriods()
+        const periods = response?.data || []
         const current = periods.find(p => p.status === 'Open') || null
         const past = periods.filter(p => p.status === 'Closed')
         setCurrentPeriod(current)
@@ -90,7 +92,8 @@ export default function EvaluationPeriodManagement() {
         await adminAPI.updatePeriodStatus(currentPeriod.id, 'Open')
         
         // Refresh periods
-        const periods = await adminAPI.getPeriods()
+        const response = await adminAPI.getPeriods()
+        const periods = response?.data || []
         const current = periods.find(p => p.status === 'Open') || null
         const past = periods.filter(p => p.status === 'Closed')
         setCurrentPeriod(current)
@@ -112,7 +115,8 @@ export default function EvaluationPeriodManagement() {
       await adminAPI.updatePeriod(currentPeriod.id, { endDate: formData.endDate })
       
       // Refresh periods
-      const periods = await adminAPI.getPeriods()
+      const response = await adminAPI.getPeriods()
+      const periods = response?.data || []
       const current = periods.find(p => p.status === 'Open') || null
       setCurrentPeriod(current)
       
@@ -137,7 +141,8 @@ export default function EvaluationPeriodManagement() {
       await adminAPI.createPeriod(formData)
       
       // Refresh periods
-      const periods = await adminAPI.getPeriods()
+      const response = await adminAPI.getPeriods()
+      const periods = response?.data || []
       const current = periods.find(p => p.status === 'Open') || null
       const past = periods.filter(p => p.status === 'Closed')
       setCurrentPeriod(current)
@@ -233,12 +238,13 @@ export default function EvaluationPeriodManagement() {
 
       <div className="container mx-auto px-6 py-8">
         {/* Current Period Card */}
-        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden mb-8 border-2 border-purple-200">
-          <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <div className="flex items-center space-x-3 mb-2">
-                  <h2 className="text-2xl font-bold text-white">{currentPeriod.name}</h2>
+        {currentPeriod ? (
+          <div className="bg-white rounded-2xl shadow-2xl overflow-hidden mb-8 border-2 border-purple-200">
+            <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-6">
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="flex items-center space-x-3 mb-2">
+                    <h2 className="text-2xl font-bold text-white">{currentPeriod.name}</h2>
                   <span className={`px-4 py-1 rounded-full text-sm font-bold ${
                     currentPeriod.status === 'Open' 
                       ? 'bg-green-400 text-green-900' 
@@ -353,6 +359,21 @@ export default function EvaluationPeriodManagement() {
             </div>
           </div>
         </div>
+        ) : (
+          <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-8 border-2 border-gray-200">
+            <div className="p-12 text-center">
+              <div className="text-6xl mb-4">📅</div>
+              <h3 className="text-2xl font-bold text-gray-800 mb-2">No Active Evaluation Period</h3>
+              <p className="text-gray-600 mb-6">Create a new evaluation period to start collecting feedback</p>
+              <button 
+                onClick={() => setShowCreateModal(true)}
+                className="px-8 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl shadow-lg transition-all"
+              >
+                Create New Period
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Past Periods Section */}
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">

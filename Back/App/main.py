@@ -22,6 +22,7 @@ try:
     from routes.system_admin import router as system_admin_router
     from routes.department_head import router as department_head_router
     from routes.secretary import router as secretary_router
+    from routes.instructor import router as instructor_router
     ROUTES_AVAILABLE = True
     print("🛣️ All routes loaded successfully")
 except ImportError as e:
@@ -38,16 +39,31 @@ app = FastAPI(
 if ROUTES_AVAILABLE:
     app.include_router(auth_router, prefix="/api/auth", tags=["authentication"])
     app.include_router(student_router, prefix="/api/student", tags=["student"])
-    app.include_router(system_admin_router, prefix="/api/admin", tags=["system-admin"])
+    # Register both admin routers under /api/admin prefix
+    # system_admin_router has: /users, /users/{id}, /users/stats, etc.
+    # admin_router has: /dashboard-stats, /courses, /evaluations, etc.
+    app.include_router(system_admin_router, prefix="/api/admin", tags=["admin-users"])
+    app.include_router(admin_router, prefix="/api/admin", tags=["admin-dashboard"])
     app.include_router(department_head_router, prefix="/api/dept-head", tags=["department-head"])
     app.include_router(secretary_router, prefix="/api/secretary", tags=["secretary"])
-    print("✅ API routes registered: auth, student, system-admin, dept-head, secretary")
+    app.include_router(instructor_router, prefix="/api/instructor", tags=["instructor"])
+    print("✅ API routes registered: auth, student, admin (users + dashboard), dept-head, secretary, instructor")
+    
+    # Debug: Print all registered routes
+    print("\n🔍 Registered API Routes:")
+    for route in app.routes:
+        if hasattr(route, 'methods') and hasattr(route, 'path'):
+            methods = ', '.join(route.methods) if route.methods else 'N/A'
+            print(f"  {methods:10} {route.path}")
 
 # CORS middleware - Updated to point to New/capstone frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",  # Vite default for New/capstone frontend
+        "http://localhost:5174",  # Alternate port
+        "http://localhost:5175",  # Alternate port
+        "http://localhost:5176",  # Alternate port
         "http://127.0.0.1:5173",
         "http://localhost:5174",  # Alternate Vite port
         "http://127.0.0.1:5174"
@@ -134,4 +150,4 @@ async def login(request: dict):
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=False)

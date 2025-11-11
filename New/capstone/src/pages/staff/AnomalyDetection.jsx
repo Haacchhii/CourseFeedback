@@ -1,8 +1,8 @@
 import React, { useMemo, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
-import { getCurrentUser, isAdmin, isDepartmentHead } from '../../utils/roleUtils'
-import { adminAPI, deptHeadAPI } from '../../services/api'
+import { getCurrentUser, isAdmin, isStaffMember } from '../../utils/roleUtils'
+import { adminAPI, deptHeadAPI, secretaryAPI, instructorAPI } from '../../services/api'
 
 export default function AnomalyDetection() {
   const navigate = useNavigate()
@@ -25,7 +25,7 @@ export default function AnomalyDetection() {
       return
     }
     
-    if (!isAdmin(currentUser) && !isDepartmentHead(currentUser)) {
+    if (!isAdmin(currentUser) && !isStaffMember(currentUser)) {
       navigate('/')
       return
     }
@@ -39,13 +39,23 @@ export default function AnomalyDetection() {
       try {
         setLoading(true)
         let data
+        
+        // Use appropriate API based on user role
         if (isAdmin(currentUser)) {
           data = await adminAPI.getAnomalies()
-        } else if (isDepartmentHead(currentUser)) {
+        } else if (currentUser.role === 'secretary') {
+          data = await secretaryAPI.getAnomalies()
+        } else if (currentUser.role === 'department_head') {
           data = await deptHeadAPI.getAnomalies()
+        } else if (currentUser.role === 'instructor') {
+          data = await instructorAPI.getAnomalies()
+        } else {
+          throw new Error(`Unsupported role: ${currentUser.role}`)
         }
         
-        setAnomalies(data || [])
+        // Extract data from response (handle both direct array and {success, data} format)
+        const anomalies = Array.isArray(data) ? data : (data?.data || [])
+        setAnomalies(anomalies)
       } catch (err) {
         console.error('Error fetching anomalies:', err)
         setError(err.message || 'Failed to load anomalies')

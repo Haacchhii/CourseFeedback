@@ -148,12 +148,12 @@ async def get_courses(
             
             courses_data.append({
                 "id": course.id,
-                "course_code": course.course_code,
-                "course_name": course.course_name,
+                "course_code": course.subject_code,  # Fixed: was course.course_code
+                "course_name": course.subject_name,  # Fixed: was course.course_name
                 "program_id": course.program_id,
                 "year_level": course.year_level,
                 "semester": course.semester,
-                "units": course.units,
+                "units": 3,  # Fixed: removed from model, default to 3
                 "sections_count": sections_count
             })
         
@@ -192,18 +192,18 @@ async def create_course(
             raise HTTPException(status_code=403, detail="Access denied to this program")
         
         # Check if course code already exists
-        existing = db.query(Course).filter(Course.course_code == course_data.course_code).first()
+        existing = db.query(Course).filter(Course.subject_code == course_data.course_code).first()
         if existing:
             raise HTTPException(status_code=400, detail="Course code already exists")
         
         # Create course
         new_course = Course(
-            course_code=course_data.course_code,
-            course_name=course_data.course_name,
+            subject_code=course_data.course_code,  # Fixed: was course_code
+            subject_name=course_data.course_name,  # Fixed: was course_name
             program_id=course_data.program_id,
             year_level=course_data.year_level,
-            semester=course_data.semester,
-            units=course_data.units
+            semester=course_data.semester
+            # Note: units field removed from model
         )
         db.add(new_course)
         db.commit()
@@ -244,12 +244,12 @@ async def update_course(
             raise HTTPException(status_code=403, detail="Access denied to this course")
         
         # Update course
-        course.course_code = course_data.course_code
-        course.course_name = course_data.course_name
+        course.subject_code = course_data.course_code  # Fixed: was course_code
+        course.subject_name = course_data.course_name  # Fixed: was course_name
         course.program_id = course_data.program_id
         course.year_level = course_data.year_level
         course.semester = course_data.semester
-        course.units = course_data.units
+        # Note: units field removed from model
         db.commit()
         
         return {
@@ -541,8 +541,8 @@ async def get_evaluations_summary(
                 ).scalar() or 0
                 
                 program_stats.append({
-                    "program_code": program.code,
-                    "program_name": program.name,
+                    "program_code": program.program_code,  # Fixed: was program.code
+                    "program_name": program.program_name,  # Fixed: was program.name
                     "evaluations_count": count
                 })
         

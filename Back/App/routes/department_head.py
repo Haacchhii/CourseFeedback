@@ -25,58 +25,130 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # ===========================
+# HELPER FUNCTIONS
+# ===========================
+
+def parse_program_ids(programs_field):
+    """
+    Parse PostgreSQL ARRAY(Integer) field that may come as:
+    - List: [1, 2, 3] 
+    - String: "{1,2,3}"
+    Returns a proper list of integers for use in SQL queries.
+    """
+    if not programs_field:
+        return []
+    
+    if isinstance(programs_field, list):
+        # Already a list, ensure all elements are integers
+        return [int(x) if not isinstance(x, int) else x for x in programs_field]
+    elif isinstance(programs_field, str):
+        # Parse PostgreSQL array string format: "{1,2,3}" -> [1, 2, 3]
+        programs_str = programs_field.strip().strip('{}').strip()
+        if programs_str:
+            try:
+                return [int(x.strip()) for x in programs_str.split(',') if x.strip() and x.strip().isdigit()]
+            except ValueError as e:
+                print(f"⚠️  Error parsing programs field '{programs_field}': {e}")
+                return []
+    
+    return []
+
+def get_dept_head_by_param(db: Session, user_id: Optional[int] = None, department: Optional[str] = None):
+    """
+    Helper function to get department head by either user_id or department name
+    Returns None if not found
+    """
+    if user_id:
+        return db.query(DepartmentHead).filter(DepartmentHead.user_id == user_id).first()
+    elif department:
+        return db.query(DepartmentHead).filter(DepartmentHead.department == department).first()
+    return None
+
+# ===========================
 # DASHBOARD & OVERVIEW
 # ===========================
 
 @router.get("/dashboard")
 async def get_department_head_dashboard(
-    user_id: int = Query(...),
+    department: Optional[str] = Query(None),
+    user_id: Optional[int] = Query(None),
     db: Session = Depends(get_db)
 ):
     """Get department head dashboard overview"""
     try:
         # Get department head info
-        dept_head = db.query(DepartmentHead).filter(DepartmentHead.user_id == user_id).first()
+        # Support both department string and user_id for flexibility
+        if user_id:
+            dept_head = db.query(DepartmentHead).filter(DepartmentHead.user_id == user_id).first()
+        elif department:
+            dept_head = db.query(DepartmentHead).filter(DepartmentHead.department == department).first()
+        else:
+            raise HTTPException(status_code=400, detail="Either user_id or department must be provided")
+        
         if not dept_head:
-            raise HTTPException(status_code=404, detail="Department head not found")
+            # Return empty dashboard instead of error
+            return {
+                "success": True,
+                "data": {
+                    "total_courses": 0,
+                    "total_evaluations": 0,
+                    "avg_rating": 0.0,
+                    "sentiment": {"positive": 0, "neutral": 0, "negative": 0},
+                    "recent_evaluations": [],
+                    "message": "No department data available"
+                }
+            }
         
         # Get programs under this department head
-        program_ids = dept_head.programs or []
+        # Use helper function to parse ARRAY(Integer) field
+        program_ids = parse_program_ids(dept_head.programs)
         
-        # Total courses
-        total_courses = db.query(func.count(Course.id)).filter(
-            Course.program_id.in_(program_ids)
-        ).scalar() or 0
+        # Debug log to verify parsing
+        logger.info(f"Department head programs: {dept_head.programs} (type: {type(dept_head.programs)})")
+        logger.info(f"Parsed program_ids: {program_ids} (type: {type(program_ids)})")
+        
+        # Total courses - use empty list check to avoid SQL errors
+        if not program_ids:
+            total_courses = 0
+        else:
+            total_courses = db.query(func.count(Course.id)).filter(
+                Course.program_id.in_(program_ids)
+            ).scalar() or 0
         
         # Total evaluations
-        total_evaluations = db.query(func.count(Evaluation.id)).join(
-            ClassSection, Evaluation.class_section_id == ClassSection.id
-        ).join(
-            Course, ClassSection.course_id == Course.id
-        ).filter(
-            Course.program_id.in_(program_ids)
-        ).scalar() or 0
-        
-        # Average rating
-        avg_rating = db.query(func.avg(Evaluation.rating_overall)).join(
-            ClassSection, Evaluation.class_section_id == ClassSection.id
-        ).join(
-            Course, ClassSection.course_id == Course.id
-        ).filter(
-            Course.program_id.in_(program_ids)
-        ).scalar() or 0.0
+        total_evaluations = 0
+        avg_rating = 0.0
+        if program_ids:
+            total_evaluations = db.query(func.count(Evaluation.id)).join(
+                ClassSection, Evaluation.class_section_id == ClassSection.id
+            ).join(
+                Course, ClassSection.course_id == Course.id
+            ).filter(
+                Course.program_id.in_(program_ids)
+            ).scalar() or 0
+            
+            # Average rating
+            avg_rating = db.query(func.avg(Evaluation.rating_overall)).join(
+                ClassSection, Evaluation.class_section_id == ClassSection.id
+            ).join(
+                Course, ClassSection.course_id == Course.id
+            ).filter(
+                Course.program_id.in_(program_ids)
+            ).scalar() or 0.0
         
         # Sentiment distribution
-        sentiment_dist = db.query(
-            Evaluation.sentiment,
-            func.count(Evaluation.id).label('count')
-        ).join(
-            ClassSection, Evaluation.class_section_id == ClassSection.id
-        ).join(
-            Course, ClassSection.course_id == Course.id
-        ).filter(
-            Course.program_id.in_(program_ids)
-        ).group_by(Evaluation.sentiment).all()
+        sentiment_dist = []
+        if program_ids:
+            sentiment_dist = db.query(
+                Evaluation.sentiment,
+                func.count(Evaluation.id).label('count')
+            ).join(
+                ClassSection, Evaluation.class_section_id == ClassSection.id
+            ).join(
+                Course, ClassSection.course_id == Course.id
+            ).filter(
+                Course.program_id.in_(program_ids)
+            ).group_by(Evaluation.sentiment).all()
         
         sentiment_data = {
             "positive": 0,
@@ -136,7 +208,14 @@ async def get_department_evaluations(
         if not dept_head:
             raise HTTPException(status_code=404, detail="Department head not found")
         
-        program_ids = dept_head.programs or []
+        program_ids = parse_program_ids(dept_head.programs)
+        if not program_ids:
+            # No programs assigned, return empty result
+            return {
+                "success": True,
+                "data": [],
+                "pagination": {"page": page, "page_size": page_size, "total": 0, "pages": 0}
+            }
         
         # Build query
         query = db.query(Evaluation).join(
@@ -216,7 +295,7 @@ async def get_sentiment_analysis(
         if not dept_head:
             raise HTTPException(status_code=404, detail="Department head not found")
         
-        program_ids = dept_head.programs or []
+        program_ids = parse_program_ids(dept_head.programs)
         
         # Calculate date range
         now = datetime.now()
@@ -284,17 +363,34 @@ async def get_sentiment_analysis(
 
 @router.get("/courses")
 async def get_department_courses(
-    user_id: int = Query(...),
+    department: Optional[str] = Query(None),
+    user_id: Optional[int] = Query(None),
     db: Session = Depends(get_db)
 ):
     """Get all courses in department head's programs"""
     try:
         # Get department head info
-        dept_head = db.query(DepartmentHead).filter(DepartmentHead.user_id == user_id).first()
-        if not dept_head:
-            raise HTTPException(status_code=404, detail="Department head not found")
+        # Support both department string and user_id for flexibility
+        if user_id:
+            dept_head = db.query(DepartmentHead).filter(DepartmentHead.user_id == user_id).first()
+        elif department:
+            # Find department head by department name
+            dept_head = db.query(DepartmentHead).filter(DepartmentHead.department == department).first()
+        else:
+            raise HTTPException(status_code=400, detail="Either user_id or department must be provided")
         
-        program_ids = dept_head.programs or []
+        if not dept_head:
+            # Return empty result instead of 404 for better UX
+            return {
+                "success": True,
+                "data": {
+                    "courses": [],
+                    "total": 0,
+                    "message": "No department found or no courses available"
+                }
+            }
+        
+        program_ids = parse_program_ids(dept_head.programs)
         
         # Get courses with evaluation stats
         courses = db.query(Course).filter(Course.program_id.in_(program_ids)).all()
@@ -329,11 +425,11 @@ async def get_department_courses(
             
             courses_data.append({
                 "id": course.id,
-                "course_code": course.course_code,
-                "course_name": course.course_name,
+                "course_code": course.subject_code,  # Fixed: was course.course_code
+                "course_name": course.subject_name,  # Fixed: was course.course_name
                 "year_level": course.year_level,
                 "semester": course.semester,
-                "units": course.units,
+                "units": 3,  # Fixed: removed from model, default to 3
                 "total_evaluations": eval_stats.total_evaluations if eval_stats else 0,
                 "avg_rating": round(eval_stats.avg_rating, 2) if eval_stats and eval_stats.avg_rating else 0.0,
                 "unique_students": eval_stats.unique_students if eval_stats else 0,
@@ -368,7 +464,7 @@ async def get_course_report(
         if not course:
             raise HTTPException(status_code=404, detail="Course not found")
         
-        program_ids = dept_head.programs or []
+        program_ids = parse_program_ids(dept_head.programs)
         if course.program_id not in program_ids:
             raise HTTPException(status_code=403, detail="Access denied to this course")
         
@@ -419,11 +515,11 @@ async def get_course_report(
             "data": {
                 "course": {
                     "id": course.id,
-                    "code": course.course_code,
-                    "name": course.course_name,
+                    "code": course.subject_code,  # Fixed: was course.course_code
+                    "name": course.subject_name,  # Fixed: was course.course_name
                     "year_level": course.year_level,
                     "semester": course.semester,
-                    "units": course.units
+                    "units": 3  # Fixed: removed from model, default to 3
                 },
                 "sections": sections_data
             }
@@ -451,7 +547,7 @@ async def get_instructor_performance(
         if not dept_head:
             raise HTTPException(status_code=404, detail="Department head not found")
         
-        program_ids = dept_head.programs or []
+        program_ids = parse_program_ids(dept_head.programs)
         
         # Get all class sections with their instructors
         sections = db.query(ClassSection).join(
@@ -534,7 +630,7 @@ async def get_anomalies(
         if not dept_head:
             raise HTTPException(status_code=404, detail="Department head not found")
         
-        program_ids = dept_head.programs or []
+        program_ids = parse_program_ids(dept_head.programs)
         
         # Query anomalous evaluations
         query = db.query(Evaluation).join(
@@ -601,7 +697,7 @@ async def get_trend_analysis(
         if not dept_head:
             raise HTTPException(status_code=404, detail="Department head not found")
         
-        program_ids = dept_head.programs or []
+        program_ids = parse_program_ids(dept_head.programs)
         
         # Get trends by month for the last 6 months
         six_months_ago = datetime.now() - timedelta(days=180)

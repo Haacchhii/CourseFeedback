@@ -256,22 +256,31 @@ export const adminAPI = {
   // ============================================
 
   /**
-   * Get system settings by category
+   * Get system settings by category - MOCK DATA
    * @param {string} category - Settings category (general, email, security, etc.)
    * @returns {Promise} Settings for category
    */
   getSettings: async (category) => {
-    return apiClient.get(`/admin/settings/${category}`)
+    return Promise.resolve({
+      success: true,
+      data: {
+        category: category || 'general',
+        settings: {},
+        message: 'System settings feature is not yet implemented. Configuration is managed through environment variables.'
+      }
+    })
   },
 
   /**
-   * Update system settings
+   * Update system settings - MOCK DATA
    * @param {Array} settings - Array of settings to update [{key, value, category}]
    * @returns {Promise} Success message
    */
   updateSettings: async (settings) => {
-    const currentUser = authAPI.getCurrentUser()
-    return apiClient.put(`/admin/settings?current_user_id=${currentUser?.id}`, { settings })
+    return Promise.resolve({
+      success: true,
+      message: 'System settings feature is not yet implemented. Changes cannot be saved.'
+    })
   },
 
   // ============================================
@@ -279,28 +288,38 @@ export const adminAPI = {
   // ============================================
 
   /**
-   * Get audit logs with filters
+   * Get audit logs with filters - MOCK DATA (audit_logs table doesn't exist yet)
    * @param {Object} params - Query parameters (page, user_id, action, start_date, end_date)
    * @returns {Promise} Audit logs with pagination
    */
   getAuditLogs: async (params = {}) => {
-    const queryParams = new URLSearchParams()
-    if (params.page) queryParams.append('page', params.page)
-    if (params.page_size) queryParams.append('page_size', params.page_size)
-    if (params.user_id) queryParams.append('user_id', params.user_id)
-    if (params.action) queryParams.append('action', params.action)
-    if (params.start_date) queryParams.append('start_date', params.start_date)
-    if (params.end_date) queryParams.append('end_date', params.end_date)
-    
-    return apiClient.get(`/admin/audit-logs?${queryParams.toString()}`)
+    // Return mock data since audit_logs table doesn't exist
+    return Promise.resolve({
+      success: true,
+      data: {
+        logs: [],
+        total: 0,
+        page: 1,
+        page_size: 20,
+        message: 'Audit logging is not yet implemented. This feature will be available in a future update.'
+      }
+    })
   },
 
   /**
-   * Get audit log statistics
+   * Get audit log statistics - MOCK DATA
    * @returns {Promise} Audit log stats
    */
   getAuditLogStats: async () => {
-    return apiClient.get('/admin/audit-logs/stats')
+    return Promise.resolve({
+      success: true,
+      data: {
+        totalLogs: 0,
+        todayLogs: 0,
+        criticalAlerts: 0,
+        message: 'Audit logging is not yet implemented.'
+      }
+    })
   },
 
   // ============================================
@@ -359,6 +378,30 @@ export const adminAPI = {
     }
     return apiClient.get(`/dept-head/dashboard?${queryParams.toString()}`)
   },
+
+  /**
+   * Get export history - MOCK DATA (export_history table doesn't exist)
+   * @returns {Promise} Export history list
+   */
+  getExportHistory: async () => {
+    return Promise.resolve({
+      success: true,
+      data: {
+        exports: [],
+        message: 'Export history tracking is not yet implemented. Downloaded files are not logged.'
+      }
+    })
+  },
+
+  /**
+   * Get instructors list (from users table with role='instructor')
+   * @param {Object} params - Query parameters
+   * @returns {Promise} Instructors list
+   */
+  getInstructors: async (params = {}) => {
+    // Get instructors from users table
+    return apiClient.get('/admin/users?role=instructor')
+  },
 }
 
 // ============================================
@@ -372,7 +415,7 @@ export const studentAPI = {
    * @returns {Promise} List of enrolled courses
    */
   getCourses: async (studentId) => {
-    return apiClient.get(`/student/student/${studentId}/courses`)
+    return apiClient.get(`/student/${studentId}/courses`)
   },
 
   /**
@@ -381,7 +424,7 @@ export const studentAPI = {
    * @returns {Promise} Created evaluation
    */
   submitEvaluation: async (evaluationData) => {
-    return apiClient.post('/student/student/evaluations', evaluationData)
+    return apiClient.post('/student/evaluations', evaluationData)
   },
 
   /**
@@ -390,7 +433,7 @@ export const studentAPI = {
    * @returns {Promise} List of submitted evaluations
    */
   getEvaluations: async (studentId) => {
-    return apiClient.get(`/student/student/${studentId}/evaluations`)
+    return apiClient.get(`/student/${studentId}/evaluations`)
   },
 
   /**
@@ -424,7 +467,7 @@ export const deptHeadAPI = {
    */
   getEvaluations: async (params = {}) => {
     const currentUser = authAPI.getCurrentUser()
-    const queryParams = new URLSearchParams({ department: currentUser?.department, ...params })
+    const queryParams = new URLSearchParams({ user_id: currentUser?.id, ...params })
     return apiClient.get(`/dept-head/evaluations?${queryParams.toString()}`)
   },
 
@@ -435,7 +478,7 @@ export const deptHeadAPI = {
    */
   getSentimentAnalysis: async (params = {}) => {
     const currentUser = authAPI.getCurrentUser()
-    const queryParams = new URLSearchParams({ department: currentUser?.department, ...params })
+    const queryParams = new URLSearchParams({ user_id: currentUser?.id, ...params })
     return apiClient.get(`/dept-head/sentiment-analysis?${queryParams.toString()}`)
   },
 
@@ -446,7 +489,7 @@ export const deptHeadAPI = {
    */
   getCourses: async (params = {}) => {
     const currentUser = authAPI.getCurrentUser()
-    const queryParams = new URLSearchParams({ department: currentUser?.department, ...params })
+    const queryParams = new URLSearchParams({ user_id: currentUser?.id, ...params })
     return apiClient.get(`/dept-head/courses?${queryParams.toString()}`)
   },
 
@@ -458,7 +501,7 @@ export const deptHeadAPI = {
    */
   getCourseReport: async (courseId, params = {}) => {
     const currentUser = authAPI.getCurrentUser()
-    const queryParams = new URLSearchParams({ department: currentUser?.department, ...params })
+    const queryParams = new URLSearchParams({ user_id: currentUser?.id, ...params })
     return apiClient.get(`/dept-head/courses/${courseId}/report?${queryParams.toString()}`)
   },
 
@@ -469,7 +512,7 @@ export const deptHeadAPI = {
    */
   getInstructors: async (params = {}) => {
     const currentUser = authAPI.getCurrentUser()
-    const queryParams = new URLSearchParams({ department: currentUser?.department, ...params })
+    const queryParams = new URLSearchParams({ user_id: currentUser?.id, ...params })
     return apiClient.get(`/dept-head/instructors?${queryParams.toString()}`)
   },
 
@@ -480,7 +523,7 @@ export const deptHeadAPI = {
    */
   getAnomalies: async (params = {}) => {
     const currentUser = authAPI.getCurrentUser()
-    const queryParams = new URLSearchParams({ department: currentUser?.department, ...params })
+    const queryParams = new URLSearchParams({ user_id: currentUser?.id, ...params })
     return apiClient.get(`/dept-head/anomalies?${queryParams.toString()}`)
   },
 
@@ -491,8 +534,118 @@ export const deptHeadAPI = {
    */
   getTrends: async (params = {}) => {
     const currentUser = authAPI.getCurrentUser()
-    const queryParams = new URLSearchParams({ department: currentUser?.department, ...params })
+    const queryParams = new URLSearchParams({ user_id: currentUser?.id, ...params })
     return apiClient.get(`/dept-head/trends?${queryParams.toString()}`)
+  },
+
+  /**
+   * Get evaluation questions/form structure
+   * @returns {Promise} Question sets
+   */
+  getQuestions: async () => {
+    // Return mock question sets for now (can be replaced with API call later)
+    return Promise.resolve({
+      success: true,
+      data: {
+        questionSets: [
+          {
+            id: 1,
+            category: 'Teaching Effectiveness',
+            questions: [
+              { id: 1, text: 'The instructor demonstrates mastery of the subject matter', type: 'rating' },
+              { id: 2, text: 'The instructor presents the material in an organized manner', type: 'rating' },
+              { id: 3, text: 'The instructor encourages student participation', type: 'rating' }
+            ]
+          },
+          {
+            id: 2,
+            category: 'Course Content',
+            questions: [
+              { id: 4, text: 'The course content is relevant and up-to-date', type: 'rating' },
+              { id: 5, text: 'The learning materials are helpful', type: 'rating' }
+            ]
+          },
+          {
+            id: 3,
+            category: 'Feedback',
+            questions: [
+              { id: 6, text: 'Additional comments or suggestions', type: 'text' }
+            ]
+          }
+        ]
+      }
+    })
+  },
+}
+
+// ============================================
+// INSTRUCTOR API
+// ============================================
+
+export const instructorAPI = {
+  /**
+   * Get instructor dashboard data
+   * @returns {Promise} Dashboard data with stats
+   */
+  getDashboard: async () => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.get(`/instructor/dashboard?user_id=${currentUser?.id}`)
+  },
+
+  /**
+   * Get instructor courses
+   * @returns {Promise} List of courses taught
+   */
+  getCourses: async () => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.get(`/instructor/courses?user_id=${currentUser?.id}`)
+  },
+
+  /**
+   * Get instructor evaluations
+   * @param {Object} params - Query parameters (class_section_id, etc.)
+   * @returns {Promise} Evaluations list
+   */
+  getEvaluations: async (params = {}) => {
+    const currentUser = authAPI.getCurrentUser()
+    const queryParams = new URLSearchParams({ user_id: currentUser?.id, ...params })
+    return apiClient.get(`/instructor/evaluations?${queryParams.toString()}`)
+  },
+
+  /**
+   * Get sentiment analysis (instructor view)
+   * @param {Object} params - Query parameters
+   * @returns {Promise} Sentiment analysis data
+   */
+  getSentimentAnalysis: async (params = {}) => {
+    const currentUser = authAPI.getCurrentUser()
+    const queryParams = new URLSearchParams({ user_id: currentUser?.id, ...params })
+    return apiClient.get(`/instructor/sentiment-analysis?${queryParams.toString()}`)
+  },
+
+  /**
+   * Get anomalies (instructor view)
+   * @param {Object} params - Query parameters
+   * @returns {Promise} Anomalies list
+   */
+  getAnomalies: async (params = {}) => {
+    const currentUser = authAPI.getCurrentUser()
+    const queryParams = new URLSearchParams({ user_id: currentUser?.id, ...params })
+    return apiClient.get(`/instructor/anomalies?${queryParams.toString()}`)
+  },
+
+  /**
+   * Get evaluation questions/form structure
+   * @returns {Promise} Question sets
+   */
+  getQuestions: async () => {
+    // Return mock question sets for now (instructors typically view, not edit)
+    return Promise.resolve({
+      success: true,
+      data: {
+        questionSets: []
+      }
+    })
   },
 }
 
@@ -604,6 +757,53 @@ export const secretaryAPI = {
     const queryParams = new URLSearchParams({ user_id: currentUser?.id, ...params })
     return apiClient.get(`/secretary/reports/evaluations-summary?${queryParams.toString()}`)
   },
+
+  /**
+   * Get evaluations list
+   * @param {Object} params - Query parameters
+   * @returns {Promise} Evaluations list
+   */
+  getEvaluations: async (params = {}) => {
+    const currentUser = authAPI.getCurrentUser()
+    const queryParams = new URLSearchParams({ user_id: currentUser?.id, ...params })
+    return apiClient.get(`/secretary/evaluations?${queryParams.toString()}`)
+  },
+
+  /**
+   * Get sentiment analysis (secretary view)
+   * @param {Object} params - Query parameters
+   * @returns {Promise} Sentiment analysis data
+   */
+  getSentimentAnalysis: async (params = {}) => {
+    const currentUser = authAPI.getCurrentUser()
+    const queryParams = new URLSearchParams({ user_id: currentUser?.id, ...params })
+    return apiClient.get(`/secretary/sentiment-analysis?${queryParams.toString()}`)
+  },
+
+  /**
+   * Get anomalies (secretary view)
+   * @param {Object} params - Query parameters
+   * @returns {Promise} Anomalies list
+   */
+  getAnomalies: async (params = {}) => {
+    const currentUser = authAPI.getCurrentUser()
+    const queryParams = new URLSearchParams({ user_id: currentUser?.id, ...params })
+    return apiClient.get(`/secretary/anomalies?${queryParams.toString()}`)
+  },
+
+  /**
+   * Get evaluation questions/form structure
+   * @returns {Promise} Question sets
+   */
+  getQuestions: async () => {
+    // Return mock question sets for now (secretaries typically view, not edit)
+    return Promise.resolve({
+      success: true,
+      data: {
+        questionSets: []
+      }
+    })
+  },
 }
 
 // ============================================
@@ -709,6 +909,7 @@ export default {
   student: studentAPI,
   deptHead: deptHeadAPI,
   secretary: secretaryAPI,
+  instructor: instructorAPI,
   legacyAdmin: legacyAdminAPI,
   utils: {
     downloadFile,

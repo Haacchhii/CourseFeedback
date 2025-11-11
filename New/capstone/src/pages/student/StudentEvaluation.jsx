@@ -12,8 +12,10 @@ import {
 } from '../../data/questionnaireConfig'
 
 export default function StudentEvaluation() {
+  // ALL HOOKS MUST BE AT THE TOP - React Rules of Hooks
   const navigate = useNavigate()
   const currentUser = getCurrentUser()
+  
   const [searchTerm, setSearchTerm] = useState('')
   const [semesterFilter, setSemesterFilter] = useState('all')
   const [selectedCourse, setSelectedCourse] = useState(null)
@@ -23,7 +25,7 @@ export default function StudentEvaluation() {
   })
   
   // API State
-  const [courses, setCourses] = useState([])
+  const [courses, setCourses] = useState([]) // Initialize as empty array
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
@@ -41,26 +43,52 @@ export default function StudentEvaluation() {
     }
   }, [currentUser, navigate])
   
-  // Fetch student courses
+  // Fetch student courses - Use currentUser.id to prevent infinite loop
   useEffect(() => {
     const fetchCourses = async () => {
       try {
         setLoading(true)
-        const data = await studentAPI.getCourses(currentUser?.id)
-        setCourses(data || [])
+        setError(null)
+        
+        if (!currentUser?.id) {
+          setError('User information not found')
+          setCourses([])
+          return
+        }
+        
+        const response = await studentAPI.getCourses(currentUser.id)
+        console.log('Student Evaluations - API Response:', response) // Debug log
+        
+        // Handle different response formats
+        let coursesData = []
+        if (Array.isArray(response)) {
+          coursesData = response
+        } else if (response?.data && Array.isArray(response.data)) {
+          coursesData = response.data
+        } else if (response?.success && Array.isArray(response.data)) {
+          coursesData = response.data
+        }
+        
+        console.log('Student Evaluations - Processed Data:', coursesData) // Debug log
+        setCourses(coursesData)
+        
       } catch (err) {
-        setError(err.message)
+        console.error('Error fetching courses:', err)
+        setError(err.message || 'Failed to load courses')
+        setCourses([]) // Set empty array on error
       } finally {
         setLoading(false)
       }
     }
-    if (currentUser) {
+    
+    if (currentUser?.id) {
       fetchCourses()
     }
-  }, [currentUser])
+  }, [currentUser?.id])
 
   // Get courses available to the student
   const availableCourses = useMemo(() => {
+    if (!Array.isArray(courses)) return [] // Safety check
     return courses.map(course => ({
       ...course,
       status: course.status ? course.status.toLowerCase() : 'active'
@@ -69,17 +97,23 @@ export default function StudentEvaluation() {
 
   // Get unique semesters for filter
   const availableSemesters = useMemo(() => {
-    const semesters = [...new Set(availableCourses.map(course => course.semester))]
+    if (!Array.isArray(availableCourses)) return [] // Safety check
+    const semesters = [...new Set(availableCourses.map(course => course.semester).filter(Boolean))]
     return semesters.sort()
   }, [availableCourses])
 
   // Filter courses based on search and semester
   const filteredCourses = useMemo(() => {
+    if (!Array.isArray(availableCourses)) return [] // Safety check
     return availableCourses.filter(course => {
+      const courseName = course.name?.toLowerCase() || ''
+      const instructorName = course.instructor?.toLowerCase() || course.instructor_name?.toLowerCase() || ''
+      const classCode = course.classCode?.toLowerCase() || course.class_code?.toLowerCase() || ''
+      
       const matchesSearch = searchTerm === '' || 
-        course.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        course.instructor.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        course.classCode.toLowerCase().includes(searchTerm.toLowerCase())
+        courseName.includes(searchTerm.toLowerCase()) ||
+        instructorName.includes(searchTerm.toLowerCase()) ||
+        classCode.includes(searchTerm.toLowerCase())
       
       const matchesSemester = semesterFilter === 'all' || course.semester === semesterFilter
       
@@ -156,8 +190,6 @@ export default function StudentEvaluation() {
     return course.status === 'active'
   }
 
-  if (!currentUser) return null
-  
   // Loading state
   if (loading) {
     return (

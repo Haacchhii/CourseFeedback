@@ -1,8 +1,8 @@
 import React, { useMemo, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import { getCurrentUser, isAdmin, isDepartmentHead } from '../../utils/roleUtils'
-import { adminAPI, deptHeadAPI } from '../../services/api'
+import { getCurrentUser, isAdmin, isStaffMember } from '../../utils/roleUtils'
+import { adminAPI, deptHeadAPI, secretaryAPI, instructorAPI } from '../../services/api'
 
 const SENTIMENT_COLORS = ['#10b981', '#f59e0b', '#ef4444'] // Green, Yellow, Red
 
@@ -27,7 +27,7 @@ export default function SentimentAnalysis() {
       return
     }
     
-    if (!isAdmin(currentUser) && !isDepartmentHead(currentUser)) {
+    if (!isAdmin(currentUser) && !isStaffMember(currentUser)) {
       navigate('/')
       return
     }
@@ -45,13 +45,23 @@ export default function SentimentAnalysis() {
         if (selectedYearLevel !== 'all') filters.yearLevel = selectedYearLevel
         
         let data
+        
+        // Use appropriate API based on user role
         if (isAdmin(currentUser)) {
           data = await adminAPI.getSentimentAnalysis(filters)
-        } else if (isDepartmentHead(currentUser)) {
+        } else if (currentUser.role === 'secretary') {
+          data = await secretaryAPI.getSentimentAnalysis(filters)
+        } else if (currentUser.role === 'department_head') {
           data = await deptHeadAPI.getSentimentAnalysis(filters)
+        } else if (currentUser.role === 'instructor') {
+          data = await instructorAPI.getSentimentAnalysis(filters)
+        } else {
+          throw new Error(`Unsupported role: ${currentUser.role}`)
         }
         
-        setSentimentData(data)
+        // Extract data from response (handle both direct object and {success, data} format)
+        const sentimentData = data?.data || data
+        setSentimentData(sentimentData)
       } catch (err) {
         console.error('Error fetching sentiment analysis:', err)
         setError(err.message || 'Failed to load sentiment analysis')
@@ -63,96 +73,54 @@ export default function SentimentAnalysis() {
     fetchSentiment()
   }, [currentUser, selectedSemester, selectedYearLevel])
 
-  // Get semester options from sentiment data
-  const semesterOptions = useMemo(() => {
-    if (!sentimentData?.evaluations) return []
-    const semesters = [...new Set(sentimentData.evaluations.map(e => e.semester).filter(Boolean))].sort()
-    return semesters
-  }, [sentimentData])
-
-  // Filter evaluations by semester
-  const filteredEvaluationsBySemester = useMemo(() => {
-    if (!sentimentData?.evaluations) return []
-    if (selectedSemester === 'all') return sentimentData.evaluations
-    return accessibleEvaluations.filter(e => e.semester === selectedSemester)
-  }, [accessibleEvaluations, selectedSemester])
-
-  // Filter courses and evaluations by year level
-  const filteredCourses = useMemo(() => {
-    return accessibleCourses.filter(course => {
-      const matchesYearLevel = selectedYearLevel === 'all' || course.yearLevel.toString() === selectedYearLevel
-      return matchesYearLevel
-    })
-  }, [accessibleCourses, selectedYearLevel])
-
-  const filteredEvaluations = useMemo(() => {
-    return filteredEvaluationsBySemester.filter(evaluation => 
-      filteredCourses.some(course => course.id === evaluation.courseId)
-    )
-  }, [filteredEvaluationsBySemester, filteredCourses])
-
-  // Get year level options
-  const yearLevelOptions = useMemo(() => {
-    return [...new Set(accessibleCourses.map(course => course.yearLevel))].sort()
-  }, [accessibleCourses])
-
-  // Calculate sentiment overview
+  // Since API doesn't return courses/evaluations arrays, use the trend and overall data
   const sentimentOverview = useMemo(() => {
-    const total = filteredEvaluations.length
-    if (total === 0) return { positive: 0, neutral: 0, negative: 0 }
-
-    const positive = filteredEvaluations.filter(e => e.sentiment === 'positive').length
-    const neutral = filteredEvaluations.filter(e => e.sentiment === 'neutral').length
-    const negative = filteredEvaluations.filter(e => e.sentiment === 'negative').length
+    if (!sentimentData?.overall) {
+      return { positive: 0, neutral: 0, negative: 0 }
+    }
+    
+    const overall = sentimentData.overall
+    const total = (overall.positive || 0) + (overall.neutral || 0) + (overall.negative || 0)
+    
+    if (total === 0) {
+      return { positive: 0, neutral: 0, negative: 0 }
+    }
 
     return {
-      positive: Math.round((positive / total) * 100),
-      neutral: Math.round((neutral / total) * 100),
-      negative: Math.round((negative / total) * 100)
+      positive: Math.round(((overall.positive || 0) / total) * 100),
+      neutral: Math.round(((overall.neutral || 0) / total) * 100),
+      negative: Math.round(((overall.negative || 0) / total) * 100)
     }
-  }, [filteredEvaluations])
+  }, [sentimentData])
 
-  // Year level-wise sentiment data for stacked bar chart
-  const yearLevelSentiment = useMemo(() => {
-    const yearData = {}
-    filteredCourses.forEach(course => {
-      const yearLevel = `Year ${course.yearLevel}`
-      if (!yearData[yearLevel]) {
-        yearData[yearLevel] = { positive: 0, neutral: 0, negative: 0 }
-      }
-      
-      const courseEvals = filteredEvaluations.filter(e => e.courseId === course.id)
-      courseEvals.forEach(evaluation => {
-        if (evaluation.sentiment === 'positive') yearData[yearLevel].positive++
-        else if (evaluation.sentiment === 'neutral') yearData[yearLevel].neutral++
-        else if (evaluation.sentiment === 'negative') yearData[yearLevel].negative++
-      })
-    })
-
-    return Object.keys(yearData).sort().map(yearLevel => ({
-      name: yearLevel,
-      positive: yearData[yearLevel].positive,
-      neutral: yearData[yearLevel].neutral,
-      negative: yearData[yearLevel].negative
+  // Prepare trend data for charts
+  const trendData = useMemo(() => {
+    if (!sentimentData?.trends || sentimentData.trends.length === 0) {
+      return []
+    }
+    return sentimentData.trends.map(trend => ({
+      date: trend.date,
+      positive: trend.positive || 0,
+      neutral: trend.neutral || 0,
+      negative: trend.negative || 0
     }))
-  }, [filteredCourses, filteredEvaluations])
+  }, [sentimentData])
 
-  // Evaluation criteria breakdown
+  // Semester and year level options - not available in current API
+  const semesterOptions = []
+  const yearLevelOptions = []
+  const filteredCourses = []
+  const filteredEvaluations = []
+
+  // Year level-wise sentiment data - not available in current API
+  const yearLevelSentiment = useMemo(() => {
+    return [] // Empty for now since API doesn't provide this breakdown
+  }, [])
+
+  // Evaluation criteria breakdown - not available in current API
   const criteriaBreakdown = useMemo(() => {
-    if (filteredEvaluations.length === 0) return []
-
-    const criteria = ['Content Quality', 'Delivery Method', 'Assessment Fairness', 'Support Provided']
-    
-    return criteria.map(criterion => {
-      // Mock average ratings for each criterion (in real app, would calculate from actual ratings)
-      const avgRating = (Math.random() * 2 + 3).toFixed(1) // Random 3.0-5.0 rating
-      return {
-        name: criterion,
-        rating: parseFloat(avgRating),
-        color: parseFloat(avgRating) >= 4.0 ? '#10b981' : parseFloat(avgRating) >= 3.0 ? '#f59e0b' : '#ef4444'
-      }
-    })
-  }, [filteredEvaluations])
+    return [] // Empty for now since API doesn't provide detailed criteria
+  }, [])
 
   if (!currentUser) return null
 
@@ -211,36 +179,7 @@ export default function SentimentAnalysis() {
               </div>
             </div>
             
-            {/* Enhanced Filters */}
-            <div className="flex items-center space-x-6">
-              <div className="flex items-center space-x-3">
-                <label className="text-sm font-medium text-white">Academic Period:</label>
-                <select 
-                  value={selectedSemester}
-                  onChange={(e) => setSelectedSemester(e.target.value)}
-                  className="lpu-select bg-white/10 backdrop-blur-sm text-white border-white/20"
-                >
-                  <option value="all">All Semesters</option>
-                  {semesterOptions.map(semester => (
-                    <option key={semester} value={semester}>{semester}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div className="flex items-center space-x-3">
-                <label className="text-sm font-medium text-white">Year Level:</label>
-                <select 
-                  value={selectedYearLevel}
-                  onChange={(e) => setSelectedYearLevel(e.target.value)}
-                  className="lpu-select bg-white/10 backdrop-blur-sm text-white border-white/20"
-                >
-                  <option value="all">All Year Levels</option>
-                  {yearLevelOptions.map(yearLevel => (
-                    <option key={yearLevel} value={yearLevel}>Year {yearLevel}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
+            {/* Filters temporarily hidden - API doesn't support filtering yet */}
           </div>
         </div>
       </header>
@@ -256,7 +195,9 @@ export default function SentimentAnalysis() {
               <h2 className="text-xl font-bold text-gray-900">Academic Sentiment Overview</h2>
             </div>
             <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-              {filteredEvaluations.length} total responses
+              {sentimentData?.overall ? 
+                ((sentimentData.overall.positive || 0) + (sentimentData.overall.neutral || 0) + (sentimentData.overall.negative || 0)) : 0
+              } total responses
             </span>
           </div>
           
