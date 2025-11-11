@@ -77,7 +77,7 @@ export default function EvaluationQuestions() {
     }
     
     fetchQuestionSets()
-  }, [currentUser])
+  }, [currentUser?.role, currentUser?.id])
 
   // Filter question sets based on user role and filters
   const filteredQuestionSets = useMemo(() => {
@@ -116,7 +116,8 @@ export default function EvaluationQuestions() {
     return { total, active, archived, global, department }
   }, [filteredQuestionSets])
 
-  const handleCreateQuestionSet = () => {
+  const handleCreateQuestionSet = (e) => {
+    e?.preventDefault()
     // In a real app, this would make an API call
     // Example: await api.createQuestionSet(newQuestionSet)
     setShowCreateModal(false)
@@ -127,19 +128,22 @@ export default function EvaluationQuestions() {
     })
   }
 
-  const handleStatusChange = (questionSetId, newStatus) => {
+  const handleStatusChange = (questionSetId, newStatus, e) => {
+    e?.preventDefault()
     // In a real app, this would make an API call
     // Example: await api.updateQuestionSetStatus(questionSetId, newStatus)
   }
 
-  const addQuestion = () => {
+  const addQuestion = (e) => {
+    e?.preventDefault()
     setNewQuestionSet(prev => ({
       ...prev,
       questions: [...prev.questions, { text: '', type: 'likert', category: 'Content Quality' }]
     }))
   }
 
-  const removeQuestion = (index) => {
+  const removeQuestion = (index, e) => {
+    e?.preventDefault()
     setNewQuestionSet(prev => ({
       ...prev,
       questions: prev.questions.filter((_, i) => i !== index)
@@ -548,7 +552,7 @@ export default function EvaluationQuestions() {
                             Edit Template
                           </button>
                           <button
-                            onClick={() => handleStatusChange(questionSet.id, questionSet.status === 'active' ? 'archived' : 'active')}
+                            onClick={(e) => handleStatusChange(questionSet.id, questionSet.status === 'active' ? 'archived' : 'active', e)}
                             className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors duration-200 ${
                               questionSet.status === 'active' 
                                 ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' 
@@ -702,7 +706,7 @@ export default function EvaluationQuestions() {
                           </h4>
                           {newQuestionSet.questions.length > 1 && (
                             <button
-                              onClick={() => removeQuestion(index)}
+                              onClick={(e) => removeQuestion(index, e)}
                               className="text-red-600 hover:text-red-800 text-sm font-medium hover:underline transition-colors duration-200"
                             >
                               Remove Question

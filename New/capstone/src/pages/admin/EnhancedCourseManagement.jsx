@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend } from 'recharts'
 import { getCurrentUser, isSystemAdmin } from '../../utils/roleUtils'
 import { adminAPI } from '../../services/api'
+import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
 
 export default function EnhancedCourseManagement() {
   const navigate = useNavigate()
@@ -24,8 +25,6 @@ export default function EnhancedCourseManagement() {
   // API State
   const [courses, setCourses] = useState([])
   const [instructors, setInstructors] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
 
   const [formData, setFormData] = useState({
@@ -40,32 +39,32 @@ export default function EnhancedCourseManagement() {
     status: 'Active'
   })
 
+  // Use timeout hook for API calls
+  const { data: apiData, loading, error, retry } = useApiWithTimeout(
+    async () => {
+      const [coursesData, instructorsData] = await Promise.all([
+        adminAPI.getCourses(),
+        adminAPI.getInstructors()
+      ])
+      return { courses: coursesData?.data || [], instructors: instructorsData?.data || [] }
+    },
+    [currentUser?.id, currentUser?.role]
+  )
+
+  // Update state when data changes
+  useEffect(() => {
+    if (apiData) {
+      setCourses(apiData.courses)
+      setInstructors(apiData.instructors)
+    }
+  }, [apiData])
+
   // Redirect if not system admin
   useEffect(() => {
-    if (!currentUser || !isSystemAdmin(currentUser)) {
+    if (currentUser && !isSystemAdmin(currentUser)) {
       navigate('/courses')
     }
-  }, [currentUser, navigate])
-  
-  // Fetch data
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true)
-        const [coursesData, instructorsData] = await Promise.all([
-          adminAPI.getCourses(),
-          adminAPI.getInstructors()
-        ])
-        setCourses(coursesData?.data || [])
-        setInstructors(instructorsData?.data || [])
-      } catch (err) {
-        setError(err.message)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchData()
-  }, [])
+  }, [currentUser?.role, currentUser?.id, navigate])
 
   // Get programs
   const programs = useMemo(() => {
@@ -207,7 +206,8 @@ export default function EnhancedCourseManagement() {
     }
   }
 
-  const handleBulkImport = () => {
+  const handleBulkImport = (e) => {
+    e?.preventDefault()
     if (importPreview.length > 0) {
       alert(`Successfully imported ${importPreview.length} courses!`)
       setShowBulkImportModal(false)
@@ -216,13 +216,15 @@ export default function EnhancedCourseManagement() {
     }
   }
 
-  const handleAssignInstructor = () => {
+  const handleAssignInstructor = (e) => {
+    e?.preventDefault()
     alert(`Instructor assigned to ${selectedCourses.length} course(s)`)
     setShowAssignInstructorModal(false)
     setSelectedCourses([])
   }
 
-  const handleArchiveCourse = async (course) => {
+  const handleArchiveCourse = async (course, e) => {
+    e?.preventDefault()
     if (window.confirm(`Archive "${course.name}"?\n\nThis will hide the course from active listings but preserve all data.`)) {
       try {
         await adminAPI.updateCourse(course.id, { status: 'Archived' })
@@ -235,7 +237,8 @@ export default function EnhancedCourseManagement() {
     }
   }
 
-  const toggleCourseSelection = (courseId) => {
+  const toggleCourseSelection = (courseId, e) => {
+    e?.preventDefault()
     setSelectedCourses(prev =>
       prev.includes(courseId)
         ? prev.filter(id => id !== courseId)
@@ -245,40 +248,9 @@ export default function EnhancedCourseManagement() {
 
   if (!currentUser || !isSystemAdmin(currentUser)) return null
   
-  // Loading state
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-          <p className="mt-4 text-gray-600">Loading courses...</p>
-        </div>
-      </div>
-    )
-  }
-  
-  // Error state
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-        <div className="bg-white p-8 rounded-lg shadow-lg max-w-md">
-          <div className="text-red-600 text-center">
-            <svg className="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-            <h3 className="text-xl font-bold mb-2">Error Loading Courses</h3>
-            <p className="text-gray-600 mb-4">{error}</p>
-            <button 
-              onClick={() => window.location.reload()} 
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-            >
-              Retry
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  // Loading and error states
+  if (loading) return <LoadingSpinner message="Loading courses..." />
+  if (error) return <ErrorDisplay error={error} onRetry={retry} />
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -514,7 +486,7 @@ export default function EnhancedCourseManagement() {
                           <input
                             type="checkbox"
                             checked={selectedCourses.includes(course.id)}
-                            onChange={() => toggleCourseSelection(course.id)}
+                            onChange={(e) => toggleCourseSelection(course.id, e)}
                             className="w-4 h-4 text-indigo-600 rounded focus:ring-2 focus:ring-indigo-500"
                           />
                         </td>
@@ -566,7 +538,7 @@ export default function EnhancedCourseManagement() {
                               </svg>
                             </button>
                             <button
-                              onClick={() => handleArchiveCourse(course)}
+                              onClick={(e) => handleArchiveCourse(course, e)}
                               className="p-2 bg-orange-100 hover:bg-orange-200 text-orange-600 rounded-lg transition-all"
                               title="Archive Course"
                             >

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getCurrentUser, isSystemAdmin } from '../../utils/roleUtils'
 import { adminAPI } from '../../services/api'
+import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
 
 export default function EvaluationPeriodManagement() {
   const navigate = useNavigate()
@@ -10,8 +11,6 @@ export default function EvaluationPeriodManagement() {
   // State
   const [currentPeriod, setCurrentPeriod] = useState(null)
   const [pastPeriods, setPastPeriods] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
 
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -23,40 +22,29 @@ export default function EvaluationPeriodManagement() {
     notifyUsers: true
   })
 
+  // Use timeout hook for API call
+  const { data: periodsData, loading, error, retry } = useApiWithTimeout(
+    () => adminAPI.getPeriods(),
+    [currentUser?.id, currentUser?.role]
+  )
+
+  // Update periods when data changes
+  useEffect(() => {
+    if (periodsData?.data) {
+      const periods = periodsData.data
+      const current = periods.find(p => p.status === 'Open') || null
+      const past = periods.filter(p => p.status === 'Closed')
+      setCurrentPeriod(current)
+      setPastPeriods(past)
+    }
+  }, [periodsData])
+
   // Redirect if not system admin
   useEffect(() => {
-    if (!currentUser || !isSystemAdmin(currentUser)) {
+    if (currentUser && !isSystemAdmin(currentUser)) {
       navigate('/dashboard')
     }
-  }, [currentUser, navigate])
-
-  // Fetch periods from API
-  useEffect(() => {
-    const fetchPeriods = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        const response = await adminAPI.getPeriods()
-        const periods = response?.data || []
-        
-        // Separate current and past periods
-        const current = periods.find(p => p.status === 'Open') || null
-        const past = periods.filter(p => p.status === 'Closed')
-        
-        setCurrentPeriod(current)
-        setPastPeriods(past)
-      } catch (err) {
-        console.error('Error fetching periods:', err)
-        setError(err.message || 'Failed to load evaluation periods')
-      } finally {
-        setLoading(false)
-      }
-    }
-    
-    if (currentUser && isSystemAdmin(currentUser)) {
-      fetchPeriods()
-    }
-  }, [currentUser])
+  }, [currentUser?.role, currentUser?.id, navigate])
 
   const handleClosePeriod = async () => {
     if (!currentPeriod) return
@@ -176,38 +164,9 @@ export default function EvaluationPeriodManagement() {
 
   if (!currentUser || !isSystemAdmin(currentUser)) return null
 
-  // Loading state
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600 font-medium">Loading evaluation periods...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-        <div className="text-center bg-white p-8 rounded-xl shadow-lg max-w-md">
-          <svg className="w-16 h-16 text-red-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <h2 className="mt-4 text-2xl font-bold text-gray-900">Error Loading Periods</h2>
-          <p className="mt-2 text-gray-600">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    )
-  }
+  // Loading and error states
+  if (loading) return <LoadingSpinner message="Loading evaluation periods..." />
+  if (error) return <ErrorDisplay error={error} onRetry={retry} />
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">

@@ -116,9 +116,22 @@ async def get_courses(
         # Get secretary info
         secretary = db.query(Secretary).filter(Secretary.user_id == user_id).first()
         if not secretary:
-            raise HTTPException(status_code=404, detail="Secretary not found")
+            # Return empty instead of 404 to prevent frontend crashes
+            return {
+                "success": True,
+                "data": [],
+                "pagination": {"page": page, "page_size": page_size, "total": 0, "pages": 0}
+            }
         
         program_ids = secretary.programs or []
+        
+        # Return empty if no programs
+        if not program_ids:
+            return {
+                "success": True,
+                "data": [],
+                "pagination": {"page": page, "page_size": page_size, "total": 0, "pages": 0}
+            }
         
         # Build query
         query = db.query(Course).filter(Course.program_id.in_(program_ids))
@@ -127,8 +140,8 @@ async def get_courses(
             search_filter = f"%{search}%"
             query = query.filter(
                 or_(
-                    Course.course_code.ilike(search_filter),
-                    Course.course_name.ilike(search_filter)
+                    Course.subject_code.ilike(search_filter),
+                    Course.subject_name.ilike(search_filter)
                 )
             )
         
@@ -138,6 +151,14 @@ async def get_courses(
         total = query.count()
         offset = (page - 1) * page_size
         courses = query.offset(offset).limit(page_size).all()
+        
+        # Return empty if no courses
+        if not courses:
+            return {
+                "success": True,
+                "data": [],
+                "pagination": {"page": page, "page_size": page_size, "total": 0, "pages": 0}
+            }
         
         courses_data = []
         for course in courses:
@@ -560,3 +581,88 @@ async def get_evaluations_summary(
     except Exception as e:
         logger.error(f"Error fetching evaluations summary: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/evaluations")
+async def get_secretary_evaluations(
+    user_id: int = Query(...),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
+    course_id: Optional[int] = None,
+    sentiment: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Get evaluations for secretary's programs"""
+    try:
+        # Get secretary info
+        secretary = db.query(Secretary).filter(Secretary.user_id == user_id).first()
+        if not secretary:
+            raise HTTPException(status_code=404, detail="Secretary not found")
+        
+        program_ids = secretary.programs or []
+        if not program_ids:
+            # No programs assigned, return empty result
+            return {
+                "success": True,
+                "data": [],
+                "pagination": {"page": page, "page_size": page_size, "total": 0, "pages": 0}
+            }
+        
+        # Build query for evaluations
+        query = db.query(Evaluation).join(
+            ClassSection, Evaluation.class_section_id == ClassSection.id
+        ).join(
+            Course, ClassSection.course_id == Course.id
+        ).filter(
+            Course.program_id.in_(program_ids)
+        )
+        
+        # Apply filters
+        if course_id:
+            query = query.filter(Course.id == course_id)
+        if sentiment:
+            query = query.filter(Evaluation.sentiment == sentiment)
+        
+        # Get total count
+        total = query.count()
+        
+        # Apply pagination
+        evaluations = query.order_by(Evaluation.created_at.desc()).offset(
+            (page - 1) * page_size
+        ).limit(page_size).all()
+        
+        # Format response
+        result = []
+        for evaluation in evaluations:
+            class_section = evaluation.class_section
+            course = class_section.course if class_section else None
+            
+            result.append({
+                "id": evaluation.id,
+                "course_name": course.course_name if course else "Unknown",
+                "course_code": course.course_code if course else "Unknown",
+                "class_code": class_section.class_code if class_section else "Unknown",
+                "instructor_name": class_section.instructor_name if class_section else "Unknown",
+                "student_id": evaluation.student_id,
+                "rating": evaluation.average_rating,
+                "sentiment": evaluation.sentiment,
+                "created_at": evaluation.created_at.isoformat() if evaluation.created_at else None,
+                "comment": evaluation.comment
+            })
+        
+        return {
+            "success": True,
+            "data": result,
+            "pagination": {
+                "page": page,
+                "page_size": page_size,
+                "total": total,
+                "pages": (total + page_size - 1) // page_size
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching evaluations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+

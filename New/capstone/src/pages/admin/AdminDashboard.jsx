@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts'
 import { getCurrentUser, isAdmin, canManageUsers, canManageCourses, canManageEvaluations, canConfigureSystem, canExportData, canViewAuditLogs, getRoleDisplayName } from '../../utils/roleUtils'
 import { adminAPI } from '../../services/api'
+import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
 
 const COLORS = ['#7a0000', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6']
 
@@ -10,9 +11,15 @@ export default function AdminDashboard() {
   const navigate = useNavigate()
   const currentUser = getCurrentUser()
   const [activeTab, setActiveTab] = useState('overview')
-  const [stats, setStats] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+
+  // Use custom hook for data fetching with timeout
+  const { data: stats, loading, error, retry } = useApiWithTimeout(
+    async () => {
+      const response = await adminAPI.getDashboardStats()
+      return response.data || response
+    },
+    [currentUser?.id, currentUser?.role]
+  )
 
   // Redirect if not an admin
   useEffect(() => {
@@ -25,29 +32,7 @@ export default function AdminDashboard() {
       navigate('/dashboard') // Redirect to staff dashboard
       return
     }
-  }, [currentUser, navigate])
-
-  // Fetch dashboard statistics
-  useEffect(() => {
-    const fetchDashboard = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        const response = await adminAPI.getDashboardStats()
-        // Backend returns {success: true, data: {...}}
-        setStats(response.data || response)
-      } catch (err) {
-        console.error('Error fetching dashboard:', err)
-        setError(err.message || 'Failed to load dashboard')
-      } finally {
-        setLoading(false)
-      }
-    }
-    
-    if (currentUser && isAdmin(currentUser)) {
-      fetchDashboard()
-    }
-  }, [currentUser])
+  }, [currentUser?.role, currentUser?.id, navigate])
 
   // Prepare chart data
   const programChartData = useMemo(() => {
@@ -83,35 +68,12 @@ export default function AdminDashboard() {
 
   // Loading state
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#7a0000] mx-auto"></div>
-          <p className="mt-4 text-gray-600 font-medium">Loading dashboard...</p>
-        </div>
-      </div>
-    )
+    return <LoadingSpinner message="Loading admin dashboard..." />
   }
 
   // Error state
   if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-        <div className="text-center bg-white p-8 rounded-xl shadow-lg max-w-md">
-          <svg className="w-16 h-16 text-red-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <h2 className="mt-4 text-2xl font-bold text-gray-900">Error Loading Dashboard</h2>
-          <p className="mt-2 text-gray-600">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-4 px-6 py-2 bg-[#7a0000] text-white rounded-lg hover:bg-[#5a0000] transition-colors"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    )
+    return <ErrorDisplay error={error} onRetry={retry} />
   }
 
   if (!stats) return null

@@ -3,14 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { getCurrentUser, isAdmin, isStaffMember } from '../../utils/roleUtils'
 import { adminAPI, deptHeadAPI, secretaryAPI, instructorAPI } from '../../services/api'
+import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
 
 export default function Evaluations() {
   const navigate = useNavigate()
   const currentUser = getCurrentUser()
   const [evaluations, setEvaluations] = useState([])
   const [courses, setCourses] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [programFilter, setProgramFilter] = useState('all')
   const [sentimentFilter, setSentimentFilter] = useState('all')
@@ -33,56 +32,54 @@ export default function Evaluations() {
       navigate('/')
       return
     }
-  }, [currentUser, navigate])
+  }, [currentUser?.role, currentUser?.id, navigate])
 
-  // Fetch evaluations from API
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!currentUser) return
+  // Use timeout hook for API calls
+  const { data: apiData, loading, error, retry } = useApiWithTimeout(
+    async () => {
+      if (!currentUser) return null
       
-      try {
-        setLoading(true)
-        const filters = {}
-        if (programFilter !== 'all') filters.program = programFilter
-        if (sentimentFilter !== 'all') filters.sentiment = sentimentFilter
-        if (semesterFilter !== 'all') filters.semester = semesterFilter
-        if (yearLevelFilter !== 'all') filters.yearLevel = yearLevelFilter
-        
-        let evaluationsData, coursesData
-        
-        // Use appropriate API based on user role
-        if (isAdmin(currentUser)) {
-          evaluationsData = await adminAPI.getEvaluations(filters)
-          coursesData = await adminAPI.getCourses()
-        } else if (currentUser.role === 'secretary') {
-          evaluationsData = await secretaryAPI.getEvaluations(filters)
-          coursesData = await secretaryAPI.getCourses()
-        } else if (currentUser.role === 'department_head') {
-          evaluationsData = await deptHeadAPI.getEvaluations(filters)
-          coursesData = await deptHeadAPI.getCourses()
-        } else if (currentUser.role === 'instructor') {
-          evaluationsData = await instructorAPI.getEvaluations(filters)
-          coursesData = await instructorAPI.getCourses()
-        } else {
-          throw new Error(`Unsupported role: ${currentUser.role}`)
-        }
-        
-        // Extract data from response (handle both direct arrays and {success, data} format)
-        const evaluations = Array.isArray(evaluationsData) ? evaluationsData : (evaluationsData?.data || [])
-        const courses = Array.isArray(coursesData) ? coursesData : (coursesData?.data || [])
-        
-        setEvaluations(evaluations)
-        setCourses(courses)
-      } catch (err) {
-        console.error('Error fetching evaluations:', err)
-        setError(err.message || 'Failed to load evaluations')
-      } finally {
-        setLoading(false)
+      const filters = {}
+      if (programFilter !== 'all') filters.program = programFilter
+      if (sentimentFilter !== 'all') filters.sentiment = sentimentFilter
+      if (semesterFilter !== 'all') filters.semester = semesterFilter
+      if (yearLevelFilter !== 'all') filters.yearLevel = yearLevelFilter
+      
+      let evaluationsData, coursesData
+      
+      // Use appropriate API based on user role
+      if (isAdmin(currentUser)) {
+        evaluationsData = await adminAPI.getEvaluations(filters)
+        coursesData = await adminAPI.getCourses()
+      } else if (currentUser.role === 'secretary') {
+        evaluationsData = await secretaryAPI.getEvaluations(filters)
+        coursesData = await secretaryAPI.getCourses()
+      } else if (currentUser.role === 'department_head') {
+        evaluationsData = await deptHeadAPI.getEvaluations(filters)
+        coursesData = await deptHeadAPI.getCourses()
+      } else if (currentUser.role === 'instructor') {
+        evaluationsData = await instructorAPI.getEvaluations(filters)
+        coursesData = await instructorAPI.getCourses()
+      } else {
+        throw new Error(`Unsupported role: ${currentUser.role}`)
       }
+      
+      // Extract data from response
+      const evaluations = Array.isArray(evaluationsData) ? evaluationsData : (evaluationsData?.data || [])
+      const courses = Array.isArray(coursesData) ? coursesData : (coursesData?.data || [])
+      
+      return { evaluations, courses }
+    },
+    [currentUser?.id, currentUser?.role, programFilter, sentimentFilter, semesterFilter, yearLevelFilter]
+  )
+
+  // Update state when data changes
+  useEffect(() => {
+    if (apiData) {
+      setEvaluations(apiData.evaluations)
+      setCourses(apiData.courses)
     }
-    
-    fetchData()
-  }, [currentUser, programFilter, sentimentFilter, semesterFilter, yearLevelFilter])
+  }, [apiData])
 
   // Get unique values for filters
   const filterOptions = useMemo(() => {
@@ -245,40 +242,9 @@ export default function Evaluations() {
 
   if (!currentUser) return null
 
-  // Loading state
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen lpu-background">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#7a0000] mb-4"></div>
-          <p className="text-gray-600">Loading evaluations...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen lpu-background">
-        <div className="text-center bg-white p-8 rounded-lg shadow-lg max-w-md">
-          <div className="text-red-500 mb-4">
-            <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Error Loading Evaluations</h2>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="bg-[#7a0000] hover:bg-[#8f0000] text-white px-6 py-2 rounded"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    )
-  }
+  // Loading and error states
+  if (loading) return <LoadingSpinner message="Loading evaluations..." />
+  if (error) return <ErrorDisplay error={error} onRetry={retry} />
 
   return (
     <div className="min-h-screen lpu-background">

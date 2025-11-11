@@ -206,7 +206,12 @@ async def get_department_evaluations(
         # Get department head info
         dept_head = db.query(DepartmentHead).filter(DepartmentHead.user_id == user_id).first()
         if not dept_head:
-            raise HTTPException(status_code=404, detail="Department head not found")
+            # Return empty instead of 404 to prevent frontend crashes
+            return {
+                "success": True,
+                "data": [],
+                "pagination": {"page": page, "page_size": page_size, "total": 0, "pages": 0}
+            }
         
         program_ids = parse_program_ids(dept_head.programs)
         if not program_ids:
@@ -217,7 +222,7 @@ async def get_department_evaluations(
                 "pagination": {"page": page, "page_size": page_size, "total": 0, "pages": 0}
             }
         
-        # Build query
+        # Build query with defensive programming
         query = db.query(Evaluation).join(
             ClassSection, Evaluation.class_section_id == ClassSection.id
         ).join(
@@ -240,6 +245,19 @@ async def get_department_evaluations(
         offset = (page - 1) * page_size
         evaluations = query.order_by(Evaluation.submission_date.desc()).offset(offset).limit(page_size).all()
         
+        # Return empty if no evaluations
+        if not evaluations:
+            return {
+                "success": True,
+                "data": [],
+                "pagination": {
+                    "page": page,
+                    "page_size": page_size,
+                    "total": 0,
+                    "pages": 0
+                }
+            }
+        
         eval_data = []
         for e in evaluations:
             class_section = db.query(ClassSection).filter(ClassSection.id == e.class_section_id).first()
@@ -247,17 +265,17 @@ async def get_department_evaluations(
             
             eval_data.append({
                 "id": e.id,
-                "course_code": course.course_code if course else "N/A",
-                "course_name": course.course_name if course else "N/A",
-                "instructor": class_section.instructor_name if class_section else "N/A",
-                "rating_overall": e.rating_overall,
-                "rating_teaching": e.rating_teaching,
-                "rating_content": e.rating_content,
-                "rating_engagement": e.rating_engagement,
-                "sentiment": e.sentiment,
-                "sentiment_score": e.sentiment_score,
-                "is_anomaly": e.is_anomaly,
-                "comments": e.comments,
+                "course_code": course.subject_code if (course and course.subject_code) else "N/A",
+                "course_name": course.subject_name if (course and course.subject_name) else "N/A",
+                "instructor": class_section.instructor_id if class_section else "N/A",
+                "rating_overall": e.rating_overall if e.rating_overall else 0,
+                "rating_teaching": e.rating_teaching if e.rating_teaching else 0,
+                "rating_content": e.rating_content if e.rating_content else 0,
+                "rating_engagement": e.rating_engagement if e.rating_engagement else 0,
+                "sentiment": e.sentiment or "neutral",
+                "sentiment_score": e.sentiment_score if e.sentiment_score else 0,
+                "is_anomaly": e.is_anomaly if e.is_anomaly else False,
+                "text_feedback": e.text_feedback or "",
                 "submission_date": e.submission_date.isoformat() if e.submission_date else None
             })
         

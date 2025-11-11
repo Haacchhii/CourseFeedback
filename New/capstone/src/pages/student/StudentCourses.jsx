@@ -2,73 +2,58 @@ import React, { useMemo, useState, useEffect } from 'react'
 import { studentAPI } from '../../services/api'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
 
 export default function StudentCourses(){
   const nav = useNavigate()
   const { user, logout: authLogout } = useAuth()
   
-  // ALL STATE AND HOOKS MUST BE DECLARED BEFORE ANY EARLY RETURNS
+  // State
   const [currentStudent, setCurrentStudent] = useState(null)
   const [studentCourses, setStudentCourses] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
   const [query, setQuery] = useState('')
   const [semester, setSemester] = useState('')
+
+  // Get student info
+  useEffect(() => {
+    let student = user
+    if (!student) {
+      const storedUser = localStorage.getItem('currentUser')
+      if (storedUser) {
+        student = JSON.parse(storedUser)
+      }
+    }
+    setCurrentStudent(student)
+  }, [user])
+
+  // Use timeout hook for API call
+  const { data: coursesData, loading, error, retry } = useApiWithTimeout(
+    async () => {
+      if (!currentStudent?.id) return { data: [] }
+      const response = await studentAPI.getCourses(currentStudent.id)
+      return response
+    },
+    [currentStudent?.id]
+  )
+
+  // Update courses when data changes
+  useEffect(() => {
+    if (coursesData) {
+      let courses = []
+      if (Array.isArray(coursesData)) {
+        courses = coursesData
+      } else if (coursesData?.data && Array.isArray(coursesData.data)) {
+        courses = coursesData.data
+      } else if (coursesData?.success && Array.isArray(coursesData.data)) {
+        courses = coursesData.data
+      }
+      setStudentCourses(courses)
+    }
+  }, [coursesData])
   
   function logout(){ 
     authLogout()
   }
-
-  // Get current student info and fetch their courses
-  useEffect(() => {
-    const fetchStudentData = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        
-        // Get student from auth context or localStorage
-        let student = user
-        if (!student) {
-          const storedUser = localStorage.getItem('currentUser')
-          if (storedUser) {
-            student = JSON.parse(storedUser)
-          }
-        }
-        
-        if (!student) {
-          setError('No student information found')
-          return
-        }
-        
-        setCurrentStudent(student)
-        
-        // Fetch student's courses from API
-        const response = await studentAPI.getCourses(student.id)
-        console.log('API Response:', response) // Debug log
-        
-        // Handle different response formats
-        let coursesData = []
-        if (Array.isArray(response)) {
-          coursesData = response
-        } else if (response?.data && Array.isArray(response.data)) {
-          coursesData = response.data
-        } else if (response?.success && Array.isArray(response.data)) {
-          coursesData = response.data
-        }
-        
-        setStudentCourses(coursesData)
-        
-      } catch (err) {
-        console.error('Error fetching student courses:', err)
-        setError(err.message || 'Failed to load courses')
-        setStudentCourses([]) // Set empty array on error
-      } finally {
-        setLoading(false)
-      }
-    }
-    
-    fetchStudentData()
-  }, [user])
 
   const semesters = useMemo(() => {
     if (!Array.isArray(studentCourses)) return ['All']
@@ -89,53 +74,10 @@ export default function StudentCourses(){
     })
   }, [query, semester, studentCourses])
 
-  if (!currentStudent) {
-    return (
-      <div className="p-6 max-w-7xl mx-auto">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#7a0000] mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading...</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (loading) {
-    return (
-      <div className="p-6 max-w-7xl mx-auto">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#7a0000] mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading your courses...</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="p-6 max-w-7xl mx-auto">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="text-center">
-            <svg className="w-16 h-16 text-red-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <h2 className="mt-4 text-xl font-bold text-gray-900">Error Loading Courses</h2>
-            <p className="mt-2 text-gray-600">{error}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="mt-4 px-6 py-2 bg-[#7a0000] text-white rounded-lg hover:bg-[#8f0000] transition-colors"
-            >
-              Retry
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  // Loading and error states
+  if (!currentStudent) return <LoadingSpinner message="Loading student info..." />
+  if (loading) return <LoadingSpinner message="Loading your courses..." />
+  if (error) return <ErrorDisplay error={error} onRetry={retry} />
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">

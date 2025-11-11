@@ -104,7 +104,11 @@ async def get_instructor_courses(
     try:
         instructor = db.query(Instructor).filter(Instructor.user_id == user_id).first()
         if not instructor:
-            raise HTTPException(status_code=404, detail="Instructor not found")
+            # Return empty instead of 404 to prevent frontend crashes
+            return {
+                "success": True,
+                "data": []
+            }
         
         # Get class sections with course info
         sections = db.query(ClassSection, Course).join(
@@ -112,6 +116,13 @@ async def get_instructor_courses(
         ).filter(
             ClassSection.instructor_id == user_id
         ).all()
+        
+        # Return empty if no sections
+        if not sections:
+            return {
+                "success": True,
+                "data": []
+            }
         
         courses_data = []
         for section, course in sections:
@@ -122,11 +133,11 @@ async def get_instructor_courses(
             
             courses_data.append({
                 "section_id": section.id,
-                "class_code": section.class_code,
-                "course_code": course.subject_code,
-                "course_name": course.subject_name,
-                "semester": section.semester,
-                "academic_year": section.academic_year,
+                "class_code": section.class_code if section.class_code else "Unknown",
+                "course_code": course.subject_code if course and course.subject_code else "Unknown",
+                "course_name": course.subject_name if course and course.subject_name else "Unknown",
+                "semester": section.semester if section.semester else "Unknown",
+                "academic_year": section.academic_year if section.academic_year else "Unknown",
                 "evaluations_count": eval_count
             })
         
@@ -139,7 +150,12 @@ async def get_instructor_courses(
         raise
     except Exception as e:
         logger.error(f"Error fetching instructor courses: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        # Return empty data instead of crashing
+        return {
+            "success": True,
+            "data": [],
+            "error": str(e)
+        }
 
 # ===========================
 # EVALUATIONS
@@ -155,9 +171,13 @@ async def get_instructor_evaluations(
     try:
         instructor = db.query(Instructor).filter(Instructor.user_id == user_id).first()
         if not instructor:
-            raise HTTPException(status_code=404, detail="Instructor not found")
+            # Return empty instead of 404 to prevent frontend crashes
+            return {
+                "success": True,
+                "data": []
+            }
         
-        # Base query
+        # Base query with defensive programming
         query = db.query(Evaluation, ClassSection, Course).join(
             ClassSection, Evaluation.class_section_id == ClassSection.id
         ).join(
@@ -172,15 +192,22 @@ async def get_instructor_evaluations(
         
         results = query.all()
         
+        # Return empty array if no results (defensive programming)
+        if not results:
+            return {
+                "success": True,
+                "data": []
+            }
+        
         evaluations_data = []
         for evaluation, section, course in results:
             evaluations_data.append({
                 "id": evaluation.id,
-                "class_code": section.class_code,
-                "course_name": course.subject_name,
-                "overall_rating": evaluation.rating_overall,
-                "sentiment": evaluation.sentiment,
-                "text_feedback": evaluation.text_feedback,
+                "class_code": section.class_code if section else "Unknown",
+                "course_name": course.subject_name if course else "Unknown",
+                "overall_rating": evaluation.rating_overall if evaluation.rating_overall else 0,
+                "sentiment": evaluation.sentiment or "neutral",
+                "text_feedback": evaluation.text_feedback or "",
                 "submission_date": evaluation.submission_date.isoformat() if evaluation.submission_date else None
             })
         
@@ -193,7 +220,12 @@ async def get_instructor_evaluations(
         raise
     except Exception as e:
         logger.error(f"Error fetching instructor evaluations: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        # Return empty data instead of crashing
+        return {
+            "success": True,
+            "data": [],
+            "error": str(e)
+        }
 
 # ===========================
 # SENTIMENT ANALYSIS

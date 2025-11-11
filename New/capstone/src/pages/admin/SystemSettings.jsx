@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getCurrentUser, isSystemAdmin } from '../../utils/roleUtils'
 import { adminAPI } from '../../services/api'
+import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
 
 export default function SystemSettings() {
   const navigate = useNavigate()
@@ -10,8 +11,6 @@ export default function SystemSettings() {
   const [saved, setSaved] = useState(false)
   
   // API State
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
 
   // General Settings State
@@ -66,31 +65,28 @@ export default function SystemSettings() {
     lastBackup: 'October 21, 2025 02:00 AM'
   })
 
+  // Use timeout hook for API call
+  const { data: settingsData, loading, error, retry } = useApiWithTimeout(
+    () => adminAPI.getSettings(),
+    [currentUser?.id, currentUser?.role]
+  )
+
+  // Update settings when data changes
+  useEffect(() => {
+    if (settingsData) {
+      if (settingsData.general) setGeneralSettings(settingsData.general)
+      if (settingsData.email) setEmailSettings(settingsData.email)
+      if (settingsData.security) setSecuritySettings(settingsData.security)
+      if (settingsData.backup) setBackupSettings(settingsData.backup)
+    }
+  }, [settingsData])
+
   // Redirect if not system admin
   useEffect(() => {
-    if (!currentUser || !isSystemAdmin(currentUser)) {
+    if (currentUser && !isSystemAdmin(currentUser)) {
       navigate('/login')
     }
-  }, [currentUser, navigate])
-  
-  // Fetch settings
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        setLoading(true)
-        const data = await adminAPI.getSettings()
-        if (data.general) setGeneralSettings(data.general)
-        if (data.email) setEmailSettings(data.email)
-        if (data.security) setSecuritySettings(data.security)
-        if (data.backup) setBackupSettings(data.backup)
-      } catch (err) {
-        setError(err.message)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchSettings()
-  }, [])
+  }, [currentUser?.role, currentUser?.id, navigate])
 
   const handleSaveSettings = async (section) => {
     try {
@@ -130,40 +126,9 @@ export default function SystemSettings() {
 
   if (!currentUser || !isSystemAdmin(currentUser)) return null
   
-  // Loading state
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-gray-600"></div>
-          <p className="mt-4 text-gray-600">Loading settings...</p>
-        </div>
-      </div>
-    )
-  }
-  
-  // Error state
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-        <div className="bg-white p-8 rounded-lg shadow-lg max-w-md">
-          <div className="text-red-600 text-center">
-            <svg className="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-            <h3 className="text-xl font-bold mb-2">Error Loading Settings</h3>
-            <p className="text-gray-600 mb-4">{error}</p>
-            <button 
-              onClick={() => window.location.reload()} 
-              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-            >
-              Retry
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  // Loading and error states
+  if (loading) return <LoadingSpinner message="Loading settings..." />
+  if (error) return <ErrorDisplay error={error} onRetry={retry} />
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">

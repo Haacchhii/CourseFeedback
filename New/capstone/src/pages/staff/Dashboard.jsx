@@ -4,6 +4,7 @@ import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveCo
 import { getCurrentUser, isAdmin, isStaffMember } from '../../utils/roleUtils'
 import { adminAPI, deptHeadAPI, secretaryAPI, instructorAPI } from '../../services/api'
 import CategoryMetricsDisplay, { CategoryComparisonWidget } from '../../components/CategoryMetricsDisplay'
+import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
 
 const SENTIMENT_COLORS = ['#10b981', '#f59e0b', '#ef4444'] // Green, Yellow, Red
 
@@ -13,8 +14,6 @@ export default function Dashboard() {
 
   // Data states
   const [dashboardData, setDashboardData] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
 
   // Filter states
   const [selectedProgram, setSelectedProgram] = useState('all')
@@ -44,43 +43,36 @@ export default function Dashboard() {
       navigate('/')
       return
     }
-  }, [currentUser, navigate])
+  }, [currentUser?.role, currentUser?.id, navigate])
 
-  // Fetch dashboard data from API
-  useEffect(() => {
-    const fetchDashboard = async () => {
-      if (!currentUser) return
+  // Use timeout hook for API call
+  const { data: apiData, loading, error, retry } = useApiWithTimeout(
+    async () => {
+      if (!currentUser) return null
       
-      try {
-        setLoading(true)
-        // Filters not currently supported by API
-        const filters = {}
-        
-        // Use appropriate API based on user role
-        let response
-        if (currentUser.role === 'secretary') {
-          response = await secretaryAPI.getDashboard(filters)
-        } else if (currentUser.role === 'department_head') {
-          response = await deptHeadAPI.getDashboard(filters)
-        } else if (currentUser.role === 'instructor') {
-          response = await instructorAPI.getDashboard(filters)
-        } else {
-          throw new Error(`Unsupported staff role: ${currentUser.role}`)
-        }
-        
-        // Extract data from response (handle both direct object and {success, data} format)
-        const data = response?.data || response
-        setDashboardData(data)
-      } catch (err) {
-        console.error('Error fetching dashboard:', err)
-        setError(err.message || 'Failed to load dashboard')
-      } finally {
-        setLoading(false)
+      const filters = {}
+      let response
+      if (currentUser.role === 'secretary') {
+        response = await secretaryAPI.getDashboard(filters)
+      } else if (currentUser.role === 'department_head') {
+        response = await deptHeadAPI.getDashboard(filters)
+      } else if (currentUser.role === 'instructor') {
+        response = await instructorAPI.getDashboard(filters)
+      } else {
+        throw new Error(`Unsupported staff role: ${currentUser.role}`)
       }
+      
+      return response?.data || response
+    },
+    [currentUser?.id, currentUser?.role]
+  )
+
+  // Update dashboardData when apiData changes
+  useEffect(() => {
+    if (apiData) {
+      setDashboardData(apiData)
     }
-    
-    fetchDashboard()
-  }, [currentUser]) // Removed filter dependencies since API doesn't support them yet
+  }, [apiData])
 
   // Calculate statistics from dashboard API data (not from course/evaluation lists)
   const stats = useMemo(() => {
@@ -125,40 +117,9 @@ export default function Dashboard() {
 
   if (!currentUser) return null
 
-  // Loading state
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9]">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#7a0000] mb-4"></div>
-          <p className="text-gray-600">Loading dashboard...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9]">
-        <div className="text-center bg-white p-8 rounded-lg shadow-lg max-w-md">
-          <div className="text-red-500 mb-4">
-            <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Error Loading Dashboard</h2>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="bg-[#7a0000] hover:bg-[#8f0000] text-white px-6 py-2 rounded"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    )
-  }
+  // Loading and error states
+  if (loading) return <LoadingSpinner message="Loading dashboard..." />
+  if (error) return <ErrorDisplay error={error} onRetry={retry} />
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9]">
