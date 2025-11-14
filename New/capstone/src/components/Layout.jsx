@@ -1,20 +1,18 @@
 import React from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { getCurrentUser, isAdmin, isStaffMember, getRoleDisplayName } from '../utils/roleUtils'
+import { isAdmin, isStaffMember, getRoleDisplayName } from '../utils/roleUtils'
+import { useAuth } from '../context/AuthContext'
 
 export default function Layout({ children }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const currentUser = getCurrentUser()
+  const { user: currentUser, logout: authLogout } = useAuth()
   
   // ALL HOOKS MUST BE BEFORE ANY EARLY RETURNS (React Rules of Hooks)
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
 
   const handleLogout = () => {
-    localStorage.removeItem('token')
-    localStorage.removeItem('currentUser')
-    localStorage.removeItem('role')
-    navigate('/login')
+    authLogout()
   }
 
   // Don't show layout on landing page or auth pages

@@ -57,6 +57,17 @@ CREATE TABLE IF NOT EXISTS secretaries (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Instructors Table
+CREATE TABLE IF NOT EXISTS instructors (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    department VARCHAR(255),
+    specialization VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Courses Table
 CREATE TABLE IF NOT EXISTS courses (
     id SERIAL PRIMARY KEY,

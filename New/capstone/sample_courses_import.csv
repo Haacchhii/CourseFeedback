@@ -1,0 +1,11 @@
+name,classCode,instructor,program,yearLevel,semester,academicYear
+Introduction to Programming,CS101,Dr. Maria Santos,BSIT,1,First Semester,2024-2025
+Data Structures and Algorithms,CS201,Prof. Juan Cruz,BSIT,2,First Semester,2024-2025
+Web Development,CS202,Dr. Ana Reyes,BSIT,2,First Semester,2024-2025
+Database Management Systems,CS301,Dr. Maria Santos,BSIT,3,First Semester,2024-2025
+Software Engineering,CS302,Prof. Juan Cruz,BSIT,3,First Semester,2024-2025
+Capstone Project 1,CS401,Dr. Ana Reyes,BSIT,4,First Semester,2024-2025
+Mobile Application Development,CS303,Dr. Maria Santos,BSIT,3,Second Semester,2024-2025
+Network Security,CYBER201,Prof. Juan Cruz,BS-CYBER,2,First Semester,2024-2025
+Ethical Hacking,CYBER301,Dr. Ana Reyes,BS-CYBER,3,First Semester,2024-2025
+Cybersecurity Fundamentals,CYBER101,Dr. Maria Santos,BS-CYBER,1,First Semester,2024-2025

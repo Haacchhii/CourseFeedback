@@ -1,19 +1,26 @@
 import React, { useMemo, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import { getCurrentUser, isAdmin, isStaffMember } from '../../utils/roleUtils'
+import { isAdmin, isStaffMember } from '../../utils/roleUtils'
+import { useAuth } from '../../context/AuthContext'
 import { adminAPI, deptHeadAPI, secretaryAPI, instructorAPI } from '../../services/api'
 
 const SENTIMENT_COLORS = ['#10b981', '#f59e0b', '#ef4444'] // Green, Yellow, Red
 
 export default function SentimentAnalysis() {
   const navigate = useNavigate()
-  const currentUser = getCurrentUser()
+  const { user: currentUser } = useAuth()
   const [sentimentData, setSentimentData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [selectedSemester, setSelectedSemester] = useState('all')
   const [selectedYearLevel, setSelectedYearLevel] = useState('all')
+  const [selectedProgram, setSelectedProgram] = useState('all')
+  const [showFilters, setShowFilters] = useState(false)
+
+  // Filter options states
+  const [programOptions, setProgramOptions] = useState([])
+  const [yearLevelOptions, setYearLevelOptions] = useState([])
 
   // Redirect unauthorized users
   useEffect(() => {
@@ -33,6 +40,45 @@ export default function SentimentAnalysis() {
     }
   }, [currentUser, navigate])
 
+  // Fetch filter options on mount
+  useEffect(() => {
+    const fetchFilterOptions = async () => {
+      if (!currentUser) return
+      
+      try {
+        let programsResponse, yearLevelsResponse
+        
+        if (currentUser.role === 'secretary') {
+          [programsResponse, yearLevelsResponse] = await Promise.all([
+            secretaryAPI.getPrograms(),
+            secretaryAPI.getYearLevels()
+          ])
+        } else if (currentUser.role === 'department_head') {
+          [programsResponse, yearLevelsResponse] = await Promise.all([
+            deptHeadAPI.getPrograms(),
+            deptHeadAPI.getYearLevels()
+          ])
+        } else if (currentUser.role === 'instructor') {
+          [programsResponse, yearLevelsResponse] = await Promise.all([
+            instructorAPI.getPrograms(),
+            instructorAPI.getYearLevels()
+          ])
+        }
+        
+        if (programsResponse?.data) {
+          setProgramOptions(programsResponse.data)
+        }
+        if (yearLevelsResponse?.data) {
+          setYearLevelOptions(yearLevelsResponse.data)
+        }
+      } catch (err) {
+        console.error('Error fetching filter options:', err)
+      }
+    }
+    
+    fetchFilterOptions()
+  }, [currentUser?.role])
+
   // Fetch sentiment analysis from API
   useEffect(() => {
     const fetchSentiment = async () => {
@@ -43,6 +89,7 @@ export default function SentimentAnalysis() {
         const filters = {}
         if (selectedSemester !== 'all') filters.semester = selectedSemester
         if (selectedYearLevel !== 'all') filters.yearLevel = selectedYearLevel
+        if (selectedProgram !== 'all') filters.program_id = selectedProgram
         
         let data
         
@@ -71,7 +118,7 @@ export default function SentimentAnalysis() {
     }
     
     fetchSentiment()
-  }, [currentUser, selectedSemester, selectedYearLevel])
+  }, [currentUser, selectedSemester, selectedYearLevel, selectedProgram])
 
   // Since API doesn't return courses/evaluations arrays, use the trend and overall data
   const sentimentOverview = useMemo(() => {
@@ -105,12 +152,6 @@ export default function SentimentAnalysis() {
       negative: trend.negative || 0
     }))
   }, [sentimentData])
-
-  // Semester and year level options - not available in current API
-  const semesterOptions = []
-  const yearLevelOptions = []
-  const filteredCourses = []
-  const filteredEvaluations = []
 
   // Year level-wise sentiment data - not available in current API
   const yearLevelSentiment = useMemo(() => {
@@ -261,96 +302,105 @@ export default function SentimentAnalysis() {
           </div>
         </div>
 
-        {/* Course Analysis Section */}
-        <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
-          <div className="flex items-center justify-between border-b border-gray-200 pb-4 mb-6">
-            <div className="flex items-center">
-              <svg className="w-6 h-6 text-[#7a0000] mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+        {/* Filters Section */}
+        <div className="lpu-card mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-bold text-gray-900">Analysis Filters</h3>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="lpu-btn-secondary flex items-center space-x-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
               </svg>
-              <h2 className="text-xl font-bold text-gray-900">Course Performance - {selectedSemester}</h2>
-            </div>
+              <span>{showFilters ? 'Hide Filters' : 'Show Filters'}</span>
+            </button>
           </div>
-          
-          {filteredCourses.length > 0 ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredCourses
-                .filter(course => course.semester.includes(selectedSemester.includes('1st') ? 'First Semester' : 'Second Semester'))
-                .map((course) => {
-                  const totalResponses = filteredEvaluations.filter(e => e.courseId === course.id).length;
-                  const responseRate = course.enrolledStudents ? Math.round((totalResponses / course.enrolledStudents) * 100) : 0;
-                  
-                  return (
-                    <div key={course.id} className="bg-white border-2 border-gray-200 rounded-lg p-5 hover:shadow-lg hover:border-[#7a0000] transition-all duration-200">
-                      <div className="flex justify-between items-start mb-3">
-                        <h3 className="font-semibold text-gray-900 text-sm">{course.name}</h3>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          course.program === 'BSIT' ? 'bg-blue-100 text-blue-800' :
-                          course.program === 'BSCS-DS' ? 'bg-green-100 text-green-800' :
-                          course.program === 'BS-CY' ? 'bg-red-100 text-red-800' :
-                          'bg-purple-100 text-purple-800'
-                        }`}>
-                          {course.program}
-                        </span>
-                      </div>
-                      
-                      <div className="space-y-1 mb-3">
-                        <div className="flex items-center text-xs text-gray-600">
-                          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"></path>
-                          </svg>
-                          {course.instructor}
-                        </div>
-                        <div className="flex items-center text-xs text-gray-600">
-                          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z"></path>
-                          </svg>
-                          Year {course.yearLevel} - {course.classCode}
-                        </div>
-                      </div>
-                      
-                      <div className="flex justify-between items-center text-xs mb-2">
-                        <span className="text-gray-600 flex items-center">
-                          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                          </svg>
-                          {totalResponses}/{course.enrolledStudents || 0} responses
-                        </span>
-                        <span className={`font-semibold ${
-                          responseRate >= 80 ? 'text-green-600' :
-                          responseRate >= 60 ? 'text-yellow-600' :
-                          'text-red-600'
-                        }`}>
-                          {responseRate}%
-                        </span>
-                      </div>
-                      
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          className={`h-2 rounded-full transition-all duration-300 ${
-                            responseRate >= 80 ? 'bg-green-500' :
-                            responseRate >= 60 ? 'bg-yellow-500' :
-                            'bg-red-500'
-                          }`}
-                          style={{ width: `${responseRate}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-32 text-gray-500">
-              <svg className="w-12 h-12 text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-              </svg>
-              <p>No courses available for the selected semester and filters</p>
+
+          {showFilters && (
+            <div className="lpu-card p-6 bg-gray-50">
+              <div className="grid md:grid-cols-3 gap-6">
+                {/* Program Filter */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Academic Program
+                  </label>
+                  <select
+                    value={selectedProgram}
+                    onChange={(e) => setSelectedProgram(e.target.value)}
+                    className="lpu-select w-full"
+                  >
+                    <option value="all">All Programs</option>
+                    {programOptions.map(program => (
+                      <option key={program.id} value={program.id}>
+                        {program.code} - {program.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Year Level Filter */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Year Level
+                  </label>
+                  <select
+                    value={selectedYearLevel}
+                    onChange={(e) => setSelectedYearLevel(e.target.value)}
+                    className="lpu-select w-full"
+                  >
+                    <option value="all">All Year Levels</option>
+                    {yearLevelOptions.map(yl => (
+                      <option key={yl.value} value={yl.value}>
+                        {yl.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Semester Filter */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Semester
+                  </label>
+                  <select
+                    value={selectedSemester}
+                    onChange={(e) => setSelectedSemester(e.target.value)}
+                    className="lpu-select w-full"
+                  >
+                    <option value="all">All Semesters</option>
+                    <option value="1">First Semester</option>
+                    <option value="2">Second Semester</option>
+                    <option value="3">Summer</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="mt-4 flex justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    setSelectedProgram('all')
+                    setSelectedYearLevel('all')
+                    setSelectedSemester('all')
+                  }}
+                  className="lpu-btn-secondary"
+                >
+                  Reset Filters
+                </button>
+                <button
+                  onClick={() => setShowFilters(false)}
+                  className="lpu-btn-primary"
+                >
+                  Apply Filters
+                </button>
+              </div>
             </div>
           )}
         </div>
 
+        {/* Sentiment Trend and Analysis Grid */}
         <div className="grid lg:grid-cols-2 gap-8 mb-8">
-          {/* Enhanced Year Level Chart */}
+          {/* Academic Year Level Analysis */}
           <div className="bg-white rounded-xl shadow-lg p-8">
             <div className="flex items-center mb-4">
               <svg className="w-6 h-6 text-[#7a0000] mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

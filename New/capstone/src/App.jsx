@@ -17,6 +17,7 @@ import EnhancedCourseManagement from './pages/admin/EnhancedCourseManagement'
 import SystemSettings from './pages/admin/SystemSettings'
 import AuditLogViewer from './pages/admin/AuditLogViewer'
 import DataExportCenter from './pages/admin/DataExportCenter'
+import EmailNotifications from './pages/admin/EmailNotifications'
 
 // Staff Pages (Secretary/Dept Head/Instructor)
 import StaffDashboard from './pages/staff/Dashboard'
@@ -76,6 +77,11 @@ export default function App(){
         <Route path="/admin/audit-logs" element={
           <ProtectedRoute allowedRoles={['admin']}>
             <AuditLogViewer/>
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/emails" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <EmailNotifications/>
           </ProtectedRoute>
         } />
 

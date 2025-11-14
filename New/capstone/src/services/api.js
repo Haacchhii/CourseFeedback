@@ -247,6 +247,9 @@ export const adminAPI = {
     if (params.search) queryParams.append('search', params.search)
     if (params.status) queryParams.append('status', params.status)
     if (params.department) queryParams.append('department', params.department)
+    // Use pagination instead of loading all courses at once
+    if (params.page) queryParams.append('page', params.page)
+    if (params.page_size) queryParams.append('page_size', params.page_size)
     
     return apiClient.get(`/admin/courses?${queryParams.toString()}`)
   },
@@ -256,31 +259,22 @@ export const adminAPI = {
   // ============================================
 
   /**
-   * Get system settings by category - MOCK DATA
-   * @param {string} category - Settings category (general, email, security, etc.)
+   * Get system settings by category
+   * @param {string} category - Settings category (general, email, security, backup)
    * @returns {Promise} Settings for category
    */
-  getSettings: async (category) => {
-    return Promise.resolve({
-      success: true,
-      data: {
-        category: category || 'general',
-        settings: {},
-        message: 'System settings feature is not yet implemented. Configuration is managed through environment variables.'
-      }
-    })
+  getSettings: async (category = 'general') => {
+    return apiClient.get(`/admin/settings/${category}`)
   },
 
   /**
-   * Update system settings - MOCK DATA
-   * @param {Array} settings - Array of settings to update [{key, value, category}]
+   * Update system settings
+   * @param {Object} data - {category: string, settings: object}
    * @returns {Promise} Success message
    */
-  updateSettings: async (settings) => {
-    return Promise.resolve({
-      success: true,
-      message: 'System settings feature is not yet implemented. Changes cannot be saved.'
-    })
+  updateSettings: async (data) => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.put(`/admin/settings?current_user_id=${currentUser?.id}`, data)
   },
 
   // ============================================
@@ -288,38 +282,29 @@ export const adminAPI = {
   // ============================================
 
   /**
-   * Get audit logs with filters - MOCK DATA (audit_logs table doesn't exist yet)
-   * @param {Object} params - Query parameters (page, user_id, action, start_date, end_date)
+   * Get audit logs with filters
+   * @param {Object} params - Query parameters (page, action, severity, user_id, start_date, end_date)
    * @returns {Promise} Audit logs with pagination
    */
   getAuditLogs: async (params = {}) => {
-    // Return mock data since audit_logs table doesn't exist
-    return Promise.resolve({
-      success: true,
-      data: {
-        logs: [],
-        total: 0,
-        page: 1,
-        page_size: 20,
-        message: 'Audit logging is not yet implemented. This feature will be available in a future update.'
-      }
-    })
+    const queryParams = new URLSearchParams()
+    if (params.page) queryParams.append('page', params.page)
+    if (params.page_size) queryParams.append('page_size', params.page_size)
+    if (params.action) queryParams.append('action', params.action)
+    if (params.severity) queryParams.append('severity', params.severity)
+    if (params.user_id) queryParams.append('user_id', params.user_id)
+    if (params.start_date) queryParams.append('start_date', params.start_date)
+    if (params.end_date) queryParams.append('end_date', params.end_date)
+    
+    return apiClient.get(`/admin/audit-logs?${queryParams.toString()}`)
   },
 
   /**
-   * Get audit log statistics - MOCK DATA
+   * Get audit log statistics
    * @returns {Promise} Audit log stats
    */
   getAuditLogStats: async () => {
-    return Promise.resolve({
-      success: true,
-      data: {
-        totalLogs: 0,
-        todayLogs: 0,
-        criticalAlerts: 0,
-        message: 'Audit logging is not yet implemented.'
-      }
-    })
+    return apiClient.get('/admin/audit-logs/stats')
   },
 
   // ============================================
@@ -384,13 +369,7 @@ export const adminAPI = {
    * @returns {Promise} Export history list
    */
   getExportHistory: async () => {
-    return Promise.resolve({
-      success: true,
-      data: {
-        exports: [],
-        message: 'Export history tracking is not yet implemented. Downloaded files are not logged.'
-      }
-    })
+    return apiClient.get('/admin/export/history')
   },
 
   /**
@@ -401,6 +380,233 @@ export const adminAPI = {
   getInstructors: async (params = {}) => {
     // Get instructors from users table
     return apiClient.get('/admin/users?role=instructor')
+  },
+
+  // ============================================
+  // EMAIL NOTIFICATIONS
+  // ============================================
+
+  /**
+   * Send email notification
+   * @param {Object} notificationData - Notification data
+   * @returns {Promise} Send result
+   */
+  sendEmailNotification: async (notificationData) => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.post(`/admin/send-notification?current_user_id=${currentUser?.id}`, notificationData)
+  },
+
+  /**
+   * Get email configuration status
+   * @returns {Promise} Email config status
+   */
+  getEmailConfigStatus: async () => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.get(`/admin/email-config-status?current_user_id=${currentUser?.id}`)
+  },
+
+  /**
+   * Create new course
+   * @param {Object} courseData - Course data
+   * @returns {Promise} Created course
+   */
+  createCourse: async (courseData) => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.post(`/admin/courses?current_user_id=${currentUser?.id}`, courseData)
+  },
+
+  /**
+   * Update course
+   * @param {number} courseId - Course ID
+   * @param {Object} courseData - Updated course data
+   * @returns {Promise} Updated course
+   */
+  updateCourse: async (courseId, courseData) => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.put(`/admin/courses/${courseId}?current_user_id=${currentUser?.id}`, courseData)
+  },
+
+  /**
+   * Delete course
+   * @param {number} courseId - Course ID
+   * @returns {Promise} Success message
+   */
+  deleteCourse: async (courseId) => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.delete(`/admin/courses/${courseId}?current_user_id=${currentUser?.id}`)
+  },
+
+  /**
+   * Get programs list
+   * @returns {Promise} Programs list
+   */
+  getPrograms: async () => {
+    return apiClient.get('/admin/programs')
+  },
+
+  // ============================================
+  // SECTION MANAGEMENT
+  // ============================================
+
+  /**
+   * Get all class sections with enrollment counts
+   * @param {Object} params - Query parameters (search, program_id, year_level, semester)
+   * @returns {Promise} Sections list with enrollment data
+   */
+  getSections: async (params = {}) => {
+    const queryParams = new URLSearchParams()
+    if (params.search) queryParams.append('search', params.search)
+    if (params.program_id) queryParams.append('program_id', params.program_id)
+    if (params.year_level) queryParams.append('year_level', params.year_level)
+    if (params.semester) queryParams.append('semester', params.semester)
+    
+    const query = queryParams.toString()
+    return apiClient.get(`/admin/sections${query ? '?' + query : ''}`)
+  },
+
+  /**
+   * Create a new class section
+   * @param {Object} sectionData - Section data (course_id, instructor_id, class_code, semester, academic_year, max_students)
+   * @returns {Promise} Created section data
+   */
+  createSection: async (sectionData) => {
+    return apiClient.post('/admin/sections', sectionData)
+  },
+
+  /**
+   * Update an existing section
+   * @param {number} sectionId - Section ID
+   * @param {Object} sectionData - Updated section data
+   * @returns {Promise} Updated section data
+   */
+  updateSection: async (sectionId, sectionData) => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.put(`/admin/sections/${sectionId}?current_user_id=${currentUser?.id}`, sectionData)
+  },
+
+  /**
+   * Delete a section
+   * @param {number} sectionId - Section ID
+   * @returns {Promise} Success message
+   */
+  deleteSection: async (sectionId) => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.delete(`/admin/sections/${sectionId}?current_user_id=${currentUser?.id}`)
+  },
+
+  /**
+   * Get enrolled students for a specific section
+   * @param {number} sectionId - Section ID
+   * @returns {Promise} List of enrolled students
+   */
+  getSectionStudents: async (sectionId) => {
+    return apiClient.get(`/admin/sections/${sectionId}/students`)
+  },
+
+  /**
+   * Get available students (with accounts, not enrolled) for a section
+   * @param {number} sectionId - Section ID
+   * @param {string} search - Optional search query
+   * @returns {Promise} List of available students
+   */
+  getAvailableStudents: async (sectionId, search = '') => {
+    const query = search ? `?search=${encodeURIComponent(search)}` : ''
+    return apiClient.get(`/admin/sections/${sectionId}/available-students${query}`)
+  },
+
+  /**
+   * Enroll multiple students in a section
+   * @param {number} sectionId - Section ID
+   * @param {Array<number>} studentIds - Array of student IDs to enroll
+   * @returns {Promise} Success message with counts
+   */
+  enrollStudents: async (sectionId, studentIds) => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.post(
+      `/admin/sections/${sectionId}/enroll?current_user_id=${currentUser?.id}`,
+      { student_ids: studentIds }
+    )
+  },
+
+  /**
+   * Remove a student from a section
+   * @param {number} sectionId - Section ID
+   * @param {number} studentId - Student ID
+   * @returns {Promise} Success message
+   */
+  removeStudentFromSection: async (sectionId, studentId) => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.delete(`/admin/sections/${sectionId}/students/${studentId}?current_user_id=${currentUser?.id}`)
+  },
+
+  // ============================================
+  // DATA EXPORT
+  // ============================================
+
+  /**
+   * Export users data
+   * @param {Object} options - Export options (format, filters)
+   * @returns {Promise} Export data
+   */
+  exportUsers: async (options = {}) => {
+    const format = options.format || 'json'
+    return apiClient.get(`/admin/export/users?format=${format}`)
+  },
+
+  /**
+   * Export evaluations data
+   * @param {Object} options - Export options (format, dateRange, filters)
+   * @returns {Promise} Export data
+   */
+  exportEvaluations: async (options = {}) => {
+    const format = options.format || 'json'
+    const params = new URLSearchParams({ format })
+    if (options.dateRange) {
+      if (options.dateRange.start) params.append('start_date', options.dateRange.start)
+      if (options.dateRange.end) params.append('end_date', options.dateRange.end)
+    }
+    return apiClient.get(`/admin/export/evaluations?${params.toString()}`)
+  },
+
+  /**
+   * Export courses data
+   * @param {Object} options - Export options (format, filters)
+   * @returns {Promise} Export data
+   */
+  exportCourses: async (options = {}) => {
+    const format = options.format || 'json'
+    return apiClient.get(`/admin/export/courses?format=${format}`)
+  },
+
+  /**
+   * Export analytics data
+   * @param {Object} options - Export options (format, dateRange)
+   * @returns {Promise} Export data
+   */
+  exportAnalytics: async (options = {}) => {
+    const format = options.format || 'json'
+    const params = new URLSearchParams({ format })
+    if (options.dateRange) {
+      if (options.dateRange.start) params.append('start_date', options.dateRange.start)
+      if (options.dateRange.end) params.append('end_date', options.dateRange.end)
+    }
+    return apiClient.get(`/admin/export/analytics?${params.toString()}`)
+  },
+
+  /**
+   * Export custom query data
+   * @param {Object} options - Custom export options
+   * @returns {Promise} Export data
+   */
+  exportCustom: async (options = {}) => {
+    const format = options.format || 'json'
+    return apiClient.post('/admin/export/custom', {
+      format,
+      tables: options.tables,
+      fields: options.fields,
+      filters: options.filters,
+      dateRange: options.dateRange
+    })
   },
 }
 
@@ -576,6 +782,24 @@ export const deptHeadAPI = {
       }
     })
   },
+
+  /**
+   * Get programs list for filtering
+   * @returns {Promise} List of programs managed by dept head
+   */
+  getPrograms: async () => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.get(`/dept-head/programs?user_id=${currentUser?.id}`)
+  },
+
+  /**
+   * Get year levels list for filtering
+   * @returns {Promise} List of year levels
+   */
+  getYearLevels: async () => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.get(`/dept-head/year-levels?user_id=${currentUser?.id}`)
+  },
 }
 
 // ============================================
@@ -646,6 +870,24 @@ export const instructorAPI = {
         questionSets: []
       }
     })
+  },
+
+  /**
+   * Get programs list for filtering
+   * @returns {Promise} List of programs
+   */
+  getPrograms: async () => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.get(`/instructor/programs?user_id=${currentUser?.id}`)
+  },
+
+  /**
+   * Get year levels list for filtering
+   * @returns {Promise} List of year levels
+   */
+  getYearLevels: async () => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.get(`/instructor/year-levels?user_id=${currentUser?.id}`)
   },
 }
 
@@ -748,6 +990,15 @@ export const secretaryAPI = {
   },
 
   /**
+   * Get year levels list for filtering
+   * @returns {Promise} List of year levels
+   */
+  getYearLevels: async () => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.get(`/secretary/year-levels?user_id=${currentUser?.id}`)
+  },
+
+  /**
    * Get evaluations summary report
    * @param {Object} params - Query parameters (semester, academic_year)
    * @returns {Promise} Evaluations summary
@@ -803,6 +1054,15 @@ export const secretaryAPI = {
         questionSets: []
       }
     })
+  },
+
+  /**
+   * Get year levels list for filtering
+   * @returns {Promise} List of year levels
+   */
+  getYearLevels: async () => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.get(`/secretary/year-levels?user_id=${currentUser?.id}`)
   },
 }
 

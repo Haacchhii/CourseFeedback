@@ -1,184 +1,209 @@
 /**
  * Course Evaluation Questionnaire Configuration
- * Based on standard academic course evaluation frameworks
+ * Based on LPU Batangas Course Evaluation Form
  * 
  * Rating Scale: 1-4 (Likert Scale)
- * 1 = Strongly Disagree
- * 2 = Disagree
- * 3 = Agree
  * 4 = Strongly Agree
+ * 3 = Agree
+ * 2 = Disagree
+ * 1 = Strongly Disagree
  */
 
 export const questionnaireCategories = [
   {
-    id: 'course_content',
-    name: 'Course Content and Organization',
-    description: 'Evaluation of the course structure, materials, and relevance',
+    id: 'relevance_of_course',
+    name: 'I. Relevance of Course',
+    description: 'Evaluation of course relevance to skills and knowledge development',
     questions: [
       {
-        id: 'content_clarity',
-        text: 'The course objectives and learning outcomes were clearly defined',
-        shortLabel: 'Clarity of Objectives'
+        id: 'relevance_subject_knowledge',
+        text: 'The course helped me to develop relevant subject knowledge',
+        shortLabel: 'Subject Knowledge'
       },
       {
-        id: 'content_organization',
-        text: 'The course content was well-organized and logically structured',
-        shortLabel: 'Content Organization'
+        id: 'relevance_practical_skills',
+        text: 'The course helped me to develop related practical skills',
+        shortLabel: 'Practical Skills'
       },
       {
-        id: 'content_relevance',
-        text: 'The course content was relevant and up-to-date',
-        shortLabel: 'Content Relevance'
+        id: 'relevance_team_work',
+        text: 'The course helped me to develop team work',
+        shortLabel: 'Team Work'
       },
       {
-        id: 'content_difficulty',
-        text: 'The difficulty level of the course was appropriate for my level',
-        shortLabel: 'Appropriate Difficulty'
+        id: 'relevance_leadership',
+        text: 'The course helped me to develop leadership skills',
+        shortLabel: 'Leadership Skills'
+      },
+      {
+        id: 'relevance_communication',
+        text: 'The course helped me to develop communication skills',
+        shortLabel: 'Communication Skills'
+      },
+      {
+        id: 'relevance_positive_attitude',
+        text: 'The course helped me to develop positive attitude on my program of study',
+        shortLabel: 'Positive Attitude'
       }
     ]
   },
   {
-    id: 'instructor_effectiveness',
-    name: 'Instructor Effectiveness',
-    description: 'Evaluation of teaching methods and instructor performance',
+    id: 'course_organization',
+    name: 'II. Course Organization and ILOs',
+    description: 'Evaluation of course structure and learning outcomes',
     questions: [
       {
-        id: 'instructor_knowledge',
-        text: 'The instructor demonstrated thorough knowledge of the subject matter',
-        shortLabel: 'Subject Expertise'
+        id: 'org_curriculum',
+        text: 'The course was implemented according to the approved curriculum',
+        shortLabel: 'Approved Curriculum'
       },
       {
-        id: 'instructor_communication',
-        text: 'The instructor communicated concepts clearly and effectively',
-        shortLabel: 'Clear Communication'
+        id: 'org_ilos_known',
+        text: 'Intended Learning Outcomes (ILOs) of the course were made known from the beginning',
+        shortLabel: 'ILOs Made Known'
       },
       {
-        id: 'instructor_engagement',
-        text: 'The instructor made the course engaging and interesting',
-        shortLabel: 'Student Engagement'
+        id: 'org_ilos_clear',
+        text: 'Targeted Learning Outcomes (ILOs) of the course were clear',
+        shortLabel: 'Clear ILOs'
       },
       {
-        id: 'instructor_enthusiasm',
-        text: 'The instructor showed enthusiasm for the subject matter',
-        shortLabel: 'Instructor Enthusiasm'
+        id: 'org_ilos_relevant',
+        text: 'Intended Learning Outcomes (ILOs) of the course were relevant',
+        shortLabel: 'Relevant ILOs'
       },
       {
-        id: 'instructor_prepared',
-        text: 'The instructor was well-prepared for each class session',
-        shortLabel: 'Class Preparation'
+        id: 'org_no_overlapping',
+        text: 'There were no overlapping of contents within a course',
+        shortLabel: 'No Overlapping'
       }
     ]
   },
   {
-    id: 'teaching_methods',
-    name: 'Teaching Methods and Learning Resources',
-    description: 'Evaluation of instructional strategies and materials',
+    id: 'teaching_learning',
+    name: 'III. Teaching - Learning',
+    description: 'Evaluation of teaching methods and learning activities',
     questions: [
       {
-        id: 'methods_variety',
-        text: 'A variety of teaching methods were used to facilitate learning',
-        shortLabel: 'Variety of Methods'
+        id: 'teaching_tlas_useful',
+        text: 'Teaching - Learning Activities (TLAs) such as practical, educational tour etc. were useful and relevant',
+        shortLabel: 'TLAs Useful'
       },
       {
-        id: 'methods_technology',
-        text: 'Technology and multimedia resources were effectively utilized',
-        shortLabel: 'Technology Use'
+        id: 'teaching_ila_useful',
+        text: 'Independent Learning (ILA) activities such as journal reading, research work, project, etc. were useful and relevant',
+        shortLabel: 'ILA Useful'
       },
       {
-        id: 'methods_materials',
-        text: 'Course materials (textbooks, handouts, slides) were helpful',
-        shortLabel: 'Quality of Materials'
+        id: 'teaching_tlas_sequenced',
+        text: 'The TLAs within a course were sequenced in a logical manner',
+        shortLabel: 'TLAs Sequenced'
       },
       {
-        id: 'methods_examples',
-        text: 'Real-world examples and applications were provided',
-        shortLabel: 'Practical Examples'
+        id: 'teaching_applicable',
+        text: 'Team teaching is done as applicable',
+        shortLabel: 'Team Teaching'
+      },
+      {
+        id: 'teaching_motivated',
+        text: 'The teachers motivated the students to learn',
+        shortLabel: 'Teacher Motivation'
+      },
+      {
+        id: 'teaching_team_work',
+        text: 'The teachers provided adequate opportunities for team work',
+        shortLabel: 'Team Work Opportunities'
+      },
+      {
+        id: 'teaching_independent',
+        text: 'The teachers provided adequate opportunities for independent learning',
+        shortLabel: 'Independent Learning'
       }
     ]
   },
   {
-    id: 'assessment_feedback',
-    name: 'Assessment and Feedback',
-    description: 'Evaluation of grading, feedback, and learning assessment',
+    id: 'assessment',
+    name: 'IV. Assessment',
+    description: 'Evaluation of assessment methods and feedback',
     questions: [
       {
-        id: 'assessment_fair',
-        text: 'Assignments and exams fairly assessed my understanding',
-        shortLabel: 'Fair Assessment'
+        id: 'assessment_start',
+        text: 'Assessments tasks were held at the beginning of the course',
+        shortLabel: 'Assessment at Start'
       },
       {
-        id: 'assessment_criteria',
-        text: 'Grading criteria were clearly communicated',
-        shortLabel: 'Clear Grading Criteria'
+        id: 'assessment_all_topics',
+        text: 'Assessments covered all the main topics taught in the course',
+        shortLabel: 'All Topics Covered'
       },
       {
-        id: 'feedback_timely',
-        text: 'Feedback on assignments was provided in a timely manner',
+        id: 'assessment_number',
+        text: 'The number of assessments was appropriate and adequate',
+        shortLabel: 'Appropriate Number'
+      },
+      {
+        id: 'assessment_distribution',
+        text: 'Distribution of assessments over a semester was appropriate',
+        shortLabel: 'Good Distribution'
+      },
+      {
+        id: 'assessment_allocation',
+        text: 'Allocation of marks/grade among assessments was satisfactory',
+        shortLabel: 'Satisfactory Allocation'
+      },
+      {
+        id: 'assessment_feedback',
+        text: 'The teachers provided timely feedback on student performance',
         shortLabel: 'Timely Feedback'
-      },
-      {
-        id: 'feedback_helpful',
-        text: 'Feedback helped me improve my understanding and performance',
-        shortLabel: 'Helpful Feedback'
       }
     ]
   },
   {
-    id: 'interaction_support',
-    name: 'Interaction and Support',
-    description: 'Evaluation of instructor availability and student support',
+    id: 'learning_environment',
+    name: 'V. Learning Environment',
+    description: 'Evaluation of facilities and learning resources',
     questions: [
       {
-        id: 'interaction_accessible',
-        text: 'The instructor was accessible and available for questions',
-        shortLabel: 'Instructor Accessibility'
+        id: 'environment_classrooms',
+        text: 'Available facilities in the classrooms were satisfactory',
+        shortLabel: 'Classroom Facilities'
       },
       {
-        id: 'interaction_responsive',
-        text: 'The instructor responded to student questions and concerns',
-        shortLabel: 'Responsiveness'
+        id: 'environment_library',
+        text: 'Available library facilities were adequate',
+        shortLabel: 'Library Facilities'
       },
       {
-        id: 'interaction_respectful',
-        text: 'The instructor treated students with respect',
-        shortLabel: 'Respectful Interaction'
+        id: 'environment_laboratory',
+        text: 'Available laboratory facilities were adequate',
+        shortLabel: 'Laboratory Facilities'
       },
       {
-        id: 'interaction_participation',
-        text: 'The instructor encouraged student participation and discussion',
-        shortLabel: 'Encourages Participation'
+        id: 'environment_computer',
+        text: 'Access to computer facilities were sufficient',
+        shortLabel: 'Computer Access'
+      },
+      {
+        id: 'environment_internet',
+        text: 'There was sufficient access to internet and electronic databases',
+        shortLabel: 'Internet Access'
+      },
+      {
+        id: 'environment_facilities_availability',
+        text: 'Availability of facilities for learning was satisfactory',
+        shortLabel: 'Overall Facilities'
       }
     ]
   },
   {
-    id: 'learning_outcomes',
-    name: 'Learning Outcomes and Overall Satisfaction',
-    description: 'Evaluation of learning achievement and course satisfaction',
+    id: 'counseling',
+    name: 'VI. Counseling',
+    description: 'Evaluation of counseling and consultation support',
     questions: [
       {
-        id: 'outcomes_objectives',
-        text: 'I achieved the learning objectives of this course',
-        shortLabel: 'Achieved Objectives'
-      },
-      {
-        id: 'outcomes_skills',
-        text: 'This course helped me develop new skills and knowledge',
-        shortLabel: 'Skill Development'
-      },
-      {
-        id: 'outcomes_thinking',
-        text: 'This course enhanced my critical thinking abilities',
-        shortLabel: 'Critical Thinking'
-      },
-      {
-        id: 'outcomes_satisfaction',
-        text: 'Overall, I am satisfied with this course',
-        shortLabel: 'Overall Satisfaction'
-      },
-      {
-        id: 'outcomes_recommend',
-        text: 'I would recommend this course to other students',
-        shortLabel: 'Would Recommend'
+        id: 'counseling_available',
+        text: 'The teachers were available for consultation whenever needed',
+        shortLabel: 'Teacher Availability'
       }
     ]
   }

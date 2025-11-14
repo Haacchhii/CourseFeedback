@@ -148,7 +148,7 @@ export default function StudentCourses(){
                 <div className="text-sm font-medium text-gray-500 text-center py-2">Completed</div>
               ) : (
                 <Link 
-                  to={`/student/evaluate/${c.id}`} 
+                  to={`/student/evaluate/${c.class_section_id || c.id}`}
                   className="block w-full text-center px-3 py-2 bg-[#7a0000] text-white rounded text-sm hover:bg-[#8f0000] transition-colors"
                 >
                   Evaluate
@@ -197,7 +197,7 @@ export default function StudentCourses(){
                       <span className="text-xs lg:text-sm font-medium text-gray-500 whitespace-nowrap">Completed</span>
                     ) : (
                       <Link 
-                        to={`/student/evaluate/${c.id}`} 
+                        to={`/student/evaluate/${c.class_section_id || c.id}`}
                         className="inline-flex items-center justify-center px-2 lg:px-3 py-1 bg-[#7a0000] text-white rounded text-xs lg:text-sm hover:bg-[#8f0000] transition-colors whitespace-nowrap"
                       >
                         Evaluate

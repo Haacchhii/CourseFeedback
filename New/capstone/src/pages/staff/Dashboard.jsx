@@ -1,7 +1,8 @@
 import React, { useMemo, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
-import { getCurrentUser, isAdmin, isStaffMember } from '../../utils/roleUtils'
+import { isAdmin, isStaffMember } from '../../utils/roleUtils'
+import { useAuth } from '../../context/AuthContext'
 import { adminAPI, deptHeadAPI, secretaryAPI, instructorAPI } from '../../services/api'
 import CategoryMetricsDisplay, { CategoryComparisonWidget } from '../../components/CategoryMetricsDisplay'
 import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
@@ -10,7 +11,7 @@ const SENTIMENT_COLORS = ['#10b981', '#f59e0b', '#ef4444'] // Green, Yellow, Red
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const currentUser = getCurrentUser()
+  const { user: currentUser } = useAuth()
 
   // Data states
   const [dashboardData, setDashboardData] = useState(null)
@@ -18,7 +19,52 @@ export default function Dashboard() {
   // Filter states
   const [selectedProgram, setSelectedProgram] = useState('all')
   const [selectedYearLevel, setSelectedYearLevel] = useState('all')
+  const [selectedSemester, setSelectedSemester] = useState('all')
   const [selectedCourses, setSelectedCourses] = useState('all')
+  const [showFilters, setShowFilters] = useState(false)
+
+  // Filter options states
+  const [programOptions, setProgramOptions] = useState([])
+  const [yearLevelOptions, setYearLevelOptions] = useState([])
+
+  // Fetch filter options on mount
+  useEffect(() => {
+    const fetchFilterOptions = async () => {
+      if (!currentUser) return
+      
+      try {
+        let programsResponse, yearLevelsResponse
+        
+        if (currentUser.role === 'secretary') {
+          [programsResponse, yearLevelsResponse] = await Promise.all([
+            secretaryAPI.getPrograms(),
+            secretaryAPI.getYearLevels()
+          ])
+        } else if (currentUser.role === 'department_head') {
+          [programsResponse, yearLevelsResponse] = await Promise.all([
+            deptHeadAPI.getPrograms(),
+            deptHeadAPI.getYearLevels()
+          ])
+        } else if (currentUser.role === 'instructor') {
+          [programsResponse, yearLevelsResponse] = await Promise.all([
+            instructorAPI.getPrograms(),
+            instructorAPI.getYearLevels()
+          ])
+        }
+        
+        if (programsResponse?.data) {
+          setProgramOptions(programsResponse.data)
+        }
+        if (yearLevelsResponse?.data) {
+          setYearLevelOptions(yearLevelsResponse.data)
+        }
+      } catch (err) {
+        console.error('Error fetching filter options:', err)
+      }
+    }
+    
+    fetchFilterOptions()
+  }, [currentUser?.role])
 
   // Redirect students to evaluation page, admins to admin dashboard
   useEffect(() => {
@@ -51,6 +97,10 @@ export default function Dashboard() {
       if (!currentUser) return null
       
       const filters = {}
+      if (selectedProgram !== 'all') filters.program_id = selectedProgram
+      if (selectedYearLevel !== 'all') filters.year_level = selectedYearLevel
+      if (selectedSemester !== 'all') filters.semester = selectedSemester
+      
       let response
       if (currentUser.role === 'secretary') {
         response = await secretaryAPI.getDashboard(filters)
@@ -64,7 +114,7 @@ export default function Dashboard() {
       
       return response?.data || response
     },
-    [currentUser?.id, currentUser?.role]
+    [currentUser?.id, currentUser?.role, selectedProgram, selectedYearLevel, selectedSemester]
   )
 
   // Update dashboardData when apiData changes
@@ -259,7 +309,104 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Note: Filters temporarily hidden - API doesn't support filtering yet */}
+        {/* Filters Section */}
+        <div className="mb-8">
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="lpu-btn-secondary inline-flex items-center mb-4"
+          >
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+            </svg>
+            {showFilters ? 'Hide Filters' : 'Show Filters'}
+          </button>
+
+          {showFilters && (
+            <div className="lpu-card p-6">
+              <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center">
+                <svg className="w-5 h-5 mr-2 text-[#7a0000]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+                </svg>
+                Filter Dashboard Data
+              </h3>
+              <div className="grid md:grid-cols-3 gap-4">
+                {/* Program Filter */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    📚 Academic Program
+                  </label>
+                  <select
+                    value={selectedProgram}
+                    onChange={(e) => setSelectedProgram(e.target.value)}
+                    className="lpu-select"
+                  >
+                    <option value="all">All Programs</option>
+                    {programOptions.map((program) => (
+                      <option key={program.id} value={program.id}>
+                        {program.program_code || program.code} - {program.program_name || program.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Year Level Filter */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    🎓 Year Level
+                  </label>
+                  <select
+                    value={selectedYearLevel}
+                    onChange={(e) => setSelectedYearLevel(e.target.value)}
+                    className="lpu-select"
+                  >
+                    <option value="all">All Year Levels</option>
+                    {yearLevelOptions.map((yl) => (
+                      <option key={yl.value} value={yl.value}>
+                        {yl.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Semester Filter */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    📅 Semester
+                  </label>
+                  <select
+                    value={selectedSemester}
+                    onChange={(e) => setSelectedSemester(e.target.value)}
+                    className="lpu-select"
+                  >
+                    <option value="all">All Semesters</option>
+                    <option value="1">First Semester</option>
+                    <option value="2">Second Semester</option>
+                    <option value="3">Summer</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="mt-4 flex justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    setSelectedProgram('all')
+                    setSelectedYearLevel('all')
+                    setSelectedSemester('all')
+                  }}
+                  className="lpu-btn-secondary"
+                >
+                  Reset Filters
+                </button>
+                <button
+                  onClick={() => setShowFilters(false)}
+                  className="lpu-btn-primary"
+                >
+                  Apply Filters
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
         
         {/* Enhanced Charts Grid */}
         <div className="grid lg:grid-cols-2 gap-8 mb-8">

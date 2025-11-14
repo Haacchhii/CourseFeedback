@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getCurrentUser, isSystemAdmin } from '../../utils/roleUtils'
+import { isSystemAdmin } from '../../utils/roleUtils'
+import { useAuth } from '../../context/AuthContext'
 import { adminAPI } from '../../services/api'
+import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 export default function DataExportCenter() {
   const navigate = useNavigate()
-  const currentUser = getCurrentUser()
+  const { user: currentUser } = useAuth()
   
   const [activeTab, setActiveTab] = useState('quick')
   const [showScheduleModal, setShowScheduleModal] = useState(false)
@@ -32,6 +35,11 @@ export default function DataExportCenter() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [exporting, setExporting] = useState(false)
+  const [stats, setStats] = useState({
+    users: { total: 0, active: 0 },
+    courses: { total: 0 },
+    evaluations: { total: 0 }
+  })
 
   // Redirect if not system admin
   useEffect(() => {
@@ -45,8 +53,10 @@ export default function DataExportCenter() {
     const fetchHistory = async () => {
       try {
         setLoading(true)
-        const data = await adminAPI.getExportHistory()
-        setExportHistory(data || [])
+        const response = await adminAPI.getExportHistory()
+        const data = response?.data || response
+        // Extract exports array if it exists, otherwise use empty array
+        setExportHistory(data?.exports || [])
       } catch (err) {
         setError(err.message)
       } finally {
@@ -56,38 +66,115 @@ export default function DataExportCenter() {
     fetchHistory()
   }, [])
 
+  // Fetch dashboard stats for real-time counts
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await adminAPI.getDashboardStats()
+        const data = response.data || response // Handle both {data: {...}} and direct response
+        setStats({
+          users: { total: data.totalUsers || 0, active: data.activeUsers || 0 },
+          courses: { total: data.totalCourses || 0 },
+          evaluations: { total: data.totalEvaluations || 0 }
+        })
+      } catch (err) {
+        console.error('Failed to fetch dashboard stats:', err)
+      }
+    }
+    fetchStats()
+  }, [])
+
   const handleQuickExport = async (type) => {
     try {
       setExporting(true)
-      let blob
+      let data
       const timestamp = new Date().toISOString().split('T')[0]
       
+      // Convert frontend formats to backend-compatible formats
+      // Backend only supports 'json' and 'csv'
+      const backendFormat = (exportFormat === 'excel' || exportFormat === 'pdf') 
+        ? (exportFormat === 'excel' ? 'csv' : 'json') 
+        : exportFormat
+      
       if (type === 'All Users') {
-        blob = await adminAPI.exportUsers({ format: exportFormat })
-        downloadBlob(blob, `users_export_${timestamp}.${exportFormat}`)
+        data = await adminAPI.exportUsers({ format: backendFormat })
+        downloadData(data, `users_export_${timestamp}.${exportFormat}`, exportFormat)
       } else if (type === 'All Evaluations') {
-        blob = await adminAPI.exportEvaluations({ format: exportFormat, dateRange })
-        downloadBlob(blob, `evaluations_export_${timestamp}.${exportFormat}`)
+        data = await adminAPI.exportEvaluations({ format: backendFormat, dateRange })
+        downloadData(data, `evaluations_export_${timestamp}.${exportFormat}`, exportFormat)
       } else if (type === 'All Courses') {
-        blob = await adminAPI.exportCourses({ format: exportFormat })
-        downloadBlob(blob, `courses_export_${timestamp}.${exportFormat}`)
+        data = await adminAPI.exportCourses({ format: backendFormat })
+        downloadData(data, `courses_export_${timestamp}.${exportFormat}`, exportFormat)
       } else if (type === 'Analytics Report') {
-        blob = await adminAPI.exportAnalytics({ format: exportFormat, dateRange })
-        downloadBlob(blob, `analytics_export_${timestamp}.${exportFormat}`)
+        data = await adminAPI.exportAnalytics({ format: backendFormat, dateRange })
+        downloadData(data, `analytics_export_${timestamp}.${exportFormat}`, exportFormat)
       }
       
       // Refresh history
-      const updatedHistory = await adminAPI.getExportHistory()
-      setExportHistory(updatedHistory || [])
+      try {
+        const updatedHistory = await adminAPI.getExportHistory()
+        const historyData = updatedHistory?.data || updatedHistory
+        setExportHistory(historyData?.exports || [])
+      } catch (historyErr) {
+        console.log('Could not refresh export history:', historyErr)
+      }
+      
       alert(`${type} exported successfully!`)
     } catch (err) {
-      alert(`Export failed: ${err.message}`)
+      console.error('Export error:', err)
+      // Extract meaningful error message
+      let errorMessage = 'Unknown error occurred'
+      if (err?.response?.data?.detail) {
+        errorMessage = err.response.data.detail
+      } else if (err?.message) {
+        errorMessage = err.message
+      } else if (typeof err === 'string') {
+        errorMessage = err
+      } else if (err?.detail) {
+        errorMessage = err.detail
+      }
+      alert(`Export failed: ${errorMessage}`)
     } finally {
       setExporting(false)
     }
   }
   
-  const downloadBlob = (blob, filename) => {
+  const downloadData = (responseData, filename, format) => {
+    let blob
+    
+    // Extract the actual data from response
+    const data = responseData?.data || responseData
+    
+    console.log('downloadData called with format:', format)
+    console.log('Data structure:', Array.isArray(data) ? `Array with ${data.length} items` : typeof data)
+    
+    // Handle different formats
+    if (format === 'json') {
+      // Convert JSON to string and create blob
+      const jsonString = JSON.stringify(data, null, 2)
+      blob = new Blob([jsonString], { type: 'application/json' })
+    } else if (format === 'csv') {
+      // Convert JSON to CSV
+      const csvContent = convertToCSV(data)
+      blob = new Blob([csvContent], { type: 'text/csv' })
+    } else if (format === 'excel') {
+      // Excel format - export as CSV (Excel can open CSV)
+      const csvContent = convertToCSV(data)
+      blob = new Blob([csvContent], { type: 'text/csv' })
+      // Update filename to .csv
+      filename = filename.replace('.excel', '.csv')
+      console.log('Note: Exporting as CSV format (Excel compatible)')
+    } else if (format === 'pdf') {
+      // Generate actual PDF
+      generatePDF(data, filename)
+      return // PDF generation handles download internally
+    } else {
+      // Fallback to JSON
+      const jsonString = JSON.stringify(data, null, 2)
+      blob = new Blob([jsonString], { type: 'application/json' })
+    }
+    
+    // Download the blob
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -98,24 +185,257 @@ export default function DataExportCenter() {
     window.URL.revokeObjectURL(url)
   }
 
+  const convertToCSV = (data) => {
+    // Handle custom export format (object with multiple arrays)
+    if (typeof data === 'object' && !Array.isArray(data) && data !== null) {
+      // Check if this is a custom export with multiple tables
+      const hasArrayValues = Object.values(data).some(val => Array.isArray(val))
+      if (hasArrayValues) {
+        // Combine all arrays into CSV sections
+        let csvOutput = ''
+        Object.entries(data).forEach(([tableName, tableData]) => {
+          if (Array.isArray(tableData) && tableData.length > 0) {
+            csvOutput += `\n${tableName.toUpperCase()}\n`
+            const headers = Object.keys(tableData[0])
+            csvOutput += headers.join(',') + '\n'
+            tableData.forEach(row => {
+              const csvRow = headers.map(header => {
+                const value = row[header]
+                if (value === null || value === undefined) return ''
+                const stringValue = String(value)
+                if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+                  return `"${stringValue.replace(/"/g, '""')}"`
+                }
+                return stringValue
+              }).join(',')
+              csvOutput += csvRow + '\n'
+            })
+          }
+        })
+        return csvOutput
+      }
+    }
+    
+    // Standard array handling
+    if (!Array.isArray(data) || data.length === 0) {
+      return ''
+    }
+    
+    // Get headers from first object
+    const headers = Object.keys(data[0])
+    const csvHeaders = headers.join(',')
+    
+    // Convert each row to CSV
+    const csvRows = data.map(row => {
+      return headers.map(header => {
+        const value = row[header]
+        // Escape commas and quotes in values
+        if (value === null || value === undefined) return ''
+        const stringValue = String(value)
+        if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+          return `"${stringValue.replace(/"/g, '""')}"`
+        }
+        return stringValue
+      }).join(',')
+    })
+    
+    return [csvHeaders, ...csvRows].join('\n')
+  }
+
+  const generatePDF = (data, filename) => {
+    console.log('generatePDF called with filename:', filename)
+    console.log('Data type:', Array.isArray(data) ? 'Array' : typeof data)
+    console.log('Data length:', Array.isArray(data) ? data.length : 'N/A')
+    
+    try {
+      const doc = new jsPDF()
+      
+      // Add title
+      const title = filename.replace('.pdf', '').replace(/_/g, ' ').toUpperCase()
+      doc.setFontSize(16)
+      doc.text(title, 14, 20)
+      
+      // Add metadata
+      doc.setFontSize(10)
+      doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28)
+      
+      // Check if this is custom export format (object with multiple tables)
+      const isCustomExport = typeof data === 'object' && !Array.isArray(data) && data !== null &&
+                             Object.values(data).some(val => Array.isArray(val))
+      
+      if (isCustomExport) {
+        // Handle custom export with multiple tables
+        let currentY = 40
+        let totalRecords = 0
+        
+        Object.entries(data).forEach(([tableName, tableData]) => {
+          if (Array.isArray(tableData) && tableData.length > 0) {
+            totalRecords += tableData.length
+            
+            // Add section title
+            if (currentY > 250) {
+              doc.addPage()
+              currentY = 20
+            }
+            
+            doc.setFontSize(12)
+            doc.setFont(undefined, 'bold')
+            doc.text(tableName.toUpperCase(), 14, currentY)
+            doc.setFont(undefined, 'normal')
+            currentY += 10
+            
+            // Get headers and prepare data
+            const headers = Object.keys(tableData[0])
+            const tableRows = tableData.map(row => 
+              headers.map(header => {
+                const value = row[header]
+                if (value === null || value === undefined) return ''
+                if (typeof value === 'object') return JSON.stringify(value)
+                return String(value)
+              })
+            )
+            
+            // Add table
+            autoTable(doc, {
+              head: [headers],
+              body: tableRows,
+              startY: currentY,
+              styles: { fontSize: 8, cellPadding: 2 },
+              headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+              alternateRowStyles: { fillColor: [245, 245, 245] },
+              margin: { top: 10 },
+            })
+            
+            currentY = doc.lastAutoTable.finalY + 15
+          }
+        })
+        
+        // Update total records in header
+        doc.setFontSize(10)
+        doc.text(`Total Records: ${totalRecords}`, 14, 34)
+        
+      } else if (Array.isArray(data) && data.length > 0) {
+        // Standard array export
+        doc.text(`Total Records: ${data.length}`, 14, 34)
+        
+        // Get headers from first object
+        const headers = Object.keys(data[0])
+        
+        // Prepare table data
+        const tableData = data.map(row => 
+          headers.map(header => {
+            const value = row[header]
+            if (value === null || value === undefined) return ''
+            if (typeof value === 'object') return JSON.stringify(value)
+            return String(value)
+          })
+        )
+        
+        // Add table using autoTable
+        autoTable(doc, {
+          head: [headers],
+          body: tableData,
+          startY: 40,
+          styles: { fontSize: 8, cellPadding: 2 },
+          headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+          alternateRowStyles: { fillColor: [245, 245, 245] },
+          margin: { top: 40 },
+        })
+      } else if (typeof data === 'object' && data !== null) {
+        // For non-array data (like analytics), display as key-value pairs
+        let yPosition = 40
+        doc.setFontSize(10)
+        
+        const displayObject = (obj, indent = 0) => {
+          Object.entries(obj).forEach(([key, value]) => {
+            if (yPosition > 270) {
+              doc.addPage()
+              yPosition = 20
+            }
+            
+            const xPosition = 14 + (indent * 10)
+            
+            if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+              doc.setFont(undefined, 'bold')
+              doc.text(`${key}:`, xPosition, yPosition)
+              doc.setFont(undefined, 'normal')
+              yPosition += 6
+              displayObject(value, indent + 1)
+            } else {
+              doc.text(`${key}: ${String(value)}`, xPosition, yPosition)
+              yPosition += 6
+            }
+          })
+        }
+        
+        displayObject(data)
+      } else {
+        doc.text('No data available', 14, 40)
+      }
+      
+      // Save the PDF
+      doc.save(filename)
+      console.log('PDF generated successfully')
+    } catch (err) {
+      console.error('Error generating PDF:', err)
+      // Fallback to JSON export
+      const jsonString = JSON.stringify(data, null, 2)
+      const blob = new Blob([jsonString], { type: 'application/json' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename.replace('.pdf', '.json')
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+      alert('PDF generation failed. Downloaded as JSON instead.')
+    }
+  }
+
   const handleCustomExport = async () => {
     try {
       setExporting(true)
       const selected = Object.entries(includeFilters).filter(([_, v]) => v).map(([k, _]) => k)
-      const blob = await adminAPI.exportCustom({ 
-        categories: selected, 
-        format: exportFormat,
+      
+      // Convert frontend formats to backend-compatible formats
+      // Backend only supports 'json' and 'csv'
+      const backendFormat = (exportFormat === 'excel' || exportFormat === 'pdf') 
+        ? (exportFormat === 'excel' ? 'csv' : 'json') 
+        : exportFormat
+      
+      const data = await adminAPI.exportCustom({ 
+        tables: selected,
+        format: backendFormat,
         dateRange 
       })
       const timestamp = new Date().toISOString().split('T')[0]
-      downloadBlob(blob, `custom_export_${timestamp}.${exportFormat}`)
+      downloadData(data, `custom_export_${timestamp}.${exportFormat}`, exportFormat)
       
       // Refresh history
-      const updatedHistory = await adminAPI.getExportHistory()
-      setExportHistory(updatedHistory || [])
+      try {
+        const updatedHistory = await adminAPI.getExportHistory()
+        const historyData = updatedHistory?.data || updatedHistory
+        setExportHistory(historyData?.exports || [])
+      } catch (historyErr) {
+        console.log('Could not refresh export history:', historyErr)
+      }
+      
       alert(`Custom data exported successfully!`)
     } catch (err) {
-      alert(`Export failed: ${err.message}`)
+      console.error('Export error:', err)
+      // Extract meaningful error message
+      let errorMessage = 'Unknown error occurred'
+      if (err?.response?.data?.detail) {
+        errorMessage = err.response.data.detail
+      } else if (err?.message) {
+        errorMessage = err.message
+      } else if (typeof err === 'string') {
+        errorMessage = err
+      } else if (err?.detail) {
+        errorMessage = err.detail
+      }
+      alert(`Export failed: ${errorMessage}`)
     } finally {
       setExporting(false)
     }
@@ -275,7 +595,7 @@ export default function DataExportCenter() {
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-gray-900">All Users</h3>
-                    <p className="text-sm text-gray-600">828 total users</p>
+                    <p className="text-sm text-gray-600">{stats.users.total} total users</p>
                   </div>
                 </div>
                 <p className="text-sm text-gray-600 mb-4">Export complete user database including students, heads, and administrators.</p>
@@ -304,7 +624,7 @@ export default function DataExportCenter() {
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-gray-900">All Courses</h3>
-                    <p className="text-sm text-gray-600">300+ courses</p>
+                    <p className="text-sm text-gray-600">{stats.courses.total} courses</p>
                   </div>
                 </div>
                 <p className="text-sm text-gray-600 mb-4">Export all course data including instructors, programs, and enrollment info.</p>
@@ -325,7 +645,7 @@ export default function DataExportCenter() {
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-gray-900">All Evaluations</h3>
-                    <p className="text-sm text-gray-600">1000+ evaluations</p>
+                    <p className="text-sm text-gray-600">{stats.evaluations.total} evaluations</p>
                   </div>
                 </div>
                 <p className="text-sm text-gray-600 mb-4">Export all evaluation responses with ratings and comments.</p>

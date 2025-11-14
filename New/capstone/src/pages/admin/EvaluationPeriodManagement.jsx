@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getCurrentUser, isSystemAdmin } from '../../utils/roleUtils'
+import { isSystemAdmin } from '../../utils/roleUtils'
+import { useAuth } from '../../context/AuthContext'
 import { adminAPI } from '../../services/api'
 import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
 
 export default function EvaluationPeriodManagement() {
   const navigate = useNavigate()
-  const currentUser = getCurrentUser()
+  const { user: currentUser } = useAuth()
   
   // State
   const [currentPeriod, setCurrentPeriod] = useState(null)

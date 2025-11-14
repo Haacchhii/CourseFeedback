@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getCurrentUser } from '../../utils/roleUtils'
+import { useAuth } from '../../context/AuthContext'
 import { studentAPI } from '../../services/api'
 import { 
   questionnaireCategories, 
@@ -14,7 +14,7 @@ import {
 export default function StudentEvaluation() {
   // ALL HOOKS MUST BE AT THE TOP - React Rules of Hooks
   const navigate = useNavigate()
-  const currentUser = getCurrentUser()
+  const { user: currentUser } = useAuth()
   
   const [searchTerm, setSearchTerm] = useState('')
   const [semesterFilter, setSemesterFilter] = useState('all')

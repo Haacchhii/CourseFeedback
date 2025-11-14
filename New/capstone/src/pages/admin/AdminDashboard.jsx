@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts'
-import { getCurrentUser, isAdmin, canManageUsers, canManageCourses, canManageEvaluations, canConfigureSystem, canExportData, canViewAuditLogs, getRoleDisplayName } from '../../utils/roleUtils'
+import { isAdmin, canManageUsers, canManageCourses, canManageEvaluations, canConfigureSystem, canExportData, canViewAuditLogs, getRoleDisplayName } from '../../utils/roleUtils'
+import { useAuth } from '../../context/AuthContext'
 import { adminAPI } from '../../services/api'
 import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
 
@@ -9,17 +10,27 @@ const COLORS = ['#7a0000', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6'
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
-  const currentUser = getCurrentUser()
+  const { user: currentUser } = useAuth()
   const [activeTab, setActiveTab] = useState('overview')
 
   // Use custom hook for data fetching with timeout
-  const { data: stats, loading, error, retry } = useApiWithTimeout(
+  const { data: apiResponse, loading, error, retry } = useApiWithTimeout(
     async () => {
       const response = await adminAPI.getDashboardStats()
       return response.data || response
     },
     [currentUser?.id, currentUser?.role]
   )
+
+  // Extract stats from nested data structure
+  const stats = useMemo(() => {
+    if (!apiResponse) return null
+    // If data is already flat, return as is
+    if (apiResponse.totalUsers !== undefined) return apiResponse
+    // If data is nested, extract it
+    if (apiResponse.data) return apiResponse.data
+    return apiResponse
+  }, [apiResponse])
 
   // Redirect if not an admin
   useEffect(() => {
@@ -271,6 +282,28 @@ export default function AdminDashboard() {
               <p className="text-sm text-gray-600 mb-4">Open/close evaluation periods, monitor participation, send reminders.</p>
               <button className="w-full bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
                 Manage Periods →
+              </button>
+            </div>
+          )}
+
+          {/* Email Notifications */}
+          {canConfigureSystem(currentUser) && (
+            <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-200 cursor-pointer border-2 border-transparent hover:border-indigo-500"
+                 onClick={() => navigate('/admin/emails')}>
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center mr-4">
+                  <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Email Notifications</h3>
+                  <p className="text-sm text-gray-500">Send automated emails</p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">Send evaluation reminders, period notifications, and system alerts to students.</p>
+              <button className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                Manage Emails →
               </button>
             </div>
           )}

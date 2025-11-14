@@ -1,13 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
-import { getCurrentUser, isAdmin, isStaffMember } from '../../utils/roleUtils'
+import { isAdmin, isStaffMember } from '../../utils/roleUtils'
+import { useAuth } from '../../context/AuthContext'
 import { adminAPI, deptHeadAPI, secretaryAPI, instructorAPI } from '../../services/api'
 import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
 
 export default function Evaluations() {
   const navigate = useNavigate()
-  const currentUser = getCurrentUser()
+  const { user: currentUser } = useAuth()
   const [evaluations, setEvaluations] = useState([])
   const [courses, setCourses] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -15,6 +16,50 @@ export default function Evaluations() {
   const [sentimentFilter, setSentimentFilter] = useState('all')
   const [semesterFilter, setSemesterFilter] = useState('all')
   const [yearLevelFilter, setYearLevelFilter] = useState('all')
+  const [chartLimit, setChartLimit] = useState(10) // Top N items to show in chart
+
+  // Filter options states
+  const [programOptions, setProgramOptions] = useState([])
+  const [yearLevelOptions, setYearLevelOptions] = useState([])
+
+  // Fetch filter options on mount
+  useEffect(() => {
+    const fetchFilterOptions = async () => {
+      if (!currentUser) return
+      
+      try {
+        let programsResponse, yearLevelsResponse
+        
+        if (currentUser.role === 'secretary') {
+          [programsResponse, yearLevelsResponse] = await Promise.all([
+            secretaryAPI.getPrograms(),
+            secretaryAPI.getYearLevels()
+          ])
+        } else if (currentUser.role === 'department_head') {
+          [programsResponse, yearLevelsResponse] = await Promise.all([
+            deptHeadAPI.getPrograms(),
+            deptHeadAPI.getYearLevels()
+          ])
+        } else if (currentUser.role === 'instructor') {
+          [programsResponse, yearLevelsResponse] = await Promise.all([
+            instructorAPI.getPrograms(),
+            instructorAPI.getYearLevels()
+          ])
+        }
+        
+        if (programsResponse?.data) {
+          setProgramOptions(programsResponse.data)
+        }
+        if (yearLevelsResponse?.data) {
+          setYearLevelOptions(yearLevelsResponse.data)
+        }
+      } catch (err) {
+        console.error('Error fetching filter options:', err)
+      }
+    }
+    
+    fetchFilterOptions()
+  }, [currentUser?.role])
 
   // Redirect unauthorized users
   useEffect(() => {
@@ -186,7 +231,7 @@ export default function Evaluations() {
       // Secretary/Admin: Sentiment by Program
       const programs = filterOptions.programs
       
-      return programs.map(program => {
+      const programData = programs.map(program => {
         const programEvaluations = enhancedEvaluations.filter(e => e.courseProgram === program)
         const positive = programEvaluations.filter(e => e.sentiment === 'positive').length
         const neutral = programEvaluations.filter(e => e.sentiment === 'neutral').length
@@ -196,17 +241,21 @@ export default function Evaluations() {
           name: program,
           positive,
           neutral,
-          negative
+          negative,
+          total: positive + neutral + negative
         }
       })
+      
+      // Sort by total evaluations and apply limit
+      const sortedData = programData.sort((a, b) => b.total - a.total)
+      return chartLimit === 'all' ? sortedData : sortedData.slice(0, parseInt(chartLimit))
     } else {
       // Department Head: Sentiment by Subject/Course
       // Get unique courses for department head's assigned programs
       const departmentCourses = courses
         .filter(course => currentUser?.assignedPrograms?.includes(course.program))
-        .slice(0, 8) // Limit to 8 courses for better visualization
       
-      return departmentCourses.map(course => {
+      const courseData = departmentCourses.map(course => {
         const courseEvaluations = enhancedEvaluations.filter(e => e.courseId === course.id)
         const positive = courseEvaluations.filter(e => e.sentiment === 'positive').length
         const neutral = courseEvaluations.filter(e => e.sentiment === 'neutral').length
@@ -218,11 +267,16 @@ export default function Evaluations() {
           neutral,
           negative,
           fullName: course.name, // Full course name for tooltip
-          courseCode: course.classCode
+          courseCode: course.classCode,
+          total: positive + neutral + negative
         }
       })
+      
+      // Sort by total evaluations and apply limit
+      const sortedData = courseData.sort((a, b) => b.total - a.total)
+      return chartLimit === 'all' ? sortedData : sortedData.slice(0, parseInt(chartLimit))
     }
-  }, [enhancedEvaluations, filterOptions.programs, courses, currentUser])
+  }, [enhancedEvaluations, filterOptions.programs, courses, currentUser, chartLimit])
 
   const getSentimentColor = (sentiment) => {
     switch (sentiment) {
@@ -370,18 +424,34 @@ export default function Evaluations() {
 
         {/* Enhanced Sentiment Trend Chart */}
         <div className="lpu-chart-container mb-8">
-          <div className="chart-title">
-            <svg className="w-6 h-6 text-[#7a0000]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-            </svg>
-            {isAdmin(currentUser) ? 'Academic Program Sentiment Analysis' : 'Course-Level Sentiment Analysis'}
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <div className="chart-title">
+                <svg className="w-6 h-6 text-[#7a0000]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                </svg>
+                {isAdmin(currentUser) ? 'Academic Program Sentiment Analysis' : 'Course-Level Sentiment Analysis'}
+              </div>
+              <p className="text-gray-600 text-sm">
+                {isAdmin(currentUser) 
+                  ? 'Comprehensive sentiment distribution across all academic programs'
+                  : 'Detailed sentiment breakdown for individual courses'}
+              </p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <label className="text-sm font-medium text-gray-700">Show:</label>
+              <select
+                value={chartLimit}
+                onChange={(e) => setChartLimit(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
+              >
+                <option value="5">Top 5</option>
+                <option value="10">Top 10</option>
+                <option value="20">Top 20</option>
+                <option value="all">All Items</option>
+              </select>
+            </div>
           </div>
-          <p className="text-gray-600 text-sm mb-6">
-            {isAdmin(currentUser) 
-              ? 'Comprehensive sentiment distribution across all academic programs'
-              : 'Detailed sentiment analysis for courses in your department'
-            }
-          </p>
           
           {sentimentTrendData.length > 0 ? (
             <ResponsiveContainer width="100%" height={350}>
@@ -461,8 +531,8 @@ export default function Evaluations() {
                 className="lpu-select"
               >
                 <option value="all">All Programs</option>
-                {filterOptions.programs.map(program => (
-                  <option key={program} value={program}>{program}</option>
+                {programOptions.map(program => (
+                  <option key={program.id} value={program.code}>{program.code} - {program.name}</option>
                 ))}
               </select>
             </div>
@@ -475,8 +545,8 @@ export default function Evaluations() {
                 className="lpu-select"
               >
                 <option value="all">All Year Levels</option>
-                {filterOptions.yearLevels.map(yearLevel => (
-                  <option key={yearLevel} value={yearLevel}>Year {yearLevel}</option>
+                {yearLevelOptions.map(yearLevel => (
+                  <option key={yearLevel.value} value={yearLevel.value}>{yearLevel.label}</option>
                 ))}
               </select>
             </div>

@@ -1,36 +1,132 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
-import { getCurrentUser, isAdmin, isStaffMember } from '../../utils/roleUtils'
+import { isAdmin, isStaffMember } from '../../utils/roleUtils'
+import { useAuth } from '../../context/AuthContext'
 import { adminAPI, deptHeadAPI, secretaryAPI, instructorAPI } from '../../services/api'
 
 export default function Courses() {
-  const currentUser = getCurrentUser()
+  const { user: currentUser } = useAuth()
   const [courses, setCourses] = useState([])
   const [evaluations, setEvaluations] = useState([])
+  const [programs, setPrograms] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedProgram, setSelectedProgram] = useState('all')
+  const [chartLimit, setChartLimit] = useState(10) // Top N courses to show in chart
   const [activeTab, setActiveTab] = useState('overview')
   const [selectedCourse, setSelectedCourse] = useState(null)
   const [courseDetails, setCourseDetails] = useState(null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   
-  // Form state for new course
-  const [newCourse, setNewCourse] = useState({
-    id: '',
-    name: '',
-    instructor: '',
-    semester: 'First Semester 2025',
-    program: '',
-    yearLevel: 1,
-    status: 'Pending',
-    classCode: '',
-    enrolledStudents: 0
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 15
+  
+  // Data for section creation
+  const [availableCourses, setAvailableCourses] = useState([])
+  const [instructors, setInstructors] = useState([])
+  
+  // Form state for new section
+  const [newSection, setNewSection] = useState({
+    course_id: '',
+    instructor_id: '',
+    class_code: '',
+    semester: 1,
+    academic_year: '2024-2025',
+    max_students: 40
   })
   
   const [formErrors, setFormErrors] = useState({})
+
+  // Fetch programs from database
+  useEffect(() => {
+    const fetchPrograms = async () => {
+      if (!currentUser) return
+      
+      try {
+        let programsData
+        
+        console.log('[COURSES] Fetching programs for role:', currentUser.role)
+        
+        if (isAdmin(currentUser)) {
+          console.log('[COURSES] Calling adminAPI.getPrograms()')
+          programsData = await adminAPI.getPrograms()
+        } else if (currentUser.role === 'secretary') {
+          console.log('[COURSES] Calling secretaryAPI.getPrograms()')
+          programsData = await secretaryAPI.getPrograms()
+        } else if (currentUser.role === 'department_head') {
+          console.log('[COURSES] Calling deptHeadAPI.getPrograms()')
+          programsData = await deptHeadAPI.getPrograms()
+        } else if (currentUser.role === 'instructor') {
+          console.log('[COURSES] Calling instructorAPI.getPrograms()')
+          programsData = await instructorAPI.getPrograms()
+        }
+        
+        console.log('[COURSES] Programs API response:', programsData)
+        
+        if (programsData?.data && Array.isArray(programsData.data) && programsData.data.length > 0) {
+          console.log('[COURSES] Programs loaded successfully:', programsData.data)
+          setPrograms(programsData.data)
+        } else {
+          console.warn('[COURSES] No programs data in API response, will extract from courses')
+          setPrograms([])
+        }
+      } catch (err) {
+        console.error('[COURSES] Error fetching programs:', err)
+        setPrograms([])
+      }
+    }
+    
+    fetchPrograms()
+  }, [currentUser])
+  
+  // Fallback: Extract unique programs from courses if programs array is empty
+  useEffect(() => {
+    if (programs.length === 0 && courses.length > 0) {
+      console.log('[COURSES] Extracting unique programs from courses data')
+      // Create a map to deduplicate by program code
+      const programMap = new Map()
+      courses.forEach(course => {
+        if (course.program && !programMap.has(course.program)) {
+          programMap.set(course.program, {
+            id: programMap.size + 1,
+            code: course.program,
+            program_code: course.program,
+            name: course.program,
+            program_name: course.program
+          })
+        }
+      })
+      const programObjects = Array.from(programMap.values())
+      console.log('[COURSES] Extracted unique programs:', programObjects)
+      setPrograms(programObjects)
+    }
+  }, [courses, programs])
+
+  // Fetch available courses and instructors for section creation
+  useEffect(() => {
+    const fetchSectionData = async () => {
+      if (!currentUser || !showAddModal) return
+      
+      try {
+        // Fetch all courses (course definitions)
+        const coursesResponse = await adminAPI.getCourses({})
+        const coursesData = coursesResponse?.data || coursesResponse || []
+        setAvailableCourses(Array.isArray(coursesData) ? coursesData : [])
+        
+        // Fetch all instructors
+        const instructorsResponse = await adminAPI.getInstructors({})
+        const instructorsData = instructorsResponse?.data || instructorsResponse || []
+        setInstructors(Array.isArray(instructorsData) ? instructorsData : [])
+      } catch (err) {
+        console.error('[COURSES] Error fetching section data:', err)
+      }
+    }
+    
+    fetchSectionData()
+  }, [showAddModal, currentUser])
 
   // Fetch courses from API
   useEffect(() => {
@@ -78,6 +174,10 @@ export default function Courses() {
           status: course.status || 'active',
           evaluations_count: course.evaluations_count || course.evaluationCount || 0
         }))
+        
+        console.log(`[COURSES] Total courses received: ${normalizedCourses.length}`)
+        console.log(`[COURSES] User role: ${currentUser.role}`)
+        console.log(`[COURSES] First 3 courses:`, normalizedCourses.slice(0, 3))
         
         setCourses(normalizedCourses)
         setEvaluations(evaluations)
@@ -158,11 +258,42 @@ export default function Courses() {
     const matchesSearch = (course.name || course.course_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (course.code || course.course_code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (course.instructor || course.instructor_name || '').toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesProgram = selectedProgram === 'all' || course.program === selectedProgram
+    
+    // Enhanced program matching - handle different field variations
+    const courseProgram = course.program || course.program_code || course.program_name || ''
+    const matchesProgram = selectedProgram === 'all' || 
+                          courseProgram === selectedProgram ||
+                          courseProgram.includes(selectedProgram) ||
+                          selectedProgram.includes(courseProgram)
+    
     return matchesSearch && matchesProgram
   })
+  
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredCourses.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedCourses = filteredCourses.slice(startIndex, endIndex)
+  
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, selectedProgram])
 
-  const programs = [...new Set(courses.map(course => course.program).filter(p => p))].filter(p => p !== 'N/A')
+  // Calculate active courses (courses with status 'active' or ongoing evaluations)
+  const activeCourses = enhancedCourses.filter(course => {
+    const status = (course.status || '').toLowerCase()
+    return status === 'active' || status === 'ongoing' || status === 'open' || !status
+  })
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('[COURSES] Total courses:', courses.length)
+    console.log('[COURSES] Enhanced courses:', enhancedCourses.length)
+    console.log('[COURSES] Active courses:', activeCourses.length)
+    console.log('[COURSES] Filtered courses:', filteredCourses.length)
+    console.log('[COURSES] Programs in state:', programs)
+  }, [courses, enhancedCourses, activeCourses, filteredCourses, programs])
 
   const handleCourseClick = async (courseId) => {
     setSubmitting(true)
@@ -260,9 +391,11 @@ export default function Courses() {
   // Handle form input changes
   const handleInputChange = (e) => {
     const { name, value } = e.target
-    setNewCourse(prev => ({
+    setNewSection(prev => ({
       ...prev,
-      [name]: value
+      [name]: name === 'semester' || name === 'max_students' || name === 'course_id' || name === 'instructor_id' 
+        ? parseInt(value) || value
+        : value
     }))
     // Clear error for this field when user starts typing
     if (formErrors[name]) {
@@ -277,31 +410,19 @@ export default function Courses() {
   const validateForm = () => {
     const errors = {}
     
-    if (!newCourse.id.trim()) {
-      errors.id = 'Course ID is required'
-    }
-    if (!newCourse.name.trim()) {
-      errors.name = 'Course name is required'
-    }
-    if (!newCourse.instructor.trim()) {
-      errors.instructor = 'Instructor name is required'
-    }
-    if (!newCourse.program) {
-      errors.program = 'Program is required'
-    }
-    if (!newCourse.classCode.trim()) {
-      errors.classCode = 'Class code is required'
-    }
-    if (newCourse.enrolledStudents < 0) {
-      errors.enrolledStudents = 'Enrolled students cannot be negative'
-    }
+    if (!newSection.course_id) errors.course_id = 'Please select a course'
+    if (!newSection.instructor_id) errors.instructor_id = 'Please select an instructor'
+    if (!newSection.class_code?.trim()) errors.class_code = 'Class code is required'
+    if (!newSection.academic_year?.trim()) errors.academic_year = 'Academic year is required'
+    if (!newSection.max_students || newSection.max_students < 1) errors.max_students = 'Maximum students must be at least 1'
     
     setFormErrors(errors)
     return Object.keys(errors).length === 0
   }
+    
   
   // Handle form submission
-  const handleSubmitCourse = (e) => {
+  const handleSubmitCourse = async (e) => {
     e.preventDefault()
     
     if (!validateForm()) {
@@ -310,86 +431,104 @@ export default function Courses() {
     
     setSubmitting(true)
     
-    // Simulate API call
-    setTimeout(() => {
-      // Here you would typically send the data to your backend
-      // Example: await api.createCourse(newCourse)
+    try {
+      // Create section using secretary or admin API
+      let response
+      if (currentUser.role === 'secretary') {
+        response = await secretaryAPI.createSection(newSection)
+      } else if (currentUser.role === 'department_head') {
+        response = await adminAPI.createSection(newSection)
+      } else {
+        response = await adminAPI.createSection(newSection)
+      }
       
-      setSubmitting(false)
+      alert('Class section created successfully!')
       setShowAddModal(false)
       
+      // Refresh the courses list
+      const filters = {}
+      if (selectedProgram !== 'all') filters.program = selectedProgram
+      
+      let coursesData
+      if (currentUser.role === 'secretary') {
+        coursesData = await secretaryAPI.getCourses(filters)
+      } else if (currentUser.role === 'department_head') {
+        coursesData = await deptHeadAPI.getCourses(filters)
+      } else {
+        coursesData = await adminAPI.getCourses(filters)
+      }
+      
+      const coursesArray = Array.isArray(coursesData) ? coursesData : (coursesData?.data || [])
+      const normalized = coursesArray.map(course => ({
+        id: course.id || course.section_id,
+        name: course.name || course.course_name || '',
+        code: course.code || course.course_code || '',
+        classCode: course.classCode || course.class_code || '',
+        instructor: course.instructor || course.instructor_name || 'N/A',
+        program: course.program || 'N/A',
+        yearLevel: course.yearLevel || course.year_level,
+        enrolledStudents: course.enrolledStudents || course.enrolled_students || 0,
+        semester: course.semester || '',
+        academic_year: course.academic_year || course.academicYear || '',
+        status: course.status || 'active',
+        evaluations_count: course.evaluations_count || course.evaluationCount || 0
+      }))
+      setCourses(normalized)
+      
       // Reset form
-      setNewCourse({
-        id: '',
-        name: '',
-        instructor: '',
-        semester: 'First Semester 2025',
-        program: '',
-        yearLevel: 1,
-        status: 'Pending',
-        classCode: '',
-        enrolledStudents: 0
+      setNewSection({
+        course_id: '',
+        instructor_id: '',
+        class_code: '',
+        semester: 1,
+        academic_year: '2024-2025',
+        max_students: 40
       })
       setFormErrors({})
       
-      // Show success message (you can add a toast notification here)
-      alert('Course created successfully!')
-    }, 1000)
+    } catch (error) {
+      console.error('[COURSES] Error creating section:', error)
+      alert(error.message || 'Failed to create section. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
   
   // Reset form when modal is closed
   const handleCloseModal = () => {
     setShowAddModal(false)
-    setNewCourse({
-      id: '',
-      name: '',
-      instructor: '',
-      semester: 'First Semester 2025',
-      program: '',
-      yearLevel: 1,
-      status: 'Pending',
-      classCode: '',
-      enrolledStudents: 0
+    setNewSection({
+      course_id: '',
+      instructor_id: '',
+      class_code: '',
+      semester: 1,
+      academic_year: '2024-2025',
+      max_students: 40
     })
     setFormErrors({})
   }
 
-  // Convert data for recharts format
-  const chartData = filteredCourses.map(course => ({
-    code: course.code,
-    overallRating: course.overallRating,
-    responseRate: course.responseRate
-  }))
+  // Convert data for recharts format with Top N limiter
+  const chartData = useMemo(() => {
+    if (!filteredCourses || filteredCourses.length === 0) return []
+    
+    // Sort by overall rating (descending) and take top N
+    const sortedCourses = [...filteredCourses].sort((a, b) => 
+      (Number(b.overallRating) || 0) - (Number(a.overallRating) || 0)
+    )
+    
+    const limitedCourses = chartLimit === 'all' 
+      ? sortedCourses 
+      : sortedCourses.slice(0, parseInt(chartLimit))
+    
+    return limitedCourses.map(course => ({
+      code: String(course.code || 'N/A'),
+      overallRating: Number(course.overallRating) || 0,
+      responseRate: Number(course.responseRate) || 0
+    }))
+  }, [filteredCourses, chartLimit])
 
-  const chartOptions = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: 'top',
-        labels: {
-          font: {
-            family: 'system-ui, -apple-system, sans-serif',
-            weight: '600'
-          }
-        }
-      },
-      title: {
-        display: true,
-        text: 'Course Performance Overview',
-        font: {
-          size: 16,
-          weight: 'bold',
-          family: 'system-ui, -apple-system, sans-serif'
-        }
-      }
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        max: 100
-      }
-    }
-  }
+  // Recharts doesn't need chartOptions object
 
   // Loading state
   if (loading) {
@@ -448,7 +587,11 @@ export default function Courses() {
               </div>
               
               <p className="text-white/90 text-lg max-w-2xl leading-relaxed">
-                Monitor course performance, track evaluation metrics, and analyze student feedback across all academic programs.
+                {currentUser?.role === 'instructor' 
+                  ? 'View your assigned courses, track student evaluations, and monitor class performance metrics.'
+                  : currentUser?.role === 'department_head'
+                  ? 'Monitor department courses, track evaluation metrics, and analyze student feedback.'
+                  : 'Monitor course performance, track evaluation metrics, and analyze student feedback across all academic programs.'}
               </p>
             </div>
             
@@ -457,9 +600,15 @@ export default function Courses() {
                 <div className="flex items-center space-x-3">
                   <div className="text-right">
                     <p className="text-white/80 text-sm">
-                      {isAdmin(currentUser) ? 'System-wide Analysis' : `${currentUser.department} Department`}
+                      {currentUser?.role === 'instructor' 
+                        ? 'Your Assigned Sections'
+                        : currentUser?.role === 'department_head'
+                        ? `${currentUser.department || 'Department'} Courses`
+                        : 'System-wide Analysis'}
                     </p>
-                    <p className="font-bold text-[#ffd700] text-lg">{filteredCourses.length} Active Courses</p>
+                    <p className="font-bold text-[#ffd700] text-lg">
+                      {activeCourses.length} {currentUser?.role === 'instructor' ? 'Active Sections' : 'Active Courses'}
+                    </p>
                   </div>
                   <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
                     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -484,6 +633,24 @@ export default function Courses() {
       </header>
 
       <div className="container mx-auto px-6 py-8">
+        {/* Role-specific Info Banner */}
+        {currentUser?.role === 'instructor' && (
+          <div className="mb-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg">
+            <div className="flex items-start">
+              <svg className="w-5 h-5 text-blue-500 mr-3 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              </svg>
+              <div>
+                <h3 className="text-sm font-semibold text-blue-800 mb-1">Instructor View</h3>
+                <p className="text-sm text-blue-700">
+                  You are viewing only your assigned course sections ({activeCourses.length} active). 
+                  To view all courses, please contact your department head or system administrator.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* Enhanced Course Statistics */}
         <div className="grid md:grid-cols-4 gap-6 mb-8">
           <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200">
@@ -504,7 +671,7 @@ export default function Courses() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-white/90 mb-2">Total Students</h3>
-                <p className="text-3xl font-bold text-white">{courses.reduce((sum, course) => sum + course.enrollmentCount, 0)}</p>
+                <p className="text-3xl font-bold text-white">{courses.reduce((sum, course) => sum + (course.enrollmentCount || 0), 0)}</p>
               </div>
               <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
                 <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -519,7 +686,7 @@ export default function Courses() {
               <div>
                 <h3 className="text-sm font-semibold text-white/90 mb-2">Avg Rating</h3>
                 <p className="text-3xl font-bold text-white">
-                  {(courses.reduce((sum, course) => sum + course.overallRating, 0) / courses.length).toFixed(1)}
+                  {courses.length > 0 ? (courses.reduce((sum, course) => sum + (course.overallRating || 0), 0) / courses.length).toFixed(1) : '0.0'}
                 </p>
               </div>
               <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
@@ -535,7 +702,7 @@ export default function Courses() {
               <div>
                 <h3 className="text-sm font-semibold text-white/90 mb-2">Response Rate</h3>
                 <p className="text-3xl font-bold text-white">
-                  {Math.round(courses.reduce((sum, course) => sum + course.responseRate, 0) / courses.length)}%
+                  {courses.length > 0 ? Math.round(courses.reduce((sum, course) => sum + (course.responseRate || 0), 0) / courses.length) : 0}%
                 </p>
               </div>
               <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
@@ -549,8 +716,32 @@ export default function Courses() {
 
         {/* Enhanced Performance Chart */}
         <div className="lpu-card mb-8">
-          <div className="lpu-chart-container">
-            <Bar data={chartData} options={chartOptions} />
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-[#7a0000]">Course Performance Overview</h3>
+              <div className="flex items-center space-x-2">
+                <label className="text-sm font-medium text-gray-700">Show:</label>
+                <select
+                  value={chartLimit}
+                  onChange={(e) => setChartLimit(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
+                >
+                  <option value="5">Top 5</option>
+                  <option value="10">Top 10</option>
+                  <option value="20">Top 20</option>
+                  <option value="all">All Courses</option>
+                </select>
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="code" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="overallRating" fill="#7a0000" name="Overall Rating" />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
@@ -587,13 +778,27 @@ export default function Courses() {
               <label className="block text-sm font-semibold text-gray-700 mb-2">Filter by Program</label>
               <select
                 value={selectedProgram}
-                onChange={(e) => setSelectedProgram(e.target.value)}
+                onChange={(e) => {
+                  console.log('[COURSES] Program filter changed to:', e.target.value)
+                  setSelectedProgram(e.target.value)
+                }}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent bg-white transition-all duration-200"
               >
                 <option value="all">All Programs</option>
-                {programs.map(program => (
-                  <option key={program} value={program}>{program}</option>
-                ))}
+                {programs.map(program => {
+                  const displayCode = program.code || program.program_code || ''
+                  const displayName = program.name || program.program_name || 'Unknown Program'
+                  const optionValue = displayCode || displayName
+                  const optionLabel = displayCode ? `${displayCode} - ${displayName}` : displayName
+                  
+                  console.log('[COURSES] Rendering option:', { displayCode, displayName, optionValue, optionLabel })
+                  
+                  return (
+                    <option key={program.id} value={optionValue}>
+                      {optionLabel}
+                    </option>
+                  )
+                })}
               </select>
             </div>
           </div>
@@ -611,7 +816,7 @@ export default function Courses() {
                   Active Courses
                 </h2>
                 <p className="text-gray-600 mt-1 font-medium">
-                  Showing {filteredCourses.length} of {courses.length} courses
+                  Showing {startIndex + 1}-{Math.min(endIndex, filteredCourses.length)} of {filteredCourses.length} courses (Page {currentPage} of {totalPages})
                 </p>
               </div>
               <div className="flex items-center space-x-3">
@@ -635,7 +840,7 @@ export default function Courses() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">
-                {filteredCourses.map((course) => (
+                {paginatedCourses.map((course) => (
                   <tr key={course.id} className="hover:bg-gradient-to-r hover:from-gray-50 hover:to-gray-25 transition-all duration-200 group">
                     <td className="px-6 py-4">
                       <div className="flex items-center">
@@ -677,7 +882,7 @@ export default function Courses() {
                             </svg>
                           ))}
                         </div>
-                        <span className="font-bold text-gray-900">{course.overallRating}</span>
+                        <span className="font-bold text-gray-900">{course.overallRating || '0.0'}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -685,10 +890,10 @@ export default function Courses() {
                         <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
                           <div 
                             className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] h-2 rounded-full transition-all duration-300" 
-                            style={{ width: `${course.responseRate}%` }}
+                            style={{ width: `${course.responseRate || 0}%` }}
                           ></div>
                         </div>
-                        <span className="font-bold text-gray-900">{course.responseRate}%</span>
+                        <span className="font-bold text-gray-900">{course.responseRate || 0}%</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -704,6 +909,62 @@ export default function Courses() {
               </tbody>
             </table>
           </div>
+          
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+              <div className="text-sm text-gray-600">
+                Page {currentPage} of {totalPages} • {filteredCourses.length} total courses
+              </div>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                >
+                  Previous
+                </button>
+                
+                {/* Page Numbers */}
+                <div className="flex space-x-1">
+                  {[...Array(totalPages)].map((_, i) => {
+                    const pageNum = i + 1
+                    // Show first page, last page, current page, and pages around current
+                    if (
+                      pageNum === 1 ||
+                      pageNum === totalPages ||
+                      (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
+                    ) {
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                            currentPage === pageNum
+                              ? 'bg-[#7a0000] text-white'
+                              : 'border border-gray-300 text-gray-700 hover:bg-gray-100'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      )
+                    } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+                      return <span key={pageNum} className="px-2 py-2 text-gray-500">...</span>
+                    }
+                    return null
+                  })}
+                </div>
+                
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
           
           {filteredCourses.length === 0 && (
             <div className="text-center py-12 text-gray-500">
@@ -791,13 +1052,13 @@ export default function Courses() {
                       <p className="text-sm text-gray-500 mb-4">Average across all evaluations</p>
                       <div className="text-center">
                         <div className="text-5xl font-bold text-blue-600 mb-2">
-                          {courseDetails.overallRating}
+                          {courseDetails.overallRating || '0.0'}
                         </div>
                         <div className="flex justify-center mb-3">
                           {[...Array(5)].map((_, i) => (
                             <svg 
                               key={i} 
-                              className={`w-6 h-6 ${i < Math.floor(courseDetails.overallRating) ? 'text-[#ffd700]' : 'text-gray-300'}`} 
+                              className={`w-6 h-6 ${i < Math.floor(courseDetails.overallRating || 0) ? 'text-[#ffd700]' : 'text-gray-300'}`} 
                               fill="currentColor" 
                               viewBox="0 0 20 20"
                             >
@@ -887,8 +1148,8 @@ export default function Courses() {
                       </svg>
                     </div>
                     <div>
-                      <h2 className="text-xl font-bold text-white">Add New Course</h2>
-                      <p className="text-[#ffd700] text-sm">Fill in the course details below</p>
+                      <h2 className="text-xl font-bold text-white">Create New Class Section</h2>
+                      <p className="text-[#ffd700] text-sm">Add a new section for an existing course</p>
                     </div>
                   </div>
                   <button
@@ -906,23 +1167,28 @@ export default function Courses() {
             {/* Modal Body - Form */}
             <form onSubmit={handleSubmitCourse} className="p-6">
               <div className="grid md:grid-cols-2 gap-6">
-                {/* Course ID */}
-                <div>
+                {/* Course Selection */}
+                <div className="md:col-span-2">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Course ID <span className="text-red-500">*</span>
+                    Select Course <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="text"
-                    name="id"
-                    value={newCourse.id}
+                  <select
+                    name="course_id"
+                    value={newSection.course_id}
                     onChange={handleInputChange}
-                    placeholder="e.g., BSIT101"
-                    className={`lpu-input ${formErrors.id ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
-                  />
-                  {formErrors.id && (
-                    <p className="text-red-500 text-xs mt-1">{formErrors.id}</p>
+                    className={`lpu-select ${formErrors.course_id ? 'border-red-500' : ''}`}
+                  >
+                    <option value="">-- Select a Course --</option>
+                    {availableCourses.map(course => (
+                      <option key={course.id} value={course.id}>
+                        {course.subject_code} - {course.subject_name} (Year {course.year_level})
+                      </option>
+                    ))}
+                  </select>
+                  {formErrors.course_id && (
+                    <p className="text-red-500 text-xs mt-1">{formErrors.course_id}</p>
                   )}
-                  <p className="text-gray-500 text-xs mt-1">Unique identifier for the course</p>
+                  <p className="text-gray-500 text-xs mt-1">Choose from existing course definitions</p>
                 </div>
                 
                 {/* Class Code */}
@@ -932,151 +1198,94 @@ export default function Courses() {
                   </label>
                   <input
                     type="text"
-                    name="classCode"
-                    value={newCourse.classCode}
+                    name="class_code"
+                    value={newSection.class_code}
                     onChange={handleInputChange}
                     placeholder="e.g., ITCO-1001-A"
-                    className={`lpu-input ${formErrors.classCode ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                    className={`lpu-input ${formErrors.class_code ? 'border-red-500' : ''}`}
                   />
-                  {formErrors.classCode && (
-                    <p className="text-red-500 text-xs mt-1">{formErrors.classCode}</p>
+                  {formErrors.class_code && (
+                    <p className="text-red-500 text-xs mt-1">{formErrors.class_code}</p>
                   )}
-                  <p className="text-gray-500 text-xs mt-1">Official class section code</p>
+                  <p className="text-gray-500 text-xs mt-1">Unique section identifier</p>
                 </div>
                 
-                {/* Course Name */}
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Course Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={newCourse.name}
-                    onChange={handleInputChange}
-                    placeholder="e.g., Introduction to Computing"
-                    className={`lpu-input ${formErrors.name ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
-                  />
-                  {formErrors.name && (
-                    <p className="text-red-500 text-xs mt-1">{formErrors.name}</p>
-                  )}
-                </div>
-                
-                {/* Instructor */}
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Instructor Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="instructor"
-                    value={newCourse.instructor}
-                    onChange={handleInputChange}
-                    placeholder="e.g., Dr. Maria Santos"
-                    className={`lpu-input ${formErrors.instructor ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
-                  />
-                  {formErrors.instructor && (
-                    <p className="text-red-500 text-xs mt-1">{formErrors.instructor}</p>
-                  )}
-                </div>
-                
-                {/* Program */}
+                {/* Instructor Selection */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Academic Program <span className="text-red-500">*</span>
+                    Assign Instructor <span className="text-red-500">*</span>
                   </label>
                   <select
-                    name="program"
-                    value={newCourse.program}
+                    name="instructor_id"
+                    value={newSection.instructor_id}
                     onChange={handleInputChange}
-                    className={`lpu-select ${formErrors.program ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                    className={`lpu-select ${formErrors.instructor_id ? 'border-red-500' : ''}`}
                   >
-                    <option value="">Select Program</option>
-                    <option value="BSIT">BSIT - Information Technology</option>
-                    <option value="BSCS">BSCS - Computer Science</option>
-                    <option value="BSCS-DS">BSCS-DS - Data Science</option>
-                    <option value="BS-CY">BS-CY - Cybersecurity</option>
-                    <option value="BMA">BMA - Multimedia Arts</option>
-                    <option value="BS-Psychology">BS-Psychology</option>
-                    <option value="AB-Psychology">AB-Psychology</option>
+                    <option value="">-- Select Instructor --</option>
+                    {instructors.map(instructor => (
+                      <option key={instructor.id} value={instructor.id}>
+                        {instructor.first_name} {instructor.last_name} ({instructor.email})
+                      </option>
+                    ))}
                   </select>
-                  {formErrors.program && (
-                    <p className="text-red-500 text-xs mt-1">{formErrors.program}</p>
+                  {formErrors.instructor_id && (
+                    <p className="text-red-500 text-xs mt-1">{formErrors.instructor_id}</p>
                   )}
-                </div>
-                
-                {/* Year Level */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Year Level <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="yearLevel"
-                    value={newCourse.yearLevel}
-                    onChange={handleInputChange}
-                    className="lpu-select"
-                  >
-                    <option value={1}>Year 1</option>
-                    <option value={2}>Year 2</option>
-                    <option value={3}>Year 3</option>
-                    <option value={4}>Year 4</option>
-                  </select>
                 </div>
                 
                 {/* Semester */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Academic Period <span className="text-red-500">*</span>
+                    Semester <span className="text-red-500">*</span>
                   </label>
                   <select
                     name="semester"
-                    value={newCourse.semester}
+                    value={newSection.semester}
                     onChange={handleInputChange}
                     className="lpu-select"
                   >
-                    <option value="First Semester 2025">First Semester 2025</option>
-                    <option value="Second Semester 2025">Second Semester 2025</option>
-                    <option value="First Semester 2026">First Semester 2026</option>
-                    <option value="Second Semester 2026">Second Semester 2026</option>
+                    <option value={1}>First Semester</option>
+                    <option value={2}>Second Semester</option>
+                    <option value={3}>Summer</option>
                   </select>
                 </div>
                 
-                {/* Enrolled Students */}
+                {/* Academic Year */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Enrolled Students
+                    Academic Year <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="academic_year"
+                    value={newSection.academic_year}
+                    onChange={handleInputChange}
+                    placeholder="e.g., 2024-2025"
+                    className={`lpu-input ${formErrors.academic_year ? 'border-red-500' : ''}`}
+                  />
+                  {formErrors.academic_year && (
+                    <p className="text-red-500 text-xs mt-1">{formErrors.academic_year}</p>
+                  )}
+                </div>
+                
+                {/* Max Students */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Maximum Students <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
-                    name="enrolledStudents"
-                    value={newCourse.enrolledStudents}
+                    name="max_students"
+                    value={newSection.max_students}
                     onChange={handleInputChange}
-                    min="0"
-                    placeholder="0"
-                    className={`lpu-input ${formErrors.enrolledStudents ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                    min="1"
+                    placeholder="40"
+                    className={`lpu-input ${formErrors.max_students ? 'border-red-500' : ''}`}
                   />
-                  {formErrors.enrolledStudents && (
-                    <p className="text-red-500 text-xs mt-1">{formErrors.enrolledStudents}</p>
+                  {formErrors.max_students && (
+                    <p className="text-red-500 text-xs mt-1">{formErrors.max_students}</p>
                   )}
-                  <p className="text-gray-500 text-xs mt-1">Number of students enrolled</p>
-                </div>
-                
-                {/* Status */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Course Status
-                  </label>
-                  <select
-                    name="status"
-                    value={newCourse.status}
-                    onChange={handleInputChange}
-                    className="lpu-select"
-                  >
-                    <option value="Pending">Pending</option>
-                    <option value="Active">Active</option>
-                    <option value="Completed">Completed</option>
-                    <option value="Archived">Archived</option>
-                  </select>
+                  <p className="text-gray-500 text-xs mt-1">Section capacity</p>
                 </div>
               </div>
               
@@ -1086,15 +1295,15 @@ export default function Courses() {
                   <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                   </svg>
-                  Course Summary
+                  Section Summary
                 </h4>
                 <div className="grid md:grid-cols-2 gap-2 text-xs text-gray-600">
-                  <div><span className="font-medium">Course:</span> {newCourse.name || 'Not specified'}</div>
-                  <div><span className="font-medium">Code:</span> {newCourse.classCode || 'Not specified'}</div>
-                  <div><span className="font-medium">Instructor:</span> {newCourse.instructor || 'Not specified'}</div>
-                  <div><span className="font-medium">Program:</span> {newCourse.program || 'Not specified'}</div>
-                  <div><span className="font-medium">Year Level:</span> Year {newCourse.yearLevel}</div>
-                  <div><span className="font-medium">Semester:</span> {newCourse.semester}</div>
+                  <div><span className="font-medium">Course:</span> {availableCourses.find(c => c.id === newSection.course_id)?.subject_name || 'Not selected'}</div>
+                  <div><span className="font-medium">Class Code:</span> {newSection.class_code || 'Not specified'}</div>
+                  <div><span className="font-medium">Instructor:</span> {instructors.find(i => i.id === newSection.instructor_id)?.first_name && instructors.find(i => i.id === newSection.instructor_id)?.last_name ? `${instructors.find(i => i.id === newSection.instructor_id).first_name} ${instructors.find(i => i.id === newSection.instructor_id).last_name}` : 'Not selected'}</div>
+                  <div><span className="font-medium">Semester:</span> {newSection.semester === 1 ? 'First Semester' : newSection.semester === 2 ? 'Second Semester' : 'Summer'}</div>
+                  <div><span className="font-medium">Academic Year:</span> {newSection.academic_year}</div>
+                  <div><span className="font-medium">Capacity:</span> {newSection.max_students} students</div>
                 </div>
               </div>
               
@@ -1126,7 +1335,7 @@ export default function Courses() {
                       <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
                       </svg>
-                      Create Course
+                      Create Section
                     </>
                   )}
                 </button>

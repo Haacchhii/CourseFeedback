@@ -201,34 +201,14 @@ async def get_department_evaluations(
     anomaly_only: bool = False,
     db: Session = Depends(get_db)
 ):
-    """Get evaluations for department head's programs"""
+    """Get all evaluations (full system access - single department system)"""
     try:
-        # Get department head info
-        dept_head = db.query(DepartmentHead).filter(DepartmentHead.user_id == user_id).first()
-        if not dept_head:
-            # Return empty instead of 404 to prevent frontend crashes
-            return {
-                "success": True,
-                "data": [],
-                "pagination": {"page": page, "page_size": page_size, "total": 0, "pages": 0}
-            }
-        
-        program_ids = parse_program_ids(dept_head.programs)
-        if not program_ids:
-            # No programs assigned, return empty result
-            return {
-                "success": True,
-                "data": [],
-                "pagination": {"page": page, "page_size": page_size, "total": 0, "pages": 0}
-            }
-        
-        # Build query with defensive programming
+        # Single department system - full access
+        # Build query without program filtering
         query = db.query(Evaluation).join(
             ClassSection, Evaluation.class_section_id == ClassSection.id
         ).join(
             Course, ClassSection.course_id == Course.id
-        ).filter(
-            Course.program_id.in_(program_ids)
         )
         
         # Apply filters
@@ -306,14 +286,9 @@ async def get_sentiment_analysis(
     time_range: str = Query("month", regex="^(week|month|semester|year)$"),
     db: Session = Depends(get_db)
 ):
-    """Get sentiment analysis trends over time"""
+    """Get sentiment analysis trends (full system access - single department)"""
     try:
-        # Get department head info
-        dept_head = db.query(DepartmentHead).filter(DepartmentHead.user_id == user_id).first()
-        if not dept_head:
-            raise HTTPException(status_code=404, detail="Department head not found")
-        
-        program_ids = parse_program_ids(dept_head.programs)
+        from datetime import timedelta
         
         # Calculate date range
         now = datetime.now()
@@ -326,17 +301,12 @@ async def get_sentiment_analysis(
         else:  # year
             start_date = now - timedelta(days=365)
         
-        # Get sentiment distribution over time
+        # Get sentiment distribution over time (all programs - full access)
         sentiments = db.query(
             func.date_trunc('day', Evaluation.submission_date).label('date'),
             Evaluation.sentiment,
             func.count(Evaluation.id).label('count')
-        ).join(
-            ClassSection, Evaluation.class_section_id == ClassSection.id
-        ).join(
-            Course, ClassSection.course_id == Course.id
         ).filter(
-            Course.program_id.in_(program_ids),
             Evaluation.submission_date >= start_date
         ).group_by(
             func.date_trunc('day', Evaluation.submission_date),
@@ -385,73 +355,64 @@ async def get_department_courses(
     user_id: Optional[int] = Query(None),
     db: Session = Depends(get_db)
 ):
-    """Get all courses in department head's programs"""
+    """Get all courses (full system access - single department system)"""
     try:
-        # Get department head info
-        # Support both department string and user_id for flexibility
-        if user_id:
-            dept_head = db.query(DepartmentHead).filter(DepartmentHead.user_id == user_id).first()
-        elif department:
-            # Find department head by department name
-            dept_head = db.query(DepartmentHead).filter(DepartmentHead.department == department).first()
-        else:
-            raise HTTPException(status_code=400, detail="Either user_id or department must be provided")
+        # Single department system - both secretary and dept_head see all courses
+        # Return class sections (not just courses) to match expected format
         
-        if not dept_head:
-            # Return empty result instead of 404 for better UX
+        # Build query for class sections with course info
+        results = db.query(ClassSection, Course, Program).join(
+            Course, ClassSection.course_id == Course.id
+        ).outerjoin(
+            Program, Course.program_id == Program.id
+        ).all()
+        
+        logger.info(f"[DEPT-HEAD] Total class sections found: {len(results)}")
+        
+        # Return empty if no results
+        if not results:
             return {
                 "success": True,
-                "data": {
-                    "courses": [],
-                    "total": 0,
-                    "message": "No department found or no courses available"
-                }
+                "data": []
             }
         
-        program_ids = parse_program_ids(dept_head.programs)
-        
-        # Get courses with evaluation stats
-        courses = db.query(Course).filter(Course.program_id.in_(program_ids)).all()
-        
         courses_data = []
-        for course in courses:
-            # Get evaluation stats for this course
-            eval_stats = db.query(
-                func.count(Evaluation.id).label('total_evaluations'),
-                func.avg(Evaluation.rating_overall).label('avg_rating'),
-                func.count(func.distinct(Evaluation.student_id)).label('unique_students')
-            ).join(
-                ClassSection, Evaluation.class_section_id == ClassSection.id
-            ).filter(
-                ClassSection.course_id == course.id
-            ).first()
+        for section, course, program in results:
+            # Get evaluation count for this section
+            eval_count = db.query(func.count(Evaluation.id)).filter(
+                Evaluation.class_section_id == section.id
+            ).scalar() or 0
             
-            # Get sentiment distribution
-            sentiment_dist = db.query(
-                Evaluation.sentiment,
-                func.count(Evaluation.id).label('count')
-            ).join(
-                ClassSection, Evaluation.class_section_id == ClassSection.id
-            ).filter(
-                ClassSection.course_id == course.id
-            ).group_by(Evaluation.sentiment).all()
+            # Get average rating
+            avg_rating = db.query(func.avg(Evaluation.rating_overall)).filter(
+                Evaluation.class_section_id == section.id
+            ).scalar() or 0.0
             
-            sentiment_data = {"positive": 0, "neutral": 0, "negative": 0}
-            for sentiment, count in sentiment_dist:
-                if sentiment:
-                    sentiment_data[sentiment.lower()] = count
+            # Construct instructor full name
+            instructor_full_name = "N/A"
+            if section.instructor:
+                first = section.instructor.first_name or ""
+                last = section.instructor.last_name or ""
+                instructor_full_name = f"{first} {last}".strip() or "N/A"
             
             courses_data.append({
-                "id": course.id,
-                "course_code": course.subject_code,  # Fixed: was course.course_code
-                "course_name": course.subject_name,  # Fixed: was course.course_name
-                "year_level": course.year_level,
-                "semester": course.semester,
-                "units": 3,  # Fixed: removed from model, default to 3
-                "total_evaluations": eval_stats.total_evaluations if eval_stats else 0,
-                "avg_rating": round(eval_stats.avg_rating, 2) if eval_stats and eval_stats.avg_rating else 0.0,
-                "unique_students": eval_stats.unique_students if eval_stats else 0,
-                "sentiment": sentiment_data
+                "section_id": section.id,
+                "id": section.id,  # For compatibility
+                "class_code": section.class_code or "Unknown",
+                "course_code": course.subject_code if course else "Unknown",
+                "course_name": course.subject_name if course else "Unknown",
+                "name": course.subject_name if course else "Unknown",  # For compatibility
+                "code": course.subject_code if course else "Unknown",  # For compatibility
+                "instructor": instructor_full_name,
+                "instructor_name": instructor_full_name,  # For compatibility
+                "program": program.program_code if program else "Unknown",
+                "year_level": course.year_level if course else 1,
+                "semester": section.semester or "Unknown",
+                "academic_year": section.academic_year or "Unknown",
+                "evaluations_count": eval_count,
+                "enrolled_students": section.max_students or 0,
+                "status": "Active",  # Default status
+                "overallRating": float(avg_rating) if avg_rating else 0.0
             })
         
         return {
@@ -641,22 +602,11 @@ async def get_anomalies(
     page_size: int = Query(10, ge=1, le=50),
     db: Session = Depends(get_db)
 ):
-    """Get detected anomalies in evaluations"""
+    """Get detected anomalies (full system access - single department)"""
     try:
-        # Get department head info
-        dept_head = db.query(DepartmentHead).filter(DepartmentHead.user_id == user_id).first()
-        if not dept_head:
-            raise HTTPException(status_code=404, detail="Department head not found")
-        
-        program_ids = parse_program_ids(dept_head.programs)
-        
-        # Query anomalous evaluations
-        query = db.query(Evaluation).join(
-            ClassSection, Evaluation.class_section_id == ClassSection.id
-        ).join(
-            Course, ClassSection.course_id == Course.id
-        ).filter(
-            Course.program_id.in_(program_ids),
+        # Single department system - full access
+        # Query anomalous evaluations (all programs)
+        query = db.query(Evaluation).filter(
             Evaluation.is_anomaly == True
         )
         
@@ -796,4 +746,69 @@ async def get_trend_analysis(
         raise
     except Exception as e:
         logger.error(f"Error fetching trend analysis: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ===========================
+# FILTER OPTIONS
+# ===========================
+
+@router.get("/programs")
+async def get_programs(
+    user_id: int = Query(...),
+    db: Session = Depends(get_db)
+):
+    """Get all programs (dept head has department-wide access)"""
+    try:
+        dept_head = db.query(DepartmentHead).filter(DepartmentHead.user_id == user_id).first()
+        if not dept_head:
+            raise HTTPException(status_code=404, detail="Department head not found")
+        
+        # Department head can access ALL programs in the department
+        programs = db.query(Program).filter(Program.is_active == True).all()
+        
+        programs_data = [{
+            "id": p.id,
+            "code": p.program_code,
+            "name": p.program_name
+        } for p in programs]
+        
+        return {
+            "success": True,
+            "data": programs_data
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching programs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/year-levels")
+async def get_year_levels(
+    user_id: int = Query(...),
+    db: Session = Depends(get_db)
+):
+    """Get list of year levels for filtering"""
+    try:
+        dept_head = db.query(DepartmentHead).filter(DepartmentHead.user_id == user_id).first()
+        if not dept_head:
+            raise HTTPException(status_code=404, detail="Department head not found")
+        
+        # Return standard year levels (1-4 for undergraduate)
+        year_levels = [
+            {"value": 1, "label": "1st Year"},
+            {"value": 2, "label": "2nd Year"},
+            {"value": 3, "label": "3rd Year"},
+            {"value": 4, "label": "4th Year"}
+        ]
+        
+        return {
+            "success": True,
+            "data": year_levels
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching year levels: {e}")
         raise HTTPException(status_code=500, detail=str(e))

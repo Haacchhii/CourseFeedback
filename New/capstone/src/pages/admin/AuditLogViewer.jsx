@@ -1,24 +1,32 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getCurrentUser, isSystemAdmin } from '../../utils/roleUtils'
+import { isSystemAdmin } from '../../utils/roleUtils'
+import { useAuth } from '../../context/AuthContext'
 import { adminAPI } from '../../services/api'
 
 export default function AuditLogViewer() {
   const navigate = useNavigate()
-  const currentUser = getCurrentUser()
+  const { user: currentUser } = useAuth()
   
   // State
   const [searchTerm, setSearchTerm] = useState('')
   const [actionFilter, setActionFilter] = useState('all')
+  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [severityFilter, setSeverityFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [userFilter, setUserFilter] = useState('all')
   const [dateFilter, setDateFilter] = useState('all')
+  const [customStartDate, setCustomStartDate] = useState('')
+  const [customEndDate, setCustomEndDate] = useState('')
   const [selectedLog, setSelectedLog] = useState(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
   const logsPerPage = 15
   
   // API State
   const [auditLogs, setAuditLogs] = useState([])
+  const [stats, setStats] = useState({ last24h: 0, criticalEvents: 0, failedAttempts: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -34,21 +42,91 @@ export default function AuditLogViewer() {
     const fetchLogs = async () => {
       try {
         setLoading(true)
-        const filters = {
-          action: actionFilter !== 'all' ? actionFilter : undefined,
-          user: userFilter !== 'all' ? userFilter : undefined,
-          date: dateFilter !== 'all' ? dateFilter : undefined
+        setError(null)
+        
+        // Build params for backend API
+        const params = {
+          page: currentPage,
+          page_size: logsPerPage
         }
-        const data = await adminAPI.getAuditLogs(filters)
-        setAuditLogs(data || [])
+        
+        // Add action filter if set
+        if (actionFilter !== 'all') {
+          params.action = actionFilter
+        }
+        
+        // Add severity filter if set
+        if (severityFilter !== 'all') {
+          params.severity = severityFilter
+        }
+        
+        // Date range filtering
+        if (dateFilter === 'custom' && customStartDate && customEndDate) {
+          params.start_date = new Date(customStartDate).toISOString()
+          params.end_date = new Date(customEndDate + 'T23:59:59').toISOString()
+        } else if (dateFilter !== 'all') {
+          const now = new Date()
+          if (dateFilter === 'today') {
+            params.start_date = new Date(now.setHours(0, 0, 0, 0)).toISOString()
+          } else if (dateFilter === 'yesterday') {
+            const yesterday = new Date()
+            yesterday.setDate(yesterday.getDate() - 1)
+            params.start_date = new Date(yesterday.setHours(0, 0, 0, 0)).toISOString()
+            params.end_date = new Date(yesterday.setHours(23, 59, 59, 999)).toISOString()
+          } else if (dateFilter === 'week') {
+            const weekAgo = new Date()
+            weekAgo.setDate(weekAgo.getDate() - 7)
+            params.start_date = weekAgo.toISOString()
+          } else if (dateFilter === '2weeks') {
+            const twoWeeksAgo = new Date()
+            twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14)
+            params.start_date = twoWeeksAgo.toISOString()
+          } else if (dateFilter === 'month') {
+            const monthAgo = new Date()
+            monthAgo.setDate(monthAgo.getDate() - 30)
+            params.start_date = monthAgo.toISOString()
+          } else if (dateFilter === '3months') {
+            const threeMonthsAgo = new Date()
+            threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
+            params.start_date = threeMonthsAgo.toISOString()
+          } else if (dateFilter === '6months') {
+            const sixMonthsAgo = new Date()
+            sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
+            params.start_date = sixMonthsAgo.toISOString()
+          } else if (dateFilter === 'year') {
+            const yearAgo = new Date()
+            yearAgo.setFullYear(yearAgo.getFullYear() - 1)
+            params.start_date = yearAgo.toISOString()
+          }
+        }
+        
+        const response = await adminAPI.getAuditLogs(params)
+        
+        if (response?.success) {
+          setAuditLogs(response.data || [])
+          // Update total pages from backend pagination
+          if (response.pagination) {
+            setTotalPages(response.pagination.total_pages)
+          }
+        } else {
+          setError('Failed to load audit logs')
+        }
       } catch (err) {
-        setError(err.message)
+        console.error('Error fetching audit logs:', err)
+        setError(err.message || 'Failed to load audit logs. Please try again.')
       } finally {
         setLoading(false)
       }
     }
     fetchLogs()
-  }, [actionFilter, userFilter, dateFilter])  // Get unique users and actions
+  }, [currentPage, actionFilter, severityFilter, dateFilter, customStartDate, customEndDate])
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [actionFilter, categoryFilter, severityFilter, statusFilter, dateFilter, searchTerm, userFilter])
+
+  // Get unique users and actions from current page
   const users = useMemo(() => {
     return [...new Set(auditLogs.map(log => log.user))].sort()
   }, [auditLogs])
@@ -56,47 +134,83 @@ export default function AuditLogViewer() {
   const actions = useMemo(() => {
     return [...new Set(auditLogs.map(log => log.action))].sort()
   }, [auditLogs])
+  
+  const categories = useMemo(() => {
+    return [...new Set(auditLogs.map(log => log.category))].sort()
+  }, [auditLogs])
 
-  // Filter logs
+  // Comprehensive list of all possible actions
+  const allPossibleActions = [
+    // Authentication
+    'LOGIN', 'LOGOUT', 'LOGIN_FAILED', 'PASSWORD_RESET', 'PASSWORD_CHANGED',
+    // User Management
+    'CREATE_USER', 'UPDATE_USER', 'DELETE_USER', 'USER_ROLE_CHANGED', 'USER_ACTIVATED', 'USER_DEACTIVATED',
+    // Course Management
+    'CREATE_COURSE', 'UPDATE_COURSE', 'DELETE_COURSE', 'COURSE_UPDATED', 'COURSE_ARCHIVED', 'COURSE_RESTORED',
+    // Section Management
+    'CREATE_SECTION', 'UPDATE_SECTION', 'DELETE_SECTION', 'SECTION_UPDATED', 'SECTION_DELETED',
+    // Enrollment
+    'ENROLL_STUDENT', 'DROP_STUDENT', 'REMOVE_STUDENT_FROM_SECTION', 'BULK_ENROLLMENT',
+    // Questionnaire
+    'QUESTIONNAIRE_SUBMITTED', 'QUESTIONNAIRE_UPDATED', 'QUESTIONNAIRE_VIEWED',
+    // Evaluation
+    'EVALUATION_CREATED', 'EVALUATION_UPDATED', 'EVALUATION_SUBMITTED', 'EVALUATION_GRADED',
+    // Period Management
+    'CREATE_PERIOD', 'UPDATE_PERIOD', 'DELETE_PERIOD', 'PERIOD_ACTIVATED', 'PERIOD_CLOSED',
+    // Data Export
+    'EXPORT_USERS', 'EXPORT_COURSES', 'EXPORT_SECTIONS', 'EXPORT_EVALUATIONS', 'EXPORT_AUDIT_LOGS',
+    // System Configuration
+    'SYSTEM_CONFIG_CHANGE', 'SETTINGS_UPDATED', 'BACKUP_CREATED', 'DATABASE_RESTORED',
+    // Program Management
+    'CREATE_PROGRAM', 'UPDATE_PROGRAM', 'DELETE_PROGRAM'
+  ]
+
+  // Client-side filtering for search, user, category, and status (since backend handles action, severity, date)
   const filteredLogs = useMemo(() => {
     return auditLogs.filter(log => {
       const matchesSearch = searchTerm === '' ||
         log.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
         log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.details.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.ipAddress.includes(searchTerm)
+        (log.details && typeof log.details === 'string' && log.details.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (log.ipAddress && log.ipAddress.includes(searchTerm))
       
-      const matchesAction = actionFilter === 'all' || log.action === actionFilter
       const matchesUser = userFilter === 'all' || log.user === userFilter
+      const matchesCategory = categoryFilter === 'all' || log.category === categoryFilter
+      const matchesStatus = statusFilter === 'all' || log.status === statusFilter
       
-      let matchesDate = true
-      if (dateFilter !== 'all') {
-        const logDate = new Date(log.timestamp)
-        const today = new Date()
-        if (dateFilter === 'today') {
-          matchesDate = logDate.toDateString() === today.toDateString()
-        } else if (dateFilter === 'week') {
-          const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
-          matchesDate = logDate >= weekAgo
-        } else if (dateFilter === 'month') {
-          const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
-          matchesDate = logDate >= monthAgo
-        }
-      }
-      
-      return matchesSearch && matchesAction && matchesUser && matchesDate
+      return matchesSearch && matchesUser && matchesCategory && matchesStatus
     })
-  }, [auditLogs, searchTerm, actionFilter, userFilter, dateFilter])
+  }, [auditLogs, searchTerm, userFilter, categoryFilter, statusFilter])
 
-  // Pagination
-  const totalPages = Math.ceil(filteredLogs.length / logsPerPage)
-  const paginatedLogs = useMemo(() => {
-    const start = (currentPage - 1) * logsPerPage
-    return filteredLogs.slice(start, start + logsPerPage)
-  }, [filteredLogs, currentPage])
+  // Use filtered logs directly (backend handles pagination)
+  const paginatedLogs = filteredLogs
 
-  // Stats
-  const stats = useMemo(() => {
+  // Fetch stats separately
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await adminAPI.getAuditLogStats()
+        if (response?.success) {
+          setStats({
+            last24h: response.data.last_24h || 0,
+            criticalEvents: response.data.critical_events || 0,
+            failedAttempts: response.data.failed_blocked || 0
+          })
+        }
+      } catch (err) {
+        console.error('Error fetching stats:', err)
+      }
+    }
+    fetchStats()
+  }, [])
+
+  // Calculate stats from all logs if API doesn't provide them
+  const displayStats = useMemo(() => {
+    if (stats.last24h !== undefined) {
+      return stats
+    }
+    
+    // Fallback to calculating from current page
     const last24h = auditLogs.filter(log => {
       const logDate = new Date(log.timestamp)
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
@@ -107,15 +221,46 @@ export default function AuditLogViewer() {
     const failedAttempts = auditLogs.filter(log => log.status === 'Failed' || log.status === 'Blocked').length
 
     return { last24h, criticalEvents, failedAttempts }
-  }, [auditLogs])
+  }, [auditLogs, stats])
 
   const handleViewDetails = (log) => {
     setSelectedLog(log)
     setShowDetailModal(true)
   }
 
-  const handleExportLogs = () => {
-    alert(`Exporting ${filteredLogs.length} audit logs to CSV...`)
+  const handleExportLogs = async () => {
+    try {
+      // Create CSV content
+      const headers = ['ID', 'Timestamp', 'User', 'Action', 'Category', 'IP Address', 'Status', 'Severity', 'Details']
+      const csvData = [
+        headers.join(','),
+        ...auditLogs.map(log => [
+          log.id,
+          new Date(log.timestamp).toLocaleString(),
+          `"${log.user}"`,
+          `"${log.action}"`,
+          `"${log.category}"`,
+          log.ipAddress,
+          log.status,
+          log.severity,
+          `"${typeof log.details === 'object' ? JSON.stringify(log.details) : log.details}"`
+        ].join(','))
+      ].join('\n')
+      
+      // Create download link
+      const blob = new Blob([csvData], { type: 'text/csv' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `audit-logs-${new Date().toISOString().split('T')[0]}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Export error:', error)
+      alert('Failed to export logs. Please try again.')
+    }
   }
 
   if (!currentUser || !isSystemAdmin(currentUser)) return null
@@ -203,7 +348,7 @@ export default function AuditLogViewer() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Last 24 Hours</p>
-                <p className="text-3xl font-bold text-green-600">{stats.last24h}</p>
+                <p className="text-3xl font-bold text-green-600">{displayStats.last24h}</p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                 <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -217,7 +362,7 @@ export default function AuditLogViewer() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Critical Events</p>
-                <p className="text-3xl font-bold text-red-600">{stats.criticalEvents}</p>
+                <p className="text-3xl font-bold text-red-600">{displayStats.criticalEvents}</p>
               </div>
               <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
                 <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -231,7 +376,7 @@ export default function AuditLogViewer() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Failed/Blocked</p>
-                <p className="text-3xl font-bold text-orange-600">{stats.failedAttempts}</p>
+                <p className="text-3xl font-bold text-orange-600">{displayStats.failedAttempts}</p>
               </div>
               <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
                 <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -244,41 +389,170 @@ export default function AuditLogViewer() {
 
         {/* Filters */}
         <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-          <div className="grid md:grid-cols-4 gap-4">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">🔎 Advanced Filters</h3>
+          
+          {/* Row 1: Search and Action */}
+          <div className="grid md:grid-cols-2 gap-4 mb-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">🔍 Search</label>
               <input
                 type="text"
-                placeholder="Search logs..."
+                placeholder="Search by user, action, IP, or details..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">⚡ Action</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">⚡ Action Type</label>
               <select
                 value={actionFilter}
                 onChange={(e) => setActionFilter(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
               >
                 <option value="all">All Actions</option>
-                {actions.map(action => (
-                  <option key={action} value={action}>{action}</option>
-                ))}
+                <optgroup label="Authentication">
+                  <option value="LOGIN">LOGIN</option>
+                  <option value="LOGOUT">LOGOUT</option>
+                  <option value="LOGIN_FAILED">LOGIN_FAILED</option>
+                  <option value="PASSWORD_RESET">PASSWORD_RESET</option>
+                  <option value="PASSWORD_CHANGED">PASSWORD_CHANGED</option>
+                </optgroup>
+                <optgroup label="User Management">
+                  <option value="CREATE_USER">CREATE_USER</option>
+                  <option value="UPDATE_USER">UPDATE_USER</option>
+                  <option value="DELETE_USER">DELETE_USER</option>
+                  <option value="USER_ROLE_CHANGED">USER_ROLE_CHANGED</option>
+                  <option value="USER_ACTIVATED">USER_ACTIVATED</option>
+                  <option value="USER_DEACTIVATED">USER_DEACTIVATED</option>
+                </optgroup>
+                <optgroup label="Course Management">
+                  <option value="CREATE_COURSE">CREATE_COURSE</option>
+                  <option value="UPDATE_COURSE">UPDATE_COURSE</option>
+                  <option value="COURSE_UPDATED">COURSE_UPDATED</option>
+                  <option value="DELETE_COURSE">DELETE_COURSE</option>
+                  <option value="COURSE_ARCHIVED">COURSE_ARCHIVED</option>
+                  <option value="COURSE_RESTORED">COURSE_RESTORED</option>
+                </optgroup>
+                <optgroup label="Section Management">
+                  <option value="CREATE_SECTION">CREATE_SECTION</option>
+                  <option value="UPDATE_SECTION">UPDATE_SECTION</option>
+                  <option value="SECTION_UPDATED">SECTION_UPDATED</option>
+                  <option value="DELETE_SECTION">DELETE_SECTION</option>
+                  <option value="SECTION_DELETED">SECTION_DELETED</option>
+                </optgroup>
+                <optgroup label="Enrollment">
+                  <option value="ENROLL_STUDENT">ENROLL_STUDENT</option>
+                  <option value="DROP_STUDENT">DROP_STUDENT</option>
+                  <option value="REMOVE_STUDENT_FROM_SECTION">REMOVE_STUDENT_FROM_SECTION</option>
+                  <option value="BULK_ENROLLMENT">BULK_ENROLLMENT</option>
+                </optgroup>
+                <optgroup label="Questionnaire & Evaluation">
+                  <option value="QUESTIONNAIRE_SUBMITTED">QUESTIONNAIRE_SUBMITTED</option>
+                  <option value="QUESTIONNAIRE_UPDATED">QUESTIONNAIRE_UPDATED</option>
+                  <option value="EVALUATION_SUBMITTED">EVALUATION_SUBMITTED</option>
+                  <option value="EVALUATION_GRADED">EVALUATION_GRADED</option>
+                </optgroup>
+                <optgroup label="Period Management">
+                  <option value="CREATE_PERIOD">CREATE_PERIOD</option>
+                  <option value="UPDATE_PERIOD">UPDATE_PERIOD</option>
+                  <option value="DELETE_PERIOD">DELETE_PERIOD</option>
+                  <option value="PERIOD_ACTIVATED">PERIOD_ACTIVATED</option>
+                  <option value="PERIOD_CLOSED">PERIOD_CLOSED</option>
+                </optgroup>
+                <optgroup label="Data Export">
+                  <option value="EXPORT_USERS">EXPORT_USERS</option>
+                  <option value="EXPORT_COURSES">EXPORT_COURSES</option>
+                  <option value="EXPORT_SECTIONS">EXPORT_SECTIONS</option>
+                  <option value="EXPORT_EVALUATIONS">EXPORT_EVALUATIONS</option>
+                  <option value="EXPORT_AUDIT_LOGS">EXPORT_AUDIT_LOGS</option>
+                </optgroup>
+                <optgroup label="System">
+                  <option value="SYSTEM_CONFIG_CHANGE">SYSTEM_CONFIG_CHANGE</option>
+                  <option value="SETTINGS_UPDATED">SETTINGS_UPDATED</option>
+                  <option value="BACKUP_CREATED">BACKUP_CREATED</option>
+                </optgroup>
+              </select>
+            </div>
+          </div>
+
+          {/* Row 2: Category, Severity, Status */}
+          <div className="grid md:grid-cols-3 gap-4 mb-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">📂 Category</label>
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              >
+                <option value="all">All Categories</option>
+                <option value="Authentication">Authentication</option>
+                <option value="User Management">User Management</option>
+                <option value="Course Management">Course Management</option>
+                <option value="Section Management">Section Management</option>
+                <option value="Enrollment">Enrollment</option>
+                <option value="Questionnaire">Questionnaire</option>
+                <option value="Evaluation">Evaluation</option>
+                <option value="Period Management">Period Management</option>
+                <option value="Data Export">Data Export</option>
+                <option value="System Configuration">System Configuration</option>
+                <option value="Program Management">Program Management</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">👤 User</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">⚠️ Severity</label>
+              <select
+                value={severityFilter}
+                onChange={(e) => setSeverityFilter(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              >
+                <option value="all">All Severities</option>
+                <option value="Info">ℹ️ Info</option>
+                <option value="Warning">⚠️ Warning</option>
+                <option value="Critical">🚨 Critical</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">✓ Status</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              >
+                <option value="all">All Statuses</option>
+                <option value="Success">✅ Success</option>
+                <option value="Failed">❌ Failed</option>
+                <option value="Blocked">🚫 Blocked</option>
+                <option value="Pending">⏳ Pending</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Row 3: User and Date Range */}
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">👤 User / Role</label>
               <select
                 value={userFilter}
                 onChange={(e) => setUserFilter(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
               >
                 <option value="all">All Users</option>
-                {users.map(user => (
-                  <option key={user} value={user}>{user}</option>
-                ))}
+                <optgroup label="By Role">
+                  <option value="System">🖥️ System</option>
+                  <option value="Admin">👨‍💼 Admin</option>
+                  <option value="Instructor">👩‍🏫 Instructor</option>
+                  <option value="Student">🎓 Student</option>
+                  <option value="Secretary">📋 Secretary</option>
+                  <option value="Department Head">🎯 Department Head</option>
+                </optgroup>
+                {users.length > 0 && (
+                  <optgroup label="Specific Users">
+                    {users.map(user => (
+                      <option key={user} value={user}>{user}</option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </div>
             <div>
@@ -290,10 +564,73 @@ export default function AuditLogViewer() {
               >
                 <option value="all">All Time</option>
                 <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
                 <option value="week">Last 7 Days</option>
+                <option value="2weeks">Last 14 Days</option>
                 <option value="month">Last 30 Days</option>
+                <option value="3months">Last 3 Months</option>
+                <option value="6months">Last 6 Months</option>
+                <option value="year">Last Year</option>
+                <option value="custom">Custom Range</option>
               </select>
             </div>
+          </div>
+
+          {/* Custom Date Range */}
+          {dateFilter === 'custom' && (
+            <div className="grid md:grid-cols-2 gap-4 mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">📆 Start Date</label>
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">📆 End Date</label>
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Filter Summary */}
+          <div className="mt-4 flex items-center justify-between pt-4 border-t border-gray-200">
+            <div className="text-sm text-gray-600">
+              {(actionFilter !== 'all' || categoryFilter !== 'all' || severityFilter !== 'all' || statusFilter !== 'all' || userFilter !== 'all' || dateFilter !== 'all' || searchTerm) && (
+                <span>🔍 Active filters: {[
+                  actionFilter !== 'all' && 'Action',
+                  categoryFilter !== 'all' && 'Category',
+                  severityFilter !== 'all' && 'Severity',
+                  statusFilter !== 'all' && 'Status',
+                  userFilter !== 'all' && 'User',
+                  dateFilter !== 'all' && 'Date',
+                  searchTerm && 'Search'
+                ].filter(Boolean).join(', ')}</span>
+              )}
+            </div>
+            <button
+              onClick={() => {
+                setSearchTerm('')
+                setActionFilter('all')
+                setCategoryFilter('all')
+                setSeverityFilter('all')
+                setStatusFilter('all')
+                setUserFilter('all')
+                setDateFilter('all')
+                setCustomStartDate('')
+                setCustomEndDate('')
+              }}
+              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-all text-sm font-medium"
+            >
+              🔄 Clear All Filters
+            </button>
           </div>
         </div>
 
@@ -364,13 +701,13 @@ export default function AuditLogViewer() {
           {/* Pagination */}
           <div className="bg-gray-50 px-6 py-4 flex items-center justify-between border-t border-gray-200">
             <div className="text-sm text-gray-600">
-              Showing {((currentPage - 1) * logsPerPage) + 1} to {Math.min(currentPage * logsPerPage, filteredLogs.length)} of {filteredLogs.length} logs
+              Showing {((currentPage - 1) * logsPerPage) + 1} to {Math.min(currentPage * logsPerPage, paginatedLogs.length + (currentPage - 1) * logsPerPage)} of {paginatedLogs.length} logs on this page
             </div>
             <div className="flex space-x-2">
               <button
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
-                className={`px-4 py-2 rounded-lg ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border border-gray-300 hover:bg-gray-50'}`}
+                className={`px-4 py-2 rounded-lg transition-all ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border border-gray-300 hover:bg-gray-50'}`}
               >
                 Previous
               </button>
@@ -380,7 +717,7 @@ export default function AuditLogViewer() {
                   <button
                     key={page}
                     onClick={() => setCurrentPage(page)}
-                    className={`px-4 py-2 rounded-lg ${currentPage === page ? 'bg-red-600 text-white' : 'bg-white border border-gray-300 hover:bg-gray-50'}`}
+                    className={`px-4 py-2 rounded-lg transition-all ${currentPage === page ? 'bg-red-600 text-white' : 'bg-white border border-gray-300 hover:bg-gray-50'}`}
                   >
                     {page}
                   </button>
@@ -445,8 +782,14 @@ export default function AuditLogViewer() {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Details</label>
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <p className="text-gray-900">{selectedLog.details}</p>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 max-h-60 overflow-y-auto">
+                  {typeof selectedLog.details === 'object' ? (
+                    <pre className="text-sm text-gray-900 whitespace-pre-wrap">
+                      {JSON.stringify(selectedLog.details, null, 2)}
+                    </pre>
+                  ) : (
+                    <p className="text-gray-900">{selectedLog.details || 'No details available'}</p>
+                  )}
                 </div>
               </div>
 

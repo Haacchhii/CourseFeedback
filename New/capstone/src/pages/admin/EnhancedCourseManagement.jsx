@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend } from 'recharts'
-import { getCurrentUser, isSystemAdmin } from '../../utils/roleUtils'
+import { isSystemAdmin } from '../../utils/roleUtils'
+import { useAuth } from '../../context/AuthContext'
 import { adminAPI } from '../../services/api'
 import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
 
 export default function EnhancedCourseManagement() {
   const navigate = useNavigate()
-  const currentUser = getCurrentUser()
+  const { user: currentUser } = useAuth()
   
   // State
   const [activeTab, setActiveTab] = useState('courses')
@@ -15,15 +16,56 @@ export default function EnhancedCourseManagement() {
   const [programFilter, setProgramFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
   const [showBulkImportModal, setShowBulkImportModal] = useState(false)
   const [showAssignInstructorModal, setShowAssignInstructorModal] = useState(false)
   const [selectedCourse, setSelectedCourse] = useState(null)
   const [selectedCourses, setSelectedCourses] = useState([])
   const [csvFile, setCsvFile] = useState(null)
   const [importPreview, setImportPreview] = useState([])
+  const [importErrors, setImportErrors] = useState([])
+  
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize] = useState(15) // 15 courses per page for faster loading
+  const [totalCourses, setTotalCourses] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  
+  // Section Management State
+  const [sections, setSections] = useState([])
+  const [selectedSection, setSelectedSection] = useState(null)
+  const [showSectionModal, setShowSectionModal] = useState(false)
+  const [showCreateSectionModal, setShowCreateSectionModal] = useState(false)
+  const [showEditSectionModal, setShowEditSectionModal] = useState(false)
+  const [enrolledStudents, setEnrolledStudents] = useState([])
+  const [availableStudents, setAvailableStudents] = useState([])
+  const [selectedStudentIds, setSelectedStudentIds] = useState([])
+  const [studentSearchTerm, setStudentSearchTerm] = useState('')
+  
+  // Section Pagination State
+  const [sectionCurrentPage, setSectionCurrentPage] = useState(1)
+  const [sectionPageSize] = useState(15) // 15 sections per page
+  
+  // Enrollment Filters
+  const [sectionSearchTerm, setSectionSearchTerm] = useState('')
+  const [sectionProgramFilter, setSectionProgramFilter] = useState('all')
+  const [sectionSemesterFilter, setSectionSemesterFilter] = useState('all')
+  const [sectionYearFilter, setSectionYearFilter] = useState('all')
+  
+  const [sectionFormData, setSectionFormData] = useState({
+    program_id: '',
+    year_level: '',
+    semester: '',
+    course_id: '',
+    instructor_id: '',
+    class_code: '',
+    academic_year: '2024-2025',
+    max_students: 40
+  })
   
   // API State
   const [courses, setCourses] = useState([])
+  const [allCourses, setAllCourses] = useState([]) // All courses for section creation (unpaginated)
   const [instructors, setInstructors] = useState([])
   const [submitting, setSubmitting] = useState(false)
 
@@ -39,16 +81,27 @@ export default function EnhancedCourseManagement() {
     status: 'Active'
   })
 
-  // Use timeout hook for API calls
+  // Use timeout hook for API calls with extended timeout for large course list
   const { data: apiData, loading, error, retry } = useApiWithTimeout(
     async () => {
-      const [coursesData, instructorsData] = await Promise.all([
-        adminAPI.getCourses(),
-        adminAPI.getInstructors()
+      const [coursesData, instructorsData, programsData] = await Promise.all([
+        adminAPI.getCourses({ 
+          page: currentPage, 
+          page_size: pageSize,
+          status: statusFilter !== 'all' ? statusFilter : undefined
+        }),
+        adminAPI.getInstructors(),
+        adminAPI.getPrograms()
       ])
-      return { courses: coursesData?.data || [], instructors: instructorsData?.data || [] }
+      return { 
+        courses: coursesData?.data || [], 
+        instructors: instructorsData?.data || [],
+        programs: programsData?.data || [],
+        pagination: coursesData?.pagination || {}
+      }
     },
-    [currentUser?.id, currentUser?.role]
+    [currentUser?.id, currentUser?.role, currentPage, pageSize, statusFilter],
+    30000 // 30 seconds timeout - should be fast with pagination
   )
 
   // Update state when data changes
@@ -56,6 +109,11 @@ export default function EnhancedCourseManagement() {
     if (apiData) {
       setCourses(apiData.courses)
       setInstructors(apiData.instructors)
+      // Update pagination state
+      if (apiData.pagination) {
+        setTotalCourses(apiData.pagination.total || 0)
+        setTotalPages(apiData.pagination.total_pages || 0)
+      }
     }
   }, [apiData])
 
@@ -66,11 +124,15 @@ export default function EnhancedCourseManagement() {
     }
   }, [currentUser?.role, currentUser?.id, navigate])
 
-  // Get programs
+  // Get programs from API data or derive from courses
   const programs = useMemo(() => {
+    if (apiData?.programs && apiData.programs.length > 0) {
+      return apiData.programs.map(p => p.code).sort()
+    }
+    // Fallback to deriving from courses
     const progs = [...new Set(courses.map(c => c.program))].filter(Boolean).sort()
     return progs
-  }, [courses])
+  }, [courses, apiData])
 
   // Get instructors - REMOVED (now fetched via API)
 
@@ -87,7 +149,7 @@ export default function EnhancedCourseManagement() {
     })
   }, [courses])
 
-  // Filter courses
+  // Filter courses (status filter is server-side, others are client-side for current page)
   const filteredCourses = useMemo(() => {
     return enhancedCourses.filter(course => {
       const matchesSearch = searchTerm === '' ||
@@ -96,11 +158,44 @@ export default function EnhancedCourseManagement() {
         course.instructor.toLowerCase().includes(searchTerm.toLowerCase())
       
       const matchesProgram = programFilter === 'all' || course.program === programFilter
-      const matchesStatus = statusFilter === 'all' || course.status === statusFilter
+      // Status filter is handled server-side now, no need to filter again
       
-      return matchesSearch && matchesProgram && matchesStatus
+      return matchesSearch && matchesProgram
     })
-  }, [enhancedCourses, searchTerm, programFilter, statusFilter])
+  }, [enhancedCourses, searchTerm, programFilter])
+
+  // Filter sections for enrollment tab
+  const filteredSections = useMemo(() => {
+    return sections.filter(section => {
+      const matchesSearch = sectionSearchTerm === '' ||
+        section.subject_code?.toLowerCase().includes(sectionSearchTerm.toLowerCase()) ||
+        section.subject_name?.toLowerCase().includes(sectionSearchTerm.toLowerCase()) ||
+        section.class_code?.toLowerCase().includes(sectionSearchTerm.toLowerCase()) ||
+        section.instructor_name?.toLowerCase().includes(sectionSearchTerm.toLowerCase())
+      
+      const matchesProgram = sectionProgramFilter === 'all' || section.program_code === sectionProgramFilter
+      
+      const matchesSemester = sectionSemesterFilter === 'all' || section.semester === parseInt(sectionSemesterFilter)
+      
+      const matchesYear = sectionYearFilter === 'all' || section.year_level === parseInt(sectionYearFilter)
+      
+      return matchesSearch && matchesProgram && matchesSemester && matchesYear
+    })
+  }, [sections, sectionSearchTerm, sectionProgramFilter, sectionSemesterFilter, sectionYearFilter])
+
+  // Paginated sections (15 per page)
+  const paginatedSections = useMemo(() => {
+    const startIndex = (sectionCurrentPage - 1) * sectionPageSize
+    const endIndex = startIndex + sectionPageSize
+    return filteredSections.slice(startIndex, endIndex)
+  }, [filteredSections, sectionCurrentPage, sectionPageSize])
+
+  const sectionTotalPages = Math.ceil(filteredSections.length / sectionPageSize)
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setSectionCurrentPage(1)
+  }, [sectionSearchTerm, sectionProgramFilter, sectionSemesterFilter, sectionYearFilter])
 
   // Analytics data
   const analytics = useMemo(() => {
@@ -192,47 +287,322 @@ export default function EnhancedCourseManagement() {
     }
   }
 
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0]
-    if (file) {
-      setCsvFile(file)
-      // Mock CSV parsing
-      const preview = [
-        { name: 'Advanced Database Systems', classCode: 'CS301', instructor: 'Dr. Maria Santos', program: 'BSIT', yearLevel: 3 },
-        { name: 'Web Development', classCode: 'CS201', instructor: 'Prof. Juan Cruz', program: 'BSIT', yearLevel: 2 },
-        { name: 'Data Structures', classCode: 'CS202', instructor: 'Dr. Ana Reyes', program: 'BSCS', yearLevel: 2 }
-      ]
-      setImportPreview(preview)
+  // Filter courses for Create Section form based on selected program, year level, and semester
+  const filteredCoursesForSection = useMemo(() => {
+    if (!sectionFormData.program_id || !sectionFormData.year_level || !sectionFormData.semester) {
+      return []
+    }
+    
+    const filtered = allCourses.filter(course => {
+      const matchProgram = course.program_id === parseInt(sectionFormData.program_id)
+      const matchYear = course.year_level === parseInt(sectionFormData.year_level) || course.yearLevel === parseInt(sectionFormData.year_level)
+      const matchSemester = course.semester === parseInt(sectionFormData.semester)
+      
+      return matchProgram && matchYear && matchSemester
+    })
+    
+    // Debug logging
+    console.log('Course filtering:', {
+      totalCoursesInCurrentPage: allCourses.length,
+      filteredCount: filtered.length,
+      filters: {
+        program_id: sectionFormData.program_id,
+        year_level: sectionFormData.year_level,
+        semester: sectionFormData.semester
+      },
+      sampleCourse: allCourses[0]
+    })
+    
+    return filtered
+  }, [allCourses, sectionFormData.program_id, sectionFormData.year_level, sectionFormData.semester])
+
+  const handleOpenCreateSectionModal = async () => {
+    setShowCreateSectionModal(true)
+    // Load all courses without pagination for the section form
+    try {
+      const response = await adminAPI.getCourses({ page_size: 10000 }) // Get all courses
+      setAllCourses(response?.data || [])
+    } catch (err) {
+      console.error('Error loading all courses:', err)
     }
   }
 
-  const handleBulkImport = (e) => {
+  const handleCreateSection = async (e) => {
+    e.preventDefault()
+    try {
+      setSubmitting(true)
+      await adminAPI.createSection(sectionFormData)
+      await loadSections()
+      alert('Section created successfully!')
+      setShowCreateSectionModal(false)
+      setSectionFormData({
+        course_id: '',
+        instructor_id: '',
+        class_code: '',
+        semester: 1,
+        academic_year: '2024-2025',
+        max_students: 40
+      })
+    } catch (err) {
+      alert(`Failed to create section: ${err.response?.data?.detail || err.message}`)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    setCsvFile(file)
+    setImportErrors([])
+    
+    try {
+      const text = await file.text()
+      const lines = text.trim().split('\n')
+      
+      if (lines.length < 2) {
+        setImportErrors(['CSV file is empty or invalid'])
+        return
+      }
+
+      // Parse header
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
+      const requiredHeaders = ['name', 'classcode', 'instructor', 'program', 'yearlevel', 'semester', 'academicyear']
+      const missingHeaders = requiredHeaders.filter(h => !headers.includes(h))
+      
+      if (missingHeaders.length > 0) {
+        setImportErrors([`Missing required columns: ${missingHeaders.join(', ')}`])
+        return
+      }
+
+      // Parse rows
+      const preview = []
+      const errors = []
+      
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim())
+        
+        if (values.length !== headers.length) {
+          errors.push(`Row ${i + 1}: Column count mismatch`)
+          continue
+        }
+
+        const row = {}
+        headers.forEach((header, idx) => {
+          row[header] = values[idx]
+        })
+
+        // Validation
+        if (!row.name || !row.classcode || !row.instructor || !row.program) {
+          errors.push(`Row ${i + 1}: Missing required fields`)
+          continue
+        }
+
+        const yearLevel = parseInt(row.yearlevel)
+        if (isNaN(yearLevel) || yearLevel < 1 || yearLevel > 4) {
+          errors.push(`Row ${i + 1}: Invalid year level (must be 1-4)`)
+          continue
+        }
+
+        preview.push({
+          name: row.name,
+          classCode: row.classcode,
+          instructor: row.instructor,
+          program: row.program,
+          yearLevel: yearLevel,
+          semester: row.semester || 'First Semester',
+          academicYear: row.academicyear || '2024-2025',
+          enrolledStudents: 0,
+          status: 'Active'
+        })
+      }
+
+      setImportPreview(preview)
+      setImportErrors(errors)
+      
+    } catch (err) {
+      setImportErrors([`Failed to parse CSV: ${err.message}`])
+    }
+  }
+
+  const handleBulkImport = async (e) => {
     e?.preventDefault()
-    if (importPreview.length > 0) {
-      alert(`Successfully imported ${importPreview.length} courses!`)
+    
+    if (importPreview.length === 0) {
+      alert('No courses to import')
+      return
+    }
+
+    if (!window.confirm(`Import ${importPreview.length} courses?\n\nThis will create new courses in the system.`)) {
+      return
+    }
+
+    try {
+      setSubmitting(true)
+      let successCount = 0
+      const errors = []
+
+      for (const courseData of importPreview) {
+        try {
+          await adminAPI.createCourse(courseData)
+          successCount++
+        } catch (err) {
+          errors.push(`Failed to import "${courseData.name}": ${err.message}`)
+        }
+      }
+
+      // Refresh courses list
+      const updatedCourses = await adminAPI.getCourses()
+      setCourses(updatedCourses?.data || [])
+
+      if (errors.length > 0) {
+        alert(`Imported ${successCount} of ${importPreview.length} courses.\n\nErrors:\n${errors.join('\n')}`)
+      } else {
+        alert(`Successfully imported ${successCount} courses!`)
+      }
+      
       setShowBulkImportModal(false)
       setCsvFile(null)
       setImportPreview([])
+      setImportErrors([])
+      
+    } catch (err) {
+      alert(`Bulk import failed: ${err.message}`)
+    } finally {
+      setSubmitting(false)
     }
   }
 
-  const handleAssignInstructor = (e) => {
+  const handleAssignInstructor = async (e) => {
     e?.preventDefault()
-    alert(`Instructor assigned to ${selectedCourses.length} course(s)`)
-    setShowAssignInstructorModal(false)
-    setSelectedCourses([])
+    
+    if (!formData.instructor) {
+      alert('Please select an instructor')
+      return
+    }
+
+    if (selectedCourses.length === 0) {
+      alert('No courses selected')
+      return
+    }
+
+    if (!window.confirm(`Assign "${formData.instructor}" to ${selectedCourses.length} course(s)?`)) {
+      return
+    }
+
+    try {
+      setSubmitting(true)
+      let successCount = 0
+      const errors = []
+
+      for (const courseId of selectedCourses) {
+        try {
+          await adminAPI.updateCourse(courseId, { instructor: formData.instructor })
+          successCount++
+        } catch (err) {
+          errors.push(`Failed to update course ID ${courseId}: ${err.message}`)
+        }
+      }
+
+      // Refresh courses list
+      const updatedCourses = await adminAPI.getCourses()
+      setCourses(updatedCourses?.data || [])
+
+      if (errors.length > 0) {
+        alert(`Updated ${successCount} of ${selectedCourses.length} courses.\n\nErrors:\n${errors.join('\n')}`)
+      } else {
+        alert(`Successfully assigned instructor to ${successCount} course(s)!`)
+      }
+      
+      setShowAssignInstructorModal(false)
+      setSelectedCourses([])
+      setFormData({...formData, instructor: ''})
+      
+    } catch (err) {
+      alert(`Instructor assignment failed: ${err.message}`)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handleArchiveCourse = async (course, e) => {
     e?.preventDefault()
     if (window.confirm(`Archive "${course.name}"?\n\nThis will hide the course from active listings but preserve all data.`)) {
       try {
+        setSubmitting(true)
         await adminAPI.updateCourse(course.id, { status: 'Archived' })
-        const updatedCourses = await adminAPI.getCourses()
-        setCourses(updatedCourses?.data || [])
+        // Trigger data reload by calling retry
+        retry()
         alert(`Course "${course.name}" archived successfully!`)
       } catch (err) {
         alert(`Failed to archive course: ${err.message}`)
+      } finally {
+        setSubmitting(false)
+      }
+    }
+  }
+
+  const handleEditCourse = (course, e) => {
+    e?.preventDefault()
+    setSelectedCourse(course)
+    setFormData({
+      name: course.name || '',
+      classCode: course.classCode || course.class_code || '',
+      instructor: course.instructor || '',
+      program: course.program || 'BSIT',
+      yearLevel: course.yearLevel || course.year_level || 1,
+      semester: course.semester || 'First Semester',
+      academicYear: course.academicYear || course.academic_year || '2024-2025',
+      enrolledStudents: course.enrolledStudents || course.enrolled_students || 0,
+      status: course.status || 'Active'
+    })
+    setShowEditModal(true)
+  }
+
+  const handleUpdateCourse = async (e) => {
+    e.preventDefault()
+    if (!selectedCourse) return
+
+    try {
+      setSubmitting(true)
+      await adminAPI.updateCourse(selectedCourse.id, formData)
+      // Trigger data reload
+      retry()
+      alert(`Course "${formData.name}" updated successfully!`)
+      setShowEditModal(false)
+      setSelectedCourse(null)
+      setFormData({
+        name: '',
+        classCode: '',
+        instructor: '',
+        program: 'BSIT',
+        yearLevel: 1,
+        semester: 'First Semester',
+        academicYear: '2024-2025',
+        enrolledStudents: 0,
+        status: 'Active'
+      })
+    } catch (err) {
+      alert(`Failed to update course: ${err.message}`)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleDeleteCourse = async (course, e) => {
+    e?.preventDefault()
+    if (window.confirm(`⚠️ DELETE "${course.name}"?\n\nThis action CANNOT be undone!\n\nAll associated evaluations and data will be permanently removed.`)) {
+      try {
+        setSubmitting(true)
+        await adminAPI.deleteCourse(course.id)
+        // Trigger data reload
+        retry()
+        alert(`Course "${course.name}" deleted successfully!`)
+      } catch (err) {
+        alert(`Failed to delete course: ${err.message}`)
+      } finally {
+        setSubmitting(false)
       }
     }
   }
@@ -245,6 +615,147 @@ export default function EnhancedCourseManagement() {
         : [...prev, courseId]
     )
   }
+
+  // Section Management Functions
+  const loadSections = async () => {
+    try {
+      const response = await adminAPI.getSections({
+        program_id: programFilter !== 'all' ? programFilter : null
+      })
+      setSections(response?.data || [])
+    } catch (err) {
+      console.error('Error loading sections:', err)
+    }
+  }
+
+  const openSectionModal = async (section) => {
+    try {
+      setSelectedSection(section)
+      setShowSectionModal(true)
+      setSubmitting(true)
+      
+      const [enrolledResp, availableResp] = await Promise.all([
+        adminAPI.getSectionStudents(section.id),
+        adminAPI.getAvailableStudents(section.id)
+      ])
+      
+      setEnrolledStudents(enrolledResp?.data || [])
+      setAvailableStudents(availableResp?.data || [])
+      setSelectedStudentIds([])
+    } catch (err) {
+      alert(`Error loading section data: ${err.message}`)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleEnrollStudents = async () => {
+    if (selectedStudentIds.length === 0) {
+      alert('Please select at least one student to enroll')
+      return
+    }
+    
+    try {
+      setSubmitting(true)
+      await adminAPI.enrollStudents(selectedSection.id, selectedStudentIds)
+      
+      // Reload section data
+      const [enrolledResp, availableResp] = await Promise.all([
+        adminAPI.getSectionStudents(selectedSection.id),
+        adminAPI.getAvailableStudents(selectedSection.id)
+      ])
+      
+      setEnrolledStudents(enrolledResp?.data || [])
+      setAvailableStudents(availableResp?.data || [])
+      setSelectedStudentIds([])
+      
+      alert(`Successfully enrolled ${selectedStudentIds.length} student(s)!`)
+    } catch (err) {
+      alert(`Failed to enroll students: ${err.message}`)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleRemoveStudent = async (studentId, studentName) => {
+    if (!window.confirm(`Remove ${studentName} from this section?`)) return
+    
+    try {
+      setSubmitting(true)
+      await adminAPI.removeStudentFromSection(selectedSection.id, studentId)
+      
+      // Reload section data
+      const [enrolledResp, availableResp] = await Promise.all([
+        adminAPI.getSectionStudents(selectedSection.id),
+        adminAPI.getAvailableStudents(selectedSection.id)
+      ])
+      
+      setEnrolledStudents(enrolledResp?.data || [])
+      setAvailableStudents(availableResp?.data || [])
+      
+      alert(`${studentName} removed successfully!`)
+    } catch (err) {
+      alert(`Failed to remove student: ${err.message}`)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleEditSection = (section, e) => {
+    e?.stopPropagation() // Prevent card click
+    setSelectedSection(section)
+    setSectionFormData({
+      program_id: section.program_id || '',
+      year_level: section.year_level || '',
+      semester: section.semester || '',
+      course_id: section.course_id || '',
+      instructor_id: section.instructor_id || '',
+      class_code: section.class_code || '',
+      academic_year: section.academic_year || '2024-2025',
+      max_students: section.max_students || 40
+    })
+    setShowEditSectionModal(true)
+  }
+
+  const handleUpdateSection = async (e) => {
+    e.preventDefault()
+    try {
+      setSubmitting(true)
+      await adminAPI.updateSection(selectedSection.id, sectionFormData)
+      await loadSections()
+      setShowEditSectionModal(false)
+      alert('Section updated successfully!')
+    } catch (err) {
+      alert(`Failed to update section: ${err.response?.data?.detail || err.message}`)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleDeleteSection = async (section, e) => {
+    e?.stopPropagation() // Prevent card click
+    if (!window.confirm(`⚠️ DELETE Section "${section.class_code}"?\n\nThis will remove all student enrollments in this section.\n\nThis action CANNOT be undone!`)) {
+      return
+    }
+    
+    try {
+      setSubmitting(true)
+      await adminAPI.deleteSection(section.id)
+      await loadSections()
+      alert('Section deleted successfully!')
+    } catch (err) {
+      alert(`Failed to delete section: ${err.response?.data?.detail || err.message}`)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Load sections when enrollment tab is active
+  useEffect(() => {
+    if (activeTab === 'enrollment') {
+      loadSections()
+    }
+  }, [activeTab, programFilter])
 
   if (!currentUser || !isSystemAdmin(currentUser)) return null
   
@@ -331,7 +842,8 @@ export default function EnhancedCourseManagement() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">Total Courses</p>
-                    <p className="text-3xl font-bold text-gray-900">{filteredCourses.length}</p>
+                    <p className="text-3xl font-bold text-gray-900">{totalCourses}</p>
+                    <p className="text-xs text-gray-500 mt-1">Showing {filteredCourses.length} on this page</p>
                   </div>
                   <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                     <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -529,12 +1041,21 @@ export default function EnhancedCourseManagement() {
                               </svg>
                             </button>
                             <button
-                              onClick={() => alert(`Editing ${course.name}...`)}
+                              onClick={(e) => handleEditCourse(course, e)}
                               className="p-2 bg-purple-100 hover:bg-purple-200 text-purple-600 rounded-lg transition-all"
                               title="Edit Course"
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                              </svg>
+                            </button>
+                            <button
+                              onClick={(e) => handleDeleteCourse(course, e)}
+                              className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-all"
+                              title="Delete Course"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                               </svg>
                             </button>
                             <button
@@ -552,6 +1073,48 @@ export default function EnhancedCourseManagement() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+              
+              {/* Pagination Controls */}
+              <div className="bg-white rounded-b-xl border-t border-gray-200 px-6 py-4 flex items-center justify-between">
+                <div className="text-sm text-gray-700">
+                  Showing <span className="font-semibold">{((currentPage - 1) * pageSize) + 1}</span> to{' '}
+                  <span className="font-semibold">{Math.min(currentPage * pageSize, totalCourses)}</span> of{' '}
+                  <span className="font-semibold">{totalCourses}</span> courses
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    First
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <span className="px-4 py-2 text-sm font-medium text-gray-700">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage >= totalPages}
+                    className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage >= totalPages}
+                    className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Last
+                  </button>
+                </div>
               </div>
             </div>
           </>
@@ -643,33 +1206,215 @@ export default function EnhancedCourseManagement() {
           </div>
         )}
 
-        {/* Enrollment Tab */}
+        {/* Enrollment Tab - Section Management */}
         {activeTab === 'enrollment' && (
           <div className="bg-white rounded-xl shadow-md p-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">👥 Enrollment Management</h3>
-            <p className="text-gray-600 mb-6">Manage student enrollments across all courses.</p>
-            
-            <div className="grid md:grid-cols-2 gap-6">
-              {filteredCourses.slice(0, 10).map(course => (
-                <div key={course.id} className="border-2 border-gray-200 rounded-xl p-4 hover:shadow-lg transition-all">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h4 className="font-bold text-gray-900">{course.name}</h4>
-                      <p className="text-sm text-gray-600">{course.instructor}</p>
-                    </div>
-                    <span className="text-2xl font-bold text-indigo-600">{course.enrolledStudents || 0}</span>
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">👥 Section Management</h3>
+                <p className="text-gray-600">Manage student enrollments by class section</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleOpenCreateSectionModal}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
+                  </svg>
+                  Create Section
+                </button>
+                <button
+                  onClick={loadSections}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all"
+                >
+                  🔄 Refresh
+                </button>
+              </div>
+            </div>
+
+            {/* Filters */}
+            <div className="mb-6 grid md:grid-cols-5 gap-4">
+              <input
+                type="text"
+                placeholder="🔍 Search sections..."
+                value={sectionSearchTerm}
+                onChange={(e) => setSectionSearchTerm(e.target.value)}
+                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+              
+              <select
+                value={sectionProgramFilter}
+                onChange={(e) => setSectionProgramFilter(e.target.value)}
+                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="all">All Programs</option>
+                {apiData?.programs && apiData.programs.map(prog => (
+                  <option key={prog.id} value={prog.code}>{prog.code}</option>
+                ))}
+              </select>
+
+              <select
+                value={sectionYearFilter}
+                onChange={(e) => setSectionYearFilter(e.target.value)}
+                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="all">All Year Levels</option>
+                <option value="1">1st Year</option>
+                <option value="2">2nd Year</option>
+                <option value="3">3rd Year</option>
+                <option value="4">4th Year</option>
+              </select>
+
+              <select
+                value={sectionSemesterFilter}
+                onChange={(e) => setSectionSemesterFilter(e.target.value)}
+                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="all">All Semesters</option>
+                <option value="1">First Semester</option>
+                <option value="2">Second Semester</option>
+                <option value="3">Summer</option>
+              </select>
+
+              <div className="text-sm text-gray-600 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="font-semibold">
+                    {filteredSections.length === 0 ? 'No sections' : `${paginatedSections.length} sections`}
                   </div>
-                  <div className="flex space-x-2">
-                    <button onClick={() => alert('View enrollment list...')} className="flex-1 px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-sm font-semibold transition-all">
-                      View List
-                    </button>
-                    <button onClick={() => alert('Add students...')} className="flex-1 px-3 py-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg text-sm font-semibold transition-all">
-                      Add Students
-                    </button>
+                  <div className="text-xs text-gray-500">
+                    {filteredSections.length > 0 && `Page ${sectionCurrentPage} of ${sectionTotalPages} • ${filteredSections.length} total`}
                   </div>
                 </div>
-              ))}
+              </div>
             </div>
+
+            {submitting && !showSectionModal ? (
+              <div className="text-center py-8">
+                <LoadingSpinner />
+              </div>
+            ) : sections.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <p className="text-lg">No sections found</p>
+                <p className="text-sm">Create class sections from the Courses tab</p>
+              </div>
+            ) : filteredSections.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <p className="text-lg">No sections match your filters</p>
+                <p className="text-sm">Try adjusting your search or filter criteria</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {paginatedSections.map(section => (
+                  <div
+                    key={section.id}
+                    className="border-2 border-gray-200 rounded-xl p-4 hover:shadow-lg transition-all relative group"
+                  >
+                    {/* Action Buttons */}
+                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={(e) => handleEditSection(section, e)}
+                        className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+                        title="Edit Section"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                        </svg>
+                      </button>
+                      <button
+                        onClick={(e) => handleDeleteSection(section, e)}
+                        className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+                        title="Delete Section"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                      </button>
+                    </div>
+
+                    {/* Section Info - Clickable */}
+                    <div 
+                      className="cursor-pointer"
+                      onClick={() => openSectionModal(section)}
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <h4 className="font-bold text-gray-900">{section.subject_code}</h4>
+                          <p className="text-sm text-gray-600">{section.subject_name}</p>
+                          <p className="text-xs text-gray-500 mt-1">Section: {section.class_code || 'N/A'}</p>
+                        </div>
+                        <span className="text-2xl font-bold text-indigo-600">
+                          {section.enrolled_count || 0}
+                        </span>
+                      </div>
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <p className="text-xs text-gray-600">
+                          {section.instructor_name || 'No instructor assigned'}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Semester {section.semester === 3 ? 'Summer' : section.semester} • {section.academic_year}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Pagination Controls */}
+              {sectionTotalPages > 1 && (
+                <div className="mt-6 flex justify-center items-center gap-2">
+                  <button
+                    onClick={() => setSectionCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={sectionCurrentPage === 1}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-all"
+                  >
+                    ← Previous
+                  </button>
+                  
+                  <div className="flex gap-2">
+                    {[...Array(sectionTotalPages)].map((_, idx) => {
+                      const pageNum = idx + 1
+                      // Show first page, last page, current page, and pages around current
+                      if (
+                        pageNum === 1 ||
+                        pageNum === sectionTotalPages ||
+                        (pageNum >= sectionCurrentPage - 1 && pageNum <= sectionCurrentPage + 1)
+                      ) {
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => setSectionCurrentPage(pageNum)}
+                            className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                              sectionCurrentPage === pageNum
+                                ? 'bg-indigo-600 text-white'
+                                : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        )
+                      } else if (
+                        pageNum === sectionCurrentPage - 2 ||
+                        pageNum === sectionCurrentPage + 2
+                      ) {
+                        return <span key={pageNum} className="px-2 py-2">...</span>
+                      }
+                      return null
+                    })}
+                  </div>
+
+                  <button
+                    onClick={() => setSectionCurrentPage(prev => Math.min(sectionTotalPages, prev + 1))}
+                    disabled={sectionCurrentPage === sectionTotalPages}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-all"
+                  >
+                    Next →
+                  </button>
+                </div>
+              )}
+            </>
+            )}
           </div>
         )}
       </div>
@@ -724,7 +1469,9 @@ export default function EnhancedCourseManagement() {
                 >
                   <option value="">Select Instructor</option>
                   {instructors.map(inst => (
-                    <option key={inst} value={inst}>{inst}</option>
+                    <option key={inst.id} value={`${inst.first_name} ${inst.last_name}`}>
+                      {inst.first_name} {inst.last_name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -812,6 +1559,171 @@ export default function EnhancedCourseManagement() {
         </div>
       )}
 
+      {/* Edit Course Modal */}
+      {showEditModal && selectedCourse && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="bg-gradient-to-r from-purple-600 to-purple-700 p-6 border-b-4 border-purple-800">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-white">✏️ Edit Course</h2>
+                <button onClick={() => { setShowEditModal(false); setSelectedCourse(null); }} className="w-10 h-10 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            
+            <form onSubmit={handleUpdateCourse} className="p-6 space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Course Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="Introduction to Programming"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Class Code *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.classCode}
+                    onChange={(e) => setFormData({...formData, classCode: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="CS101"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Instructor *</label>
+                <select
+                  value={formData.instructor}
+                  onChange={(e) => setFormData({...formData, instructor: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                >
+                  <option value="">Select Instructor</option>
+                  {instructors.map(inst => (
+                    <option key={inst.id} value={`${inst.first_name} ${inst.last_name}`}>
+                      {inst.first_name} {inst.last_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Program *</label>
+                  <select
+                    value={formData.program}
+                    onChange={(e) => setFormData({...formData, program: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    {programs.map(prog => (
+                      <option key={prog} value={prog}>{prog}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Year Level *</label>
+                  <select
+                    value={formData.yearLevel}
+                    onChange={(e) => setFormData({...formData, yearLevel: parseInt(e.target.value)})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    <option value={1}>1st Year</option>
+                    <option value={2}>2nd Year</option>
+                    <option value={3}>3rd Year</option>
+                    <option value={4}>4th Year</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Semester *</label>
+                  <select
+                    value={formData.semester}
+                    onChange={(e) => setFormData({...formData, semester: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    <option value="First Semester">First Semester</option>
+                    <option value="Second Semester">Second Semester</option>
+                    <option value="Summer">Summer</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Academic Year *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.academicYear}
+                    onChange={(e) => setFormData({...formData, academicYear: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="2024-2025"
+                  />
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Enrolled Students</label>
+                  <input
+                    type="number"
+                    value={formData.enrolledStudents}
+                    onChange={(e) => setFormData({...formData, enrolledStudents: parseInt(e.target.value)})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="30"
+                    min="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Status *</label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({...formData, status: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Archived">Archived</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex space-x-4 pt-4">
+                <button
+                  type="button"
+                  onClick={() => { setShowEditModal(false); setSelectedCourse(null); }}
+                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold transition-all"
+                  disabled={submitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  disabled={submitting}
+                >
+                  {submitting ? (
+                    <>
+                      <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      <span>Updating...</span>
+                    </>
+                  ) : (
+                    <span>Update Course</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Bulk Import Modal */}
       {showBulkImportModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -846,6 +1758,18 @@ export default function EnhancedCourseManagement() {
                   className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:border-green-500 transition-all"
                 />
               </div>
+
+              {/* Show Errors */}
+              {importErrors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-sm text-red-900 font-semibold mb-2">⚠️ Errors Found:</p>
+                  <ul className="text-sm text-red-800 space-y-1 list-disc list-inside">
+                    {importErrors.map((err, idx) => (
+                      <li key={idx}>{err}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               {importPreview.length > 0 && (
                 <>
@@ -883,15 +1807,23 @@ export default function EnhancedCourseManagement() {
                   type="button"
                   onClick={() => setShowBulkImportModal(false)}
                   className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold transition-all"
+                  disabled={submitting}
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleBulkImport}
-                  disabled={importPreview.length === 0}
-                  className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  disabled={importPreview.length === 0 || submitting}
+                  className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center"
                 >
-                  Import {importPreview.length} Courses
+                  {submitting ? (
+                    <>
+                      <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      <span>Importing...</span>
+                    </>
+                  ) : (
+                    <span>Import {importPreview.length} Courses</span>
+                  )}
                 </button>
               </div>
             </div>
@@ -928,7 +1860,9 @@ export default function EnhancedCourseManagement() {
                 >
                   <option value="">Choose instructor...</option>
                   {instructors.map(inst => (
-                    <option key={inst} value={inst}>{inst}</option>
+                    <option key={inst.id} value={`${inst.first_name} ${inst.last_name}`}>
+                      {inst.first_name} {inst.last_name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -938,17 +1872,490 @@ export default function EnhancedCourseManagement() {
                   type="button"
                   onClick={() => setShowAssignInstructorModal(false)}
                   className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold transition-all"
+                  disabled={submitting}
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleAssignInstructor}
-                  className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all"
+                  disabled={!formData.instructor || submitting}
+                  className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center"
                 >
-                  Assign Instructor
+                  {submitting ? (
+                    <>
+                      <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      <span>Assigning...</span>
+                    </>
+                  ) : (
+                    <span>Assign Instructor</span>
+                  )}
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Section Management Modal */}
+      {showSectionModal && selectedSection && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 p-6 border-b-4 border-indigo-800 sticky top-0 z-10">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold text-white">
+                    {selectedSection.subject_code} - {selectedSection.section_name}
+                  </h2>
+                  <p className="text-indigo-100">{selectedSection.subject_name}</p>
+                </div>
+                <button
+                  onClick={() => setShowSectionModal(false)}
+                  className="w-10 h-10 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+                >
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <div className="grid md:grid-cols-2 gap-6">
+                {/* Enrolled Students */}
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                    <span className="bg-green-100 text-green-700 px-3 py-1 rounded-lg mr-2">
+                      {enrolledStudents.length}
+                    </span>
+                    Enrolled Students
+                  </h3>
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {enrolledStudents.length === 0 ? (
+                      <p className="text-gray-500 text-center py-8">No students enrolled</p>
+                    ) : (
+                      enrolledStudents.map(student => (
+                        <div
+                          key={student.id}
+                          className="bg-white rounded-lg p-3 flex justify-between items-center hover:shadow-md transition-all"
+                        >
+                          <div>
+                            <p className="font-semibold text-gray-900">
+                              {student.first_name} {student.last_name}
+                            </p>
+                            <p className="text-sm text-gray-600">{student.student_number}</p>
+                          </div>
+                          <button
+                            onClick={() => handleRemoveStudent(student.id, `${student.first_name} ${student.last_name}`)}
+                            disabled={submitting}
+                            className="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-sm font-semibold transition-all disabled:opacity-50"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Available Students */}
+                <div className="bg-blue-50 rounded-xl p-4">
+                  <div className="mb-4">
+                    <h3 className="text-lg font-bold text-gray-900 mb-2 flex items-center">
+                      <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg mr-2">
+                        {availableStudents.length}
+                      </span>
+                      Available Students
+                    </h3>
+                    <input
+                      type="text"
+                      placeholder="Search students..."
+                      value={studentSearchTerm}
+                      onChange={(e) => setStudentSearchTerm(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2 max-h-72 overflow-y-auto mb-4">
+                    {availableStudents
+                      .filter(s =>
+                        !studentSearchTerm ||
+                        s.first_name.toLowerCase().includes(studentSearchTerm.toLowerCase()) ||
+                        s.last_name.toLowerCase().includes(studentSearchTerm.toLowerCase()) ||
+                        s.student_number.includes(studentSearchTerm)
+                      )
+                      .map(student => (
+                        <div
+                          key={student.id}
+                          className="bg-white rounded-lg p-3 flex items-center hover:shadow-md transition-all"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedStudentIds.includes(student.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedStudentIds([...selectedStudentIds, student.id])
+                              } else {
+                                setSelectedStudentIds(selectedStudentIds.filter(id => id !== student.id))
+                              }
+                            }}
+                            className="mr-3 w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                          />
+                          <div className="flex-1">
+                            <p className="font-semibold text-gray-900">
+                              {student.first_name} {student.last_name}
+                            </p>
+                            <p className="text-sm text-gray-600">{student.student_number}</p>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                  <button
+                    onClick={handleEnrollStudents}
+                    disabled={selectedStudentIds.length === 0 || submitting}
+                    className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center"
+                  >
+                    {submitting ? (
+                      <>
+                        <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        <span>Enrolling...</span>
+                      </>
+                    ) : (
+                      <span>Enroll {selectedStudentIds.length > 0 ? `(${selectedStudentIds.length})` : ''} Students</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Section Modal */}
+      {showCreateSectionModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="bg-gradient-to-r from-green-600 to-green-700 p-6 border-b-4 border-green-800">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-white">➕ Create New Section</h2>
+                <button 
+                  onClick={() => setShowCreateSectionModal(false)} 
+                  className="w-10 h-10 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+                >
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleCreateSection} className="p-6 space-y-4">
+              {/* Program Selection - First */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Program *</label>
+                <select
+                  required
+                  value={sectionFormData.program_id}
+                  onChange={(e) => {
+                    const newProgramId = e.target.value
+                    setSectionFormData({ 
+                      ...sectionFormData, 
+                      program_id: newProgramId,
+                      year_level: '', // Reset dependent fields
+                      semester: '',
+                      course_id: ''
+                    })
+                  }}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                >
+                  <option value="">Select a program</option>
+                  {apiData?.programs && apiData.programs.map(program => (
+                    <option key={program.id} value={program.id}>
+                      {program.code} - {program.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Year Level Selection - Second */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Year Level *</label>
+                <select
+                  required
+                  disabled={!sectionFormData.program_id}
+                  value={sectionFormData.year_level}
+                  onChange={(e) => {
+                    const newYearLevel = e.target.value
+                    setSectionFormData({ 
+                      ...sectionFormData, 
+                      year_level: newYearLevel,
+                      semester: '', // Reset dependent fields
+                      course_id: ''
+                    })
+                  }}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                >
+                  <option value="">Select year level</option>
+                  <option value="1">1st Year</option>
+                  <option value="2">2nd Year</option>
+                  <option value="3">3rd Year</option>
+                  <option value="4">4th Year</option>
+                </select>
+                {!sectionFormData.program_id && (
+                  <p className="text-xs text-gray-500 mt-1">Select a program first</p>
+                )}
+              </div>
+
+              {/* Semester Selection - Third */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Semester *</label>
+                <select
+                  required
+                  disabled={!sectionFormData.year_level}
+                  value={sectionFormData.semester}
+                  onChange={(e) => {
+                    const newSemester = e.target.value
+                    setSectionFormData({ 
+                      ...sectionFormData, 
+                      semester: newSemester,
+                      course_id: '' // Reset course selection
+                    })
+                  }}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                >
+                  <option value="">Select semester</option>
+                  <option value="1">First Semester</option>
+                  <option value="2">Second Semester</option>
+                  <option value="3">Summer</option>
+                </select>
+                {!sectionFormData.year_level && (
+                  <p className="text-xs text-gray-500 mt-1">Select year level first</p>
+                )}
+              </div>
+
+              {/* Course Selection - Fourth (filtered) */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Course *</label>
+                <select
+                  required
+                  disabled={!sectionFormData.semester}
+                  value={sectionFormData.course_id}
+                  onChange={(e) => setSectionFormData({ ...sectionFormData, course_id: parseInt(e.target.value) })}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                >
+                  <option value="">Select a course</option>
+                  {filteredCoursesForSection.length === 0 && sectionFormData.semester && (
+                    <option value="" disabled>No courses available for selected criteria</option>
+                  )}
+                  {filteredCoursesForSection.map(course => (
+                    <option key={course.id} value={course.id}>
+                      {course.course_code || course.classCode} - {course.course_name || course.name}
+                    </option>
+                  ))}
+                </select>
+                {!sectionFormData.semester && (
+                  <p className="text-xs text-gray-500 mt-1">Select semester first</p>
+                )}
+                {sectionFormData.semester && filteredCoursesForSection.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">⚠️ No courses found for the selected program, year level, and semester</p>
+                )}
+              </div>
+
+              {/* Instructor Selection */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Instructor *</label>
+                <select
+                  required
+                  value={sectionFormData.instructor_id}
+                  onChange={(e) => setSectionFormData({ ...sectionFormData, instructor_id: parseInt(e.target.value) })}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                >
+                  <option value="">Select an instructor</option>
+                  {instructors.map(instructor => (
+                    <option key={instructor.id} value={instructor.id}>
+                      {instructor.first_name} {instructor.last_name} ({instructor.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Section Code */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Section Code *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g., CS101-A, IT201-1"
+                  value={sectionFormData.class_code}
+                  onChange={(e) => setSectionFormData({ ...sectionFormData, class_code: e.target.value })}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                />
+              </div>
+
+              {/* Academic Year and Max Students */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Academic Year *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="2024-2025"
+                    value={sectionFormData.academic_year}
+                    onChange={(e) => setSectionFormData({ ...sectionFormData, academic_year: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Max Students *</label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    value={sectionFormData.max_students}
+                    onChange={(e) => setSectionFormData({ ...sectionFormData, max_students: parseInt(e.target.value) })}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateSectionModal(false)}
+                  className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-semibold transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg font-semibold transition-all flex items-center gap-2"
+                >
+                  {submitting ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Creating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
+                      </svg>
+                      <span>Create Section</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Section Modal */}
+      {showEditSectionModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6 border-b-4 border-blue-800">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-white">✏️ Edit Section</h2>
+                <button 
+                  onClick={() => setShowEditSectionModal(false)} 
+                  className="w-10 h-10 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+                >
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleUpdateSection} className="p-6 space-y-4">
+              {/* Instructor Selection */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Instructor *</label>
+                <select
+                  required
+                  value={sectionFormData.instructor_id}
+                  onChange={(e) => setSectionFormData({ ...sectionFormData, instructor_id: parseInt(e.target.value) })}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Select an instructor</option>
+                  {instructors.map(instructor => (
+                    <option key={instructor.id} value={instructor.id}>
+                      {instructor.first_name} {instructor.last_name} ({instructor.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Section Code */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Section Code *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g., CS101-A, IT201-1"
+                  value={sectionFormData.class_code}
+                  onChange={(e) => setSectionFormData({ ...sectionFormData, class_code: e.target.value })}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              {/* Academic Year and Max Students */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Academic Year *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="2024-2025"
+                    value={sectionFormData.academic_year}
+                    onChange={(e) => setSectionFormData({ ...sectionFormData, academic_year: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Max Students *</label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    value={sectionFormData.max_students}
+                    onChange={(e) => setSectionFormData({ ...sectionFormData, max_students: parseInt(e.target.value) })}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setShowEditSectionModal(false)}
+                  className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-semibold transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg font-semibold transition-all flex items-center gap-2"
+                >
+                  {submitting ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Updating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                      </svg>
+                      <span>Update Section</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

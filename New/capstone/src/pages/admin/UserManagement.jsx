@@ -1,15 +1,24 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getCurrentUser, isSystemAdmin, getRoleDisplayName } from '../../utils/roleUtils'
+import { isSystemAdmin, getRoleDisplayName } from '../../utils/roleUtils'
+import { useAuth } from '../../context/AuthContext'
 import { adminAPI } from '../../services/api'
 import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
 
 export default function UserManagement() {
   const navigate = useNavigate()
-  const currentUser = getCurrentUser()
+  const { user: currentUser } = useAuth()
   
   // State
   const [allUsers, setAllUsers] = useState([])
+  const [programs, setPrograms] = useState([])
+  const [userStats, setUserStats] = useState({
+    total_users: 0,
+    students: 0,
+    dept_heads: 0,
+    secretaries: 0,
+    admins: 0
+  })
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -17,10 +26,14 @@ export default function UserManagement() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedUser, setSelectedUser] = useState(null)
-  const [currentPage, setCurrentPage] = useState(1)
   const [selectedUsers, setSelectedUsers] = useState([])
   const [submitting, setSubmitting] = useState(false)
-  const usersPerPage = 10
+  
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize] = useState(15) // 15 users per page for faster loading
+  const [totalUsers, setTotalUsers] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
 
   // Form state
   const [formData, setFormData] = useState({
@@ -34,18 +47,53 @@ export default function UserManagement() {
     status: 'Active'
   })
 
-  // Use timeout hook for API call
-  const { data: usersData, loading, error, retry } = useApiWithTimeout(
-    () => adminAPI.getUsers(),
-    [currentUser?.id, currentUser?.role]
+  // Use timeout hook for API call with pagination
+  const { data: apiData, loading, error, retry } = useApiWithTimeout(
+    async () => {
+      const [usersResponse, programsResponse, statsResponse] = await Promise.all([
+        adminAPI.getUsers({ 
+          page: currentPage, 
+          page_size: pageSize,
+          role: roleFilter !== 'all' ? roleFilter : undefined,
+          status: statusFilter !== 'all' ? statusFilter : undefined,
+          search: searchTerm || undefined
+        }),
+        adminAPI.getPrograms(),
+        adminAPI.getUserStats()
+      ])
+      return {
+        users: usersResponse?.data || [],
+        programs: programsResponse?.data || [],
+        stats: statsResponse?.data || {
+          total_users: 0,
+          students: 0,
+          dept_heads: 0,
+          secretaries: 0,
+          admins: 0
+        },
+        pagination: usersResponse?.pagination || {}
+      }
+    },
+    [currentUser?.id, currentUser?.role, currentPage, pageSize, roleFilter, statusFilter, searchTerm]
   )
 
-  // Update allUsers when data changes
+  // Update allUsers and programs when data changes
   useEffect(() => {
-    if (usersData?.data) {
-      setAllUsers(usersData.data)
+    if (apiData) {
+      setAllUsers(apiData.users)
+      if (apiData.programs && apiData.programs.length > 0) {
+        setPrograms(apiData.programs.map(p => p.code).sort())
+      }
+      if (apiData.stats) {
+        setUserStats(apiData.stats)
+      }
+      // Update pagination state
+      if (apiData.pagination) {
+        setTotalUsers(apiData.pagination.total || 0)
+        setTotalPages(apiData.pagination.total_pages || 0)
+      }
     }
-  }, [usersData])
+  }, [apiData])
 
   // Redirect if not system admin
   useEffect(() => {
@@ -54,43 +102,24 @@ export default function UserManagement() {
     }
   }, [currentUser?.role, currentUser?.id, navigate])
 
-  // Get unique programs
-  const programs = useMemo(() => {
-    const progs = new Set()
-    allUsers.forEach(user => {
-      if (user.program) progs.add(user.program)
-      if (user.assignedPrograms) user.assignedPrograms.forEach(p => progs.add(p))
-    })
-    return Array.from(progs).sort()
-  }, [allUsers])
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [roleFilter, statusFilter, searchTerm])
 
-  // Filter users
+  // Client-side filtering for program only (server handles role, status, search)
   const filteredUsers = useMemo(() => {
+    if (programFilter === 'all') return allUsers
+    
     return allUsers.filter(user => {
-      const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim()
-      const matchesSearch = searchTerm === '' || 
-        fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchTerm.toLowerCase())
-      
-      const matchesRole = roleFilter === 'all' || user.role === roleFilter
-      const matchesStatus = statusFilter === 'all' || user.status === statusFilter
-      
-      let matchesProgram = programFilter === 'all'
-      if (!matchesProgram) {
-        if (user.program === programFilter) matchesProgram = true
-        if (user.assignedPrograms && user.assignedPrograms.includes(programFilter)) matchesProgram = true
-      }
-      
-      return matchesSearch && matchesRole && matchesStatus && matchesProgram
+      if (user.program === programFilter) return true
+      if (user.assignedPrograms && user.assignedPrograms.includes(programFilter)) return true
+      return false
     })
-  }, [allUsers, searchTerm, roleFilter, statusFilter, programFilter])
+  }, [allUsers, programFilter])
 
-  // Pagination
-  const totalPages = Math.ceil(filteredUsers.length / usersPerPage)
-  const paginatedUsers = useMemo(() => {
-    const start = (currentPage - 1) * usersPerPage
-    return filteredUsers.slice(start, start + usersPerPage)
-  }, [filteredUsers, currentPage])
+  // Use filteredUsers directly (server-side pagination already applied)
+  const paginatedUsers = filteredUsers
 
   // Handlers
   const handleAddUser = () => {
@@ -128,9 +157,8 @@ export default function UserManagement() {
       try {
         setSubmitting(true)
         await adminAPI.deleteUser(user.id)
-        // Refresh users list
-        const response = await adminAPI.getUsers()
-        setAllUsers(response?.data || [])
+        // Trigger data reload
+        retry()
         alert(`User ${fullName} deleted successfully!`)
       } catch (err) {
         console.error('Error deleting user:', err)
@@ -143,11 +171,21 @@ export default function UserManagement() {
 
   const handleResetPassword = async (user) => {
     const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim()
-    if (window.confirm(`Reset password for ${fullName}?`)) {
+    const newPassword = window.prompt(
+      `Reset password for ${fullName}\n\nEnter new password (minimum 8 characters):`,
+      'changeme123'
+    )
+    
+    if (newPassword && newPassword.trim()) {
+      if (newPassword.length < 8) {
+        alert('Password must be at least 8 characters long')
+        return
+      }
+      
       try {
         setSubmitting(true)
-        await adminAPI.resetPassword(user.id)
-        alert(`Password reset email sent to ${user.email}`)
+        await adminAPI.resetPassword(user.id, newPassword)
+        alert(`Password for ${fullName} has been reset successfully!`)
       } catch (err) {
         console.error('Error resetting password:', err)
         alert(`Failed to reset password: ${err.message}`)
@@ -161,12 +199,50 @@ export default function UserManagement() {
     e.preventDefault()
     try {
       setSubmitting(true)
-      await adminAPI.createUser(formData)
-      // Refresh users list
-      const response = await adminAPI.getUsers()
-      setAllUsers(response?.data || [])
+      
+      // Split name into first and last name
+      const nameParts = formData.name.trim().split(' ')
+      const firstName = nameParts[0] || ''
+      const lastName = nameParts.slice(1).join(' ') || nameParts[0] || 'User'
+      
+      // Get program ID from programs list if role is student
+      let programId = null
+      if (formData.role === 'student' && formData.program) {
+        // Get programs and find matching one
+        const programsResponse = await adminAPI.getPrograms()
+        const matchingProgram = programsResponse?.data?.find(p => p.code === formData.program)
+        programId = matchingProgram?.id
+      }
+      
+      // Prepare API payload matching backend UserCreate model
+      const userData = {
+        email: formData.email,
+        first_name: firstName,
+        last_name: lastName,
+        role: formData.role,
+        password: formData.password || 'changeme123', // Default password
+        department: formData.department || null,
+        program_id: programId,
+        year_level: formData.yearLevel || 1
+      }
+      
+      await adminAPI.createUser(userData)
+      
+      // Trigger data reload
+      retry()
       alert(`User ${formData.name} created successfully!`)
       setShowAddModal(false)
+      setFormData({
+        name: '',
+        email: '',
+        password: '',
+        role: 'student',
+        program: 'BSIT',
+        yearLevel: 1,
+        department: '',
+        assignedPrograms: [],
+        status: 'Active'
+      })
     } catch (err) {
       console.error('Error creating user:', err)
       alert(`Failed to create user: ${err.message}`)
@@ -179,10 +255,26 @@ export default function UserManagement() {
     e.preventDefault()
     try {
       setSubmitting(true)
-      await adminAPI.updateUser(selectedUser.id, formData)
-      // Refresh users list
-      const response = await adminAPI.getUsers()
-      setAllUsers(response?.data || [])
+      
+      // Split name into first and last name
+      const nameParts = formData.name.trim().split(' ')
+      const firstName = nameParts[0] || ''
+      const lastName = nameParts.slice(1).join(' ') || nameParts[0] || 'User'
+      
+      // Prepare API payload matching backend UserUpdate model
+      const userData = {
+        email: formData.email,
+        first_name: firstName,
+        last_name: lastName,
+        role: formData.role,
+        department: formData.department || null,
+        is_active: formData.status === 'Active'
+      }
+      
+      await adminAPI.updateUser(selectedUser.id, userData)
+      
+      // Trigger data reload
+      retry()
       alert(`User ${formData.name} updated successfully!`)
       setShowEditModal(false)
     } catch (err) {
@@ -264,7 +356,7 @@ export default function UserManagement() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Total Users</p>
-                <p className="text-3xl font-bold text-gray-900">{allUsers.length}</p>
+                <p className="text-3xl font-bold text-gray-900">{userStats.total_users}</p>
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                 <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -278,7 +370,7 @@ export default function UserManagement() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Students</p>
-                <p className="text-3xl font-bold text-green-600">{allUsers.filter(u => u.role === 'student').length}</p>
+                <p className="text-3xl font-bold text-green-600">{userStats.students}</p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                 <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -292,7 +384,7 @@ export default function UserManagement() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Dept Heads</p>
-                <p className="text-3xl font-bold text-purple-600">{allUsers.filter(u => u.role === 'department-head').length}</p>
+                <p className="text-3xl font-bold text-purple-600">{userStats.dept_heads}</p>
               </div>
               <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
                 <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -306,7 +398,7 @@ export default function UserManagement() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Staff Members</p>
-                <p className="text-3xl font-bold text-red-600">{allUsers.filter(u => u.role === 'secretary' || u.role === 'instructor' || u.role === 'department_head' || u.role === 'admin').length}</p>
+                <p className="text-3xl font-bold text-red-600">{userStats.secretaries + userStats.admins}</p>
               </div>
               <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
                 <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -495,9 +587,16 @@ export default function UserManagement() {
           {/* Pagination */}
           <div className="bg-gray-50 px-6 py-4 flex items-center justify-between border-t border-gray-200">
             <div className="text-sm text-gray-600">
-              Showing {((currentPage - 1) * usersPerPage) + 1} to {Math.min(currentPage * usersPerPage, filteredUsers.length)} of {filteredUsers.length} users
+              Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalUsers)} of {totalUsers} users
             </div>
             <div className="flex space-x-2">
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                className={`px-4 py-2 text-sm rounded-lg ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border border-gray-300 hover:bg-gray-50'}`}
+              >
+                First
+              </button>
               <button
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
@@ -505,21 +604,22 @@ export default function UserManagement() {
               >
                 Previous
               </button>
-              {[...Array(totalPages)].map((_, i) => (
-                <button
-                  key={i + 1}
-                  onClick={() => setCurrentPage(i + 1)}
-                  className={`px-4 py-2 rounded-lg ${currentPage === i + 1 ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300 hover:bg-gray-50'}`}
-                >
-                  {i + 1}
-                </button>
-              ))}
+              <span className="px-4 py-2 text-sm text-gray-700">
+                Page {currentPage} of {totalPages}
+              </span>
               <button
                 onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className={`px-4 py-2 rounded-lg ${currentPage === totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border border-gray-300 hover:bg-gray-50'}`}
+                disabled={currentPage >= totalPages}
+                className={`px-4 py-2 rounded-lg ${currentPage >= totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border border-gray-300 hover:bg-gray-50'}`}
               >
                 Next
+              </button>
+              <button
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage >= totalPages}
+                className={`px-4 py-2 text-sm rounded-lg ${currentPage >= totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border border-gray-300 hover:bg-gray-50'}`}
+              >
+                Last
               </button>
             </div>
           </div>
@@ -563,6 +663,19 @@ export default function UserManagement() {
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="user@lpubatangas.edu.ph"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Password *</label>
+                <input
+                  type="password"
+                  required
+                  value={formData.password || ''}
+                  onChange={(e) => setFormData({...formData, password: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter password (min 8 characters)"
+                  minLength={8}
                 />
               </div>
 

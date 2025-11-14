@@ -68,9 +68,11 @@ class Course(Base):
     subject_name = Column(String(255), nullable=False)
     program_id = Column(Integer, ForeignKey("programs.id"), nullable=True)
     year_level = Column(Integer, nullable=True)  # Made nullable to match DB
-    semester = Column(String(20), nullable=True)  # FIXED: Changed from Integer to String(20) to match DB
+    semester = Column(Integer, nullable=True)  # FIXED: INTEGER to match upgraded database schema
+    units = Column(Float, nullable=True)  # ADDED: units column from schema upgrade
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    # Note: updated_at column does not exist in database schema
     
     # Relationships
     program = relationship("Program", back_populates="courses")
@@ -83,7 +85,7 @@ class ClassSection(Base):
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=False)
     instructor_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     class_code = Column(String(50), nullable=False)
-    semester = Column(String(20), nullable=False)  # Fixed: matches database VARCHAR(20)
+    semester = Column(Integer, nullable=False)  # Fixed: INTEGER to match database schema
     academic_year = Column(String(20), nullable=False)  # "2024-2025"
     max_students = Column(Integer, default=40)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -115,29 +117,39 @@ class Evaluation(Base):
     student_id = Column(Integer, ForeignKey("students.id"), nullable=False)
     class_section_id = Column(Integer, ForeignKey("class_sections.id"), nullable=False)
     
-    # Rating fields (matching database)
-    rating_teaching = Column(Integer, nullable=False)  # 1-5
-    rating_content = Column(Integer, nullable=False)   # 1-5
-    rating_engagement = Column(Integer, nullable=False) # 1-5
-    rating_overall = Column(Integer, nullable=False)    # 1-5
+    # Basic rating fields (must match actual database columns)
+    rating_teaching = Column(Integer, nullable=True)     # 1-4
+    rating_content = Column(Integer, nullable=True)      # 1-4 (was rating_knowledge)
+    rating_engagement = Column(Integer, nullable=True)   # 1-4
+    rating_overall = Column(Integer, nullable=True)      # 1-4
     
-    # Text feedback fields (matching database)
-    text_feedback = Column(Text, nullable=True)      # Main feedback text
-    suggestions = Column(Text, nullable=True)        # Improvement suggestions
+    # Text feedback fields
+    text_feedback = Column(Text, nullable=True)
+    suggestions = Column(Text, nullable=True)
     
-    # ML/Sentiment analysis fields (matching database)
-    sentiment = Column(String(20), nullable=True)    # positive, neutral, negative
-    sentiment_score = Column(Float, nullable=True)   # Sentiment confidence score
-    sentiment_confidence = Column(Float, nullable=True)  # Added from database
-    is_anomaly = Column(Boolean, default=False)      # Anomaly detection flag
-    anomaly_score = Column(Float, nullable=True)     # Anomaly confidence score
-    anomaly_reason = Column(Text, nullable=True)     # Added from database
+    # JSONB field for extended ratings (if needed)
+    ratings = Column(JSONB, nullable=True)  # Stores additional ratings: {"1": 4, "2": 3, ...}
     
-    # Processing and audit fields (matching database)
-    submission_ip = Column(String(45), nullable=True)     # Audit trail
-    processing_status = Column(String(20), default='pending')  # pending, processed, flagged
+    # Sentiment analysis fields
+    sentiment = Column(String(20), nullable=True)  # positive, neutral, negative
+    sentiment_score = Column(Float, nullable=True)
+    sentiment_confidence = Column(Float, nullable=True)  # Matches DB column
+    
+    # Anomaly detection fields
+    is_anomaly = Column(Boolean, default=False)
+    anomaly_score = Column(Float, nullable=True)
+    anomaly_reason = Column(Text, nullable=True)
+    
+    # Metadata field - 'metadata' is reserved in SQLAlchemy, so we map it
+    evaluation_metadata = Column('metadata', JSONB, nullable=True)
+    
+    # Processing status fields
+    processing_status = Column(String(50), default='pending')
     processed_at = Column(DateTime, nullable=True)
+    
+    # Timestamp fields
     submission_date = Column(DateTime, default=datetime.utcnow)
+    submission_ip = Column(String(50), nullable=True)
     
     # Relationships
     student = relationship("Student", back_populates="evaluations")
@@ -145,10 +157,10 @@ class Evaluation(Base):
     
     # Indexes for performance
     __table_args__ = (
+        Index('idx_evaluations_ratings', 'ratings', postgresql_using='gin'),
         Index('idx_evaluations_sentiment', 'sentiment', 'sentiment_score'),
         Index('idx_evaluations_anomaly', 'is_anomaly', 'anomaly_score'),
         Index('idx_evaluations_processing', 'processing_status', 'processed_at'),
-        Index('idx_evaluations_date', 'submission_date'),
     )
 
 class DepartmentHead(Base):

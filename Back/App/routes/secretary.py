@@ -54,38 +54,21 @@ async def get_secretary_dashboard(
     user_id: int = Query(...),
     db: Session = Depends(get_db)
 ):
-    """Get secretary dashboard overview"""
+    """Get secretary dashboard overview (full system access - single department)"""
     try:
-        # Get secretary info
-        secretary = db.query(Secretary).filter(Secretary.user_id == user_id).first()
-        if not secretary:
-            raise HTTPException(status_code=404, detail="Secretary not found")
+        # Single department system - secretary sees all data
         
-        program_ids = secretary.programs or []
+        # Get statistics for entire system
+        total_courses = db.query(func.count(Course.id)).scalar() or 0
         
-        # Get statistics
-        total_courses = db.query(func.count(Course.id)).filter(
-            Course.program_id.in_(program_ids)
-        ).scalar() or 0
+        total_sections = db.query(func.count(ClassSection.id)).scalar() or 0
         
-        total_sections = db.query(func.count(ClassSection.id)).join(
-            Course, ClassSection.course_id == Course.id
-        ).filter(
-            Course.program_id.in_(program_ids)
-        ).scalar() or 0
-        
-        total_evaluations = db.query(func.count(Evaluation.id)).join(
-            ClassSection, Evaluation.class_section_id == ClassSection.id
-        ).join(
-            Course, ClassSection.course_id == Course.id
-        ).filter(
-            Course.program_id.in_(program_ids)
-        ).scalar() or 0
+        total_evaluations = db.query(func.count(Evaluation.id)).scalar() or 0
         
         return {
             "success": True,
             "data": {
-                "department": secretary.department,
+                "department": "Academic Department",  # Single department system
                 "total_courses": total_courses,
                 "total_sections": total_sections,
                 "total_evaluations": total_evaluations
@@ -111,82 +94,87 @@ async def get_courses(
     program_id: Optional[int] = None,
     db: Session = Depends(get_db)
 ):
-    """Get courses managed by secretary"""
+    """Get courses managed by secretary (full system access - single department system)"""
     try:
-        # Get secretary info
-        secretary = db.query(Secretary).filter(Secretary.user_id == user_id).first()
-        if not secretary:
-            # Return empty instead of 404 to prevent frontend crashes
-            return {
-                "success": True,
-                "data": [],
-                "pagination": {"page": page, "page_size": page_size, "total": 0, "pages": 0}
-            }
+        # Secretary has full system access (single department system)
+        # Return class sections (not just courses) to match expected format
         
-        program_ids = secretary.programs or []
+        # Build query for class sections with course info
+        query = db.query(ClassSection, Course, Program).join(
+            Course, ClassSection.course_id == Course.id
+        ).outerjoin(
+            Program, Course.program_id == Program.id
+        )
         
-        # Return empty if no programs
-        if not program_ids:
-            return {
-                "success": True,
-                "data": [],
-                "pagination": {"page": page, "page_size": page_size, "total": 0, "pages": 0}
-            }
-        
-        # Build query
-        query = db.query(Course).filter(Course.program_id.in_(program_ids))
+        logger.info(f"[SECRETARY] Building courses query...")
         
         if search:
             search_filter = f"%{search}%"
             query = query.filter(
                 or_(
                     Course.subject_code.ilike(search_filter),
-                    Course.subject_name.ilike(search_filter)
+                    Course.subject_name.ilike(search_filter),
+                    ClassSection.class_code.ilike(search_filter),
+                    ClassSection.instructor_name.ilike(search_filter)
                 )
             )
         
         if program_id:
             query = query.filter(Course.program_id == program_id)
         
-        total = query.count()
-        offset = (page - 1) * page_size
-        courses = query.offset(offset).limit(page_size).all()
+        # Get all results (no pagination since frontend handles it)
+        results = query.all()
+        logger.info(f"[SECRETARY] Total class sections found: {len(results)}")
         
-        # Return empty if no courses
-        if not courses:
+        # Return empty if no results
+        if not results:
             return {
                 "success": True,
-                "data": [],
-                "pagination": {"page": page, "page_size": page_size, "total": 0, "pages": 0}
+                "data": []
             }
         
         courses_data = []
-        for course in courses:
-            # Get number of sections
-            sections_count = db.query(func.count(ClassSection.id)).filter(
-                ClassSection.course_id == course.id
+        for section, course, program in results:
+            # Get evaluation count for this section
+            eval_count = db.query(func.count(Evaluation.id)).filter(
+                Evaluation.class_section_id == section.id
             ).scalar() or 0
             
+            # Get average rating
+            avg_rating = db.query(func.avg(Evaluation.rating_overall)).filter(
+                Evaluation.class_section_id == section.id
+            ).scalar() or 0.0
+            
+            # Construct instructor full name
+            instructor_full_name = "N/A"
+            if section.instructor:
+                first = section.instructor.first_name or ""
+                last = section.instructor.last_name or ""
+                instructor_full_name = f"{first} {last}".strip() or "N/A"
+            
             courses_data.append({
-                "id": course.id,
-                "course_code": course.subject_code,  # Fixed: was course.course_code
-                "course_name": course.subject_name,  # Fixed: was course.course_name
-                "program_id": course.program_id,
-                "year_level": course.year_level,
-                "semester": course.semester,
-                "units": 3,  # Fixed: removed from model, default to 3
-                "sections_count": sections_count
+                "section_id": section.id,
+                "id": section.id,  # For compatibility
+                "class_code": section.class_code or "Unknown",
+                "course_code": course.subject_code if course else "Unknown",
+                "course_name": course.subject_name if course else "Unknown",
+                "name": course.subject_name if course else "Unknown",  # For compatibility
+                "code": course.subject_code if course else "Unknown",  # For compatibility
+                "instructor": instructor_full_name,
+                "instructor_name": instructor_full_name,  # For compatibility
+                "program": program.program_code if program else "Unknown",
+                "year_level": course.year_level if course else 1,
+                "semester": section.semester or "Unknown",
+                "academic_year": section.academic_year or "Unknown",
+                "evaluations_count": eval_count,
+                "enrolled_students": section.max_students or 0,
+                "status": "Active",  # Default status
+                "overallRating": float(avg_rating) if avg_rating else 0.0
             })
         
         return {
             "success": True,
-            "data": courses_data,
-            "pagination": {
-                "page": page,
-                "page_size": page_size,
-                "total": total,
-                "total_pages": (total + page_size - 1) // page_size
-            }
+            "data": courses_data
         }
         
     except HTTPException:
@@ -217,14 +205,36 @@ async def create_course(
         if existing:
             raise HTTPException(status_code=400, detail="Course code already exists")
         
+        # Convert semester string to integer
+        semester_mapping = {
+            "First Semester": 1,
+            "1st Semester": 1,
+            "Second Semester": 2,
+            "2nd Semester": 2,
+            "Summer": 3,
+            "3rd Semester": 3
+        }
+        
+        # Try to convert semester to integer
+        if isinstance(course_data.semester, str):
+            semester_int = semester_mapping.get(course_data.semester)
+            if semester_int is None:
+                # Try to parse as integer string
+                try:
+                    semester_int = int(course_data.semester)
+                except ValueError:
+                    raise HTTPException(status_code=400, detail=f"Invalid semester value: {course_data.semester}")
+        else:
+            semester_int = course_data.semester
+        
         # Create course
         new_course = Course(
             subject_code=course_data.course_code,  # Fixed: was course_code
             subject_name=course_data.course_name,  # Fixed: was course_name
             program_id=course_data.program_id,
             year_level=course_data.year_level,
-            semester=course_data.semester
-            # Note: units field removed from model
+            semester=semester_int,  # Use converted integer
+            units=course_data.units if hasattr(course_data, 'units') else None
         )
         db.add(new_course)
         db.commit()
@@ -264,13 +274,35 @@ async def update_course(
         if course.program_id not in program_ids:
             raise HTTPException(status_code=403, detail="Access denied to this course")
         
+        # Convert semester string to integer
+        semester_mapping = {
+            "First Semester": 1,
+            "1st Semester": 1,
+            "Second Semester": 2,
+            "2nd Semester": 2,
+            "Summer": 3,
+            "3rd Semester": 3
+        }
+        
+        # Try to convert semester to integer
+        if isinstance(course_data.semester, str):
+            semester_int = semester_mapping.get(course_data.semester)
+            if semester_int is None:
+                # Try to parse as integer string
+                try:
+                    semester_int = int(course_data.semester)
+                except ValueError:
+                    raise HTTPException(status_code=400, detail=f"Invalid semester value: {course_data.semester}")
+        else:
+            semester_int = course_data.semester
+        
         # Update course
         course.subject_code = course_data.course_code  # Fixed: was course_code
         course.subject_name = course_data.course_name  # Fixed: was course_name
         course.program_id = course_data.program_id
         course.year_level = course_data.year_level
-        course.semester = course_data.semester
-        # Note: units field removed from model
+        course.semester = semester_int  # Use converted integer
+        course.units = course_data.units if hasattr(course_data, 'units') else course.units
         db.commit()
         
         return {
@@ -487,20 +519,20 @@ async def get_programs(
     user_id: int = Query(...),
     db: Session = Depends(get_db)
 ):
-    """Get programs managed by secretary"""
+    """Get all programs (secretary has department-wide access)"""
     try:
         secretary = db.query(Secretary).filter(Secretary.user_id == user_id).first()
         if not secretary:
             raise HTTPException(status_code=404, detail="Secretary not found")
         
-        program_ids = secretary.programs or []
-        programs = db.query(Program).filter(Program.id.in_(program_ids)).all()
+        # Secretary can access ALL programs in the department
+        programs = db.query(Program).filter(Program.is_active == True).all()
         
         programs_data = [{
             "id": p.id,
-            "code": p.code,
-            "name": p.name,
-            "duration_years": p.duration_years
+            "code": p.program_code,
+            "name": p.program_name,
+            "duration_years": getattr(p, 'duration_years', 4)
         } for p in programs]
         
         return {
@@ -512,6 +544,35 @@ async def get_programs(
         raise
     except Exception as e:
         logger.error(f"Error fetching programs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/year-levels")
+async def get_year_levels(
+    user_id: int = Query(...),
+    db: Session = Depends(get_db)
+):
+    """Get year levels for filtering"""
+    try:
+        secretary = db.query(Secretary).filter(Secretary.user_id == user_id).first()
+        if not secretary:
+            raise HTTPException(status_code=404, detail="Secretary not found")
+        
+        year_levels = [
+            {"value": 1, "label": "1st Year"},
+            {"value": 2, "label": "2nd Year"},
+            {"value": 3, "label": "3rd Year"},
+            {"value": 4, "label": "4th Year"}
+        ]
+        
+        return {
+            "success": True,
+            "data": year_levels
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching year levels: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # ===========================
@@ -664,5 +725,149 @@ async def get_secretary_evaluations(
         raise
     except Exception as e:
         logger.error(f"Error fetching evaluations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ===========================
+# SENTIMENT ANALYSIS
+# ===========================
+
+@router.get("/sentiment-analysis")
+async def get_sentiment_analysis(
+    user_id: int = Query(...),
+    time_range: str = Query("month", regex="^(week|month|semester|year)$"),
+    db: Session = Depends(get_db)
+):
+    """Get sentiment analysis trends over time (secretary has full access)"""
+    try:
+        from datetime import timedelta
+        
+        # Calculate date range
+        now = datetime.now()
+        if time_range == "week":
+            start_date = now - timedelta(days=7)
+        elif time_range == "month":
+            start_date = now - timedelta(days=30)
+        elif time_range == "semester":
+            start_date = now - timedelta(days=120)
+        else:  # year
+            start_date = now - timedelta(days=365)
+        
+        # Get sentiment distribution over time (all programs - secretary has full access)
+        sentiments = db.query(
+            func.date_trunc('day', Evaluation.submission_date).label('date'),
+            Evaluation.sentiment,
+            func.count(Evaluation.id).label('count')
+        ).filter(
+            Evaluation.submission_date >= start_date
+        ).group_by(
+            func.date_trunc('day', Evaluation.submission_date),
+            Evaluation.sentiment
+        ).order_by('date').all()
+        
+        # Format data for charts
+        sentiment_trends = {}
+        for date, sentiment, count in sentiments:
+            date_str = date.strftime('%Y-%m-%d') if date else "unknown"
+            if date_str not in sentiment_trends:
+                sentiment_trends[date_str] = {
+                    "date": date_str,
+                    "positive": 0,
+                    "neutral": 0,
+                    "negative": 0
+                }
+            if sentiment:
+                sentiment_trends[date_str][sentiment.lower()] = count
+        
+        # Get overall statistics
+        total_evals = db.query(func.count(Evaluation.id)).filter(
+            Evaluation.submission_date >= start_date
+        ).scalar() or 0
+        
+        sentiment_counts = db.query(
+            Evaluation.sentiment,
+            func.count(Evaluation.id).label('count')
+        ).filter(
+            Evaluation.submission_date >= start_date
+        ).group_by(Evaluation.sentiment).all()
+        
+        sentiment_summary = {
+            "positive": 0,
+            "neutral": 0,
+            "negative": 0
+        }
+        for sentiment, count in sentiment_counts:
+            if sentiment:
+                sentiment_summary[sentiment.lower()] = count
+        
+        return {
+            "success": True,
+            "data": {
+                "trends": list(sentiment_trends.values()),
+                "summary": sentiment_summary,
+                "total_evaluations": total_evals,
+                "time_range": time_range
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching sentiment analysis: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ===========================
+# ANOMALY DETECTION
+# ===========================
+
+@router.get("/anomalies")
+async def get_anomalies(
+    user_id: int = Query(...),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db)
+):
+    """Get detected anomalies in evaluations (secretary has full access)"""
+    try:
+        # Query anomalous evaluations (all programs - secretary has full access)
+        query = db.query(Evaluation).filter(
+            Evaluation.is_anomaly == True
+        )
+        
+        total = query.count()
+        offset = (page - 1) * page_size
+        anomalies = query.order_by(Evaluation.anomaly_score.desc()).offset(offset).limit(page_size).all()
+        
+        anomaly_data = []
+        for e in anomalies:
+            class_section = db.query(ClassSection).filter(ClassSection.id == e.class_section_id).first()
+            course = db.query(Course).filter(Course.id == class_section.course_id).first() if class_section else None
+            
+            anomaly_data.append({
+                "id": e.id,
+                "course_code": course.subject_code if course else "N/A",
+                "course_name": course.subject_name if course else "N/A",
+                "instructor": class_section.instructor_name if class_section else "N/A",
+                "rating_overall": e.rating_overall,
+                "anomaly_score": e.anomaly_score,
+                "comments": e.comments,
+                "sentiment": e.sentiment,
+                "submission_date": e.submission_date.isoformat() if e.submission_date else None
+            })
+        
+        return {
+            "success": True,
+            "data": anomaly_data,
+            "pagination": {
+                "page": page,
+                "page_size": page_size,
+                "total": total,
+                "total_pages": (total + page_size - 1) // page_size
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching anomalies: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 

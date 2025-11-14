@@ -415,3 +415,70 @@ async def get_evaluation_questions(
     except Exception as e:
         logger.error(f"Error fetching evaluation questions: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# ===========================
+# FILTER OPTIONS
+# ===========================
+
+@router.get("/programs")
+async def get_programs(
+    user_id: int = Query(...),
+    db: Session = Depends(get_db)
+):
+    """Get list of programs for filtering"""
+    try:
+        from models.enhanced_models import Program
+        
+        instructor = db.query(Instructor).filter(Instructor.user_id == user_id).first()
+        if not instructor:
+            raise HTTPException(status_code=404, detail="Instructor not found")
+        
+        # Get all programs
+        programs = db.query(Program).all()
+        
+        programs_data = [{
+            "id": p.id,
+            "program_code": p.program_code,
+            "program_name": p.program_name
+        } for p in programs]
+        
+        return {
+            "success": True,
+            "data": programs_data
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching programs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/year-levels")
+async def get_year_levels(
+    user_id: int = Query(...),
+    db: Session = Depends(get_db)
+):
+    """Get list of year levels for filtering"""
+    try:
+        instructor = db.query(Instructor).filter(Instructor.user_id == user_id).first()
+        if not instructor:
+            raise HTTPException(status_code=404, detail="Instructor not found")
+        
+        # Return standard year levels (1-4 for undergraduate)
+        year_levels = [
+            {"value": 1, "label": "1st Year"},
+            {"value": 2, "label": "2nd Year"},
+            {"value": 3, "label": "3rd Year"},
+            {"value": 4, "label": "4th Year"}
+        ]
+        
+        return {
+            "success": True,
+            "data": year_levels
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching year levels: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getCurrentUser, isAdmin, isStaffMember } from '../../utils/roleUtils'
+import { isAdmin, isStaffMember } from '../../utils/roleUtils'
+import { useAuth } from '../../context/AuthContext'
 import { adminAPI, deptHeadAPI, secretaryAPI, instructorAPI } from '../../services/api'
 
 export default function EvaluationQuestions() {
   const navigate = useNavigate()
-  const currentUser = getCurrentUser()
+  const { user: currentUser } = useAuth()
   const [questionSets, setQuestionSets] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)

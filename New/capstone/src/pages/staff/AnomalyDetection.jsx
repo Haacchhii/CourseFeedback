@@ -1,17 +1,30 @@
 import React, { useMemo, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
-import { getCurrentUser, isAdmin, isStaffMember } from '../../utils/roleUtils'
+import { isAdmin, isStaffMember } from '../../utils/roleUtils'
+import { useAuth } from '../../context/AuthContext'
 import { adminAPI, deptHeadAPI, secretaryAPI, instructorAPI } from '../../services/api'
 
 export default function AnomalyDetection() {
   const navigate = useNavigate()
-  const currentUser = getCurrentUser()
+  const { user: currentUser } = useAuth()
   const [anomalies, setAnomalies] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  
+  // Enhanced filter states
   const [searchTerm, setSearchTerm] = useState('')
   const [severityFilter, setSeverityFilter] = useState('all')
+  const [programFilter, setProgramFilter] = useState('all')
+  const [yearLevelFilter, setYearLevelFilter] = useState('all')
+  const [courseFilter, setCourseFilter] = useState('all')
+  const [semesterFilter, setSemesterFilter] = useState('all')
+  const [dateRangeFilter, setDateRangeFilter] = useState('all')
+  
+  // Filter options
+  const [programs, setPrograms] = useState([])
+  const [yearLevels, setYearLevels] = useState([])
+  const [courses, setCourses] = useState([])
 
   // Redirect unauthorized users
   useEffect(() => {
@@ -30,6 +43,51 @@ export default function AnomalyDetection() {
       return
     }
   }, [currentUser, navigate])
+
+  // Fetch filter options
+  useEffect(() => {
+    const fetchFilterOptions = async () => {
+      if (!currentUser) return
+      
+      try {
+        let programsRes, yearLevelsRes, coursesRes
+        
+        if (isAdmin(currentUser)) {
+          [programsRes, yearLevelsRes, coursesRes] = await Promise.all([
+            adminAPI.getPrograms(),
+            Promise.resolve({ data: [{ id: 1, year_level: 1 }, { id: 2, year_level: 2 }, { id: 3, year_level: 3 }, { id: 4, year_level: 4 }] }),
+            adminAPI.getCourses()
+          ])
+        } else if (currentUser.role === 'secretary') {
+          [programsRes, yearLevelsRes, coursesRes] = await Promise.all([
+            secretaryAPI.getPrograms(),
+            secretaryAPI.getYearLevels(),
+            secretaryAPI.getCourses()
+          ])
+        } else if (currentUser.role === 'department_head') {
+          [programsRes, yearLevelsRes, coursesRes] = await Promise.all([
+            deptHeadAPI.getPrograms(),
+            deptHeadAPI.getYearLevels(),
+            deptHeadAPI.getCourses()
+          ])
+        } else if (currentUser.role === 'instructor') {
+          [programsRes, yearLevelsRes, coursesRes] = await Promise.all([
+            instructorAPI.getPrograms(),
+            instructorAPI.getYearLevels(),
+            instructorAPI.getCourses()
+          ])
+        }
+        
+        if (programsRes?.data) setPrograms(programsRes.data)
+        if (yearLevelsRes?.data) setYearLevels(yearLevelsRes.data)
+        if (coursesRes?.data) setCourses(coursesRes.data)
+      } catch (err) {
+        console.error('Error fetching filter options:', err)
+      }
+    }
+    
+    fetchFilterOptions()
+  }, [currentUser])
 
   // Fetch anomalies from API
   useEffect(() => {
@@ -67,18 +125,53 @@ export default function AnomalyDetection() {
     fetchAnomalies()
   }, [currentUser])
 
-  // Filter anomalies
+  // Enhanced filter logic
   const filteredAnomalies = useMemo(() => {
     return anomalies.filter(anomaly => {
+      // Search filter
       const matchesSearch = searchTerm === '' || 
         anomaly.courseName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        anomaly.comment?.toLowerCase().includes(searchTerm.toLowerCase())
+        anomaly.comment?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        anomaly.instructorName?.toLowerCase().includes(searchTerm.toLowerCase())
       
+      // Severity filter
       const matchesSeverity = severityFilter === 'all' || anomaly.severity === severityFilter
       
-      return matchesSearch && matchesSeverity
+      // Program filter
+      const matchesProgram = programFilter === 'all' || anomaly.programId === parseInt(programFilter)
+      
+      // Year level filter
+      const matchesYearLevel = yearLevelFilter === 'all' || anomaly.yearLevel === parseInt(yearLevelFilter)
+      
+      // Course filter
+      const matchesCourse = courseFilter === 'all' || anomaly.courseId === parseInt(courseFilter)
+      
+      // Semester filter
+      const matchesSemester = semesterFilter === 'all' || anomaly.semester === semesterFilter
+      
+      // Date range filter
+      let matchesDateRange = true
+      if (dateRangeFilter !== 'all' && anomaly.submittedAt) {
+        const anomalyDate = new Date(anomaly.submittedAt)
+        const now = new Date()
+        
+        if (dateRangeFilter === 'today') {
+          matchesDateRange = anomalyDate.toDateString() === now.toDateString()
+        } else if (dateRangeFilter === 'week') {
+          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+          matchesDateRange = anomalyDate >= weekAgo
+        } else if (dateRangeFilter === 'month') {
+          const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+          matchesDateRange = anomalyDate >= monthAgo
+        } else if (dateRangeFilter === 'semester') {
+          const semesterStart = new Date(now.getFullYear(), now.getMonth() >= 6 ? 6 : 0, 1)
+          matchesDateRange = anomalyDate >= semesterStart
+        }
+      }
+      
+      return matchesSearch && matchesSeverity && matchesProgram && matchesYearLevel && matchesCourse && matchesSemester && matchesDateRange
     })
-  }, [anomalies, searchTerm, severityFilter])
+  }, [anomalies, searchTerm, severityFilter, programFilter, yearLevelFilter, courseFilter, semesterFilter, dateRangeFilter])
 
   // Calculate anomaly statistics
   const anomalyStats = useMemo(() => {
@@ -306,35 +399,155 @@ export default function AnomalyDetection() {
             <p className="text-gray-600 text-sm mt-1">Find specific anomalies by course, student, or content</p>
           </div>
           
-          <div className="grid md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Search Anomalies</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search by course, student, or comment..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-4 py-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent transition-all duration-200"
-                />
-                <svg className="w-5 h-5 text-gray-400 absolute left-3 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                </svg>
+          {/* Enhanced Multi-Row Filters */}
+          <div className="space-y-4">
+            {/* Row 1: Search and Severity */}
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">🔍 Search Anomalies</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search by course, instructor, or comment..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full px-4 py-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent transition-all duration-200"
+                  />
+                  <svg className="w-5 h-5 text-gray-400 absolute left-3 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                  </svg>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">⚠️ Severity Level</label>
+                <select
+                  value={severityFilter}
+                  onChange={(e) => setSeverityFilter(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent bg-white transition-all duration-200"
+                >
+                  <option key="severity-all" value="all">All Severities</option>
+                  <option key="severity-high" value="High">🔴 High Severity</option>
+                  <option key="severity-medium" value="Medium">🟡 Medium Severity</option>
+                  <option key="severity-low" value="Low">🟢 Low Severity</option>
+                </select>
               </div>
             </div>
-            
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Filter by Severity</label>
-              <select
-                value={severityFilter}
-                onChange={(e) => setSeverityFilter(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent bg-white transition-all duration-200"
+
+            {/* Row 2: Program, Year Level, Course */}
+            <div className="grid md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">🎓 Program</label>
+                <select
+                  value={programFilter}
+                  onChange={(e) => setProgramFilter(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent bg-white"
+                >
+                  <option value="all">All Programs</option>
+                  {programs.map(program => (
+                    <option key={program.id} value={program.id}>
+                      {program.name || program.program_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">📚 Year Level</label>
+                <select
+                  value={yearLevelFilter}
+                  onChange={(e) => setYearLevelFilter(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent bg-white"
+                >
+                  <option value="all">All Years</option>
+                  {yearLevels.map(yl => (
+                    <option key={yl.id} value={yl.year_level}>
+                      Year {yl.year_level}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">📖 Course</label>
+                <select
+                  value={courseFilter}
+                  onChange={(e) => setCourseFilter(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent bg-white"
+                >
+                  <option value="all">All Courses</option>
+                  {courses.map(course => (
+                    <option key={course.id} value={course.id}>
+                      {course.code} - {course.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Row 3: Semester and Date Range */}
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">📅 Semester</label>
+                <select
+                  value={semesterFilter}
+                  onChange={(e) => setSemesterFilter(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent bg-white"
+                >
+                  <option value="all">All Semesters</option>
+                  <option value="1st Semester">1st Semester</option>
+                  <option value="2nd Semester">2nd Semester</option>
+                  <option value="Summer">Summer</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">🕒 Date Range</label>
+                <select
+                  value={dateRangeFilter}
+                  onChange={(e) => setDateRangeFilter(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent bg-white"
+                >
+                  <option value="all">All Time</option>
+                  <option value="today">Today</option>
+                  <option value="week">Last 7 Days</option>
+                  <option value="month">Last 30 Days</option>
+                  <option value="semester">Current Semester</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Filter Summary and Clear */}
+            <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+              <div className="text-sm text-gray-600">
+                {(searchTerm || severityFilter !== 'all' || programFilter !== 'all' || yearLevelFilter !== 'all' || courseFilter !== 'all' || semesterFilter !== 'all' || dateRangeFilter !== 'all') && (
+                  <span className="font-medium">
+                    🔍 {[
+                      searchTerm && 'Search',
+                      severityFilter !== 'all' && 'Severity',
+                      programFilter !== 'all' && 'Program',
+                      yearLevelFilter !== 'all' && 'Year',
+                      courseFilter !== 'all' && 'Course',
+                      semesterFilter !== 'all' && 'Semester',
+                      dateRangeFilter !== 'all' && 'Date'
+                    ].filter(Boolean).join(', ')} active
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  setSearchTerm('')
+                  setSeverityFilter('all')
+                  setProgramFilter('all')
+                  setYearLevelFilter('all')
+                  setCourseFilter('all')
+                  setSemesterFilter('all')
+                  setDateRangeFilter('all')
+                }}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-all text-sm font-medium"
               >
-                <option value="all">All Severities</option>
-                <option value="high">High Severity</option>
-                <option value="medium">Medium Severity</option>
-                <option value="low">Low Severity</option>
-              </select>
+                🔄 Clear All Filters
+              </button>
             </div>
           </div>
         </div>

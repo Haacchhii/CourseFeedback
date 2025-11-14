@@ -1,12 +1,13 @@
 import React, { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Area, AreaChart } from 'recharts'
-import { getCurrentUser, isAdmin } from '../../utils/auth'
+import { isAdmin } from '../utils/roleUtils'
+import { useAuth } from '../context/AuthContext'
 import { courses, evaluations } from '../../data/mock'
 
 export default function EnhancedDashboard() {
   const navigate = useNavigate()
-  const currentUser = getCurrentUser()
+  const { user: currentUser } = useAuth()
   const [selectedCourses, setSelectedCourses] = useState('all')
   const [selectedProgram, setSelectedProgram] = useState('all')
   const [selectedYearLevel, setSelectedYearLevel] = useState('all')

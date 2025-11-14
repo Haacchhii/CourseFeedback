@@ -32,6 +32,15 @@ class Settings(BaseSettings):
         "http://localhost:8080"
     ]
     
+    # Email Configuration (SMTP)
+    SMTP_SERVER: str = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USERNAME: str = os.getenv("SMTP_USERNAME", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_FROM_EMAIL: str = os.getenv("SMTP_FROM_EMAIL", "")
+    SMTP_FROM_NAME: str = os.getenv("SMTP_FROM_NAME", "LPU Course Feedback System")
+    EMAIL_ENABLED: bool = os.getenv("EMAIL_ENABLED", "false").lower() == "true"
+    
     class Config:
         env_file = ".env"
 
