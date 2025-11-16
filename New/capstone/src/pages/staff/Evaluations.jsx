@@ -110,8 +110,12 @@ export default function Evaluations() {
       }
       
       // Extract data from response
+      console.log('[EVALUATIONS] Raw evaluationsData:', evaluationsData)
+      console.log('[EVALUATIONS] Raw coursesData:', coursesData)
       const evaluations = Array.isArray(evaluationsData) ? evaluationsData : (evaluationsData?.data || [])
       const courses = Array.isArray(coursesData) ? coursesData : (coursesData?.data || [])
+      console.log('[EVALUATIONS] Extracted evaluations:', evaluations)
+      console.log('[EVALUATIONS] Extracted courses:', courses)
       
       return { evaluations, courses }
     },
@@ -121,6 +125,10 @@ export default function Evaluations() {
   // Update state when data changes
   useEffect(() => {
     if (apiData) {
+      console.log('[EVALUATIONS] API Data received:', apiData)
+      console.log('[EVALUATIONS] Evaluations count:', apiData.evaluations?.length)
+      console.log('[EVALUATIONS] Courses count:', apiData.courses?.length)
+      console.log('[EVALUATIONS] First evaluation:', apiData.evaluations?.[0])
       setEvaluations(apiData.evaluations)
       setCourses(apiData.courses)
     }
@@ -138,7 +146,8 @@ export default function Evaluations() {
   // Enhanced evaluations with course information
   const enhancedEvaluations = useMemo(() => {
     return evaluations.map(evaluation => {
-      const course = courses.find(c => c.id === evaluation.courseId)
+      // Match by sectionId (primary) or courseId (fallback)
+      const course = courses.find(c => c.id === evaluation.sectionId || c.id === evaluation.courseId)
       
       // Calculate average rating from ratings object
       const ratings = evaluation.ratings || {}

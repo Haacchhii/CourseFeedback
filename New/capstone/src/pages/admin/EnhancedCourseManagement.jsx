@@ -63,6 +63,31 @@ export default function EnhancedCourseManagement() {
     max_students: 40
   })
   
+  // Bulk Enrollment State
+  const [showBulkEnrollModal, setShowBulkEnrollModal] = useState(false)
+  const [bulkEnrollFile, setBulkEnrollFile] = useState(null)
+  const [bulkEnrollPreview, setBulkEnrollPreview] = useState([])
+  const [bulkEnrollErrors, setBulkEnrollErrors] = useState([])
+  const [enrollmentProgress, setEnrollmentProgress] = useState({ current: 0, total: 0, status: '' })
+  
+  // Program Section Enrollment State
+  const [showProgramSectionModal, setShowProgramSectionModal] = useState(false)
+  const [programSections, setProgramSections] = useState([])
+  const [selectedProgramSectionId, setSelectedProgramSectionId] = useState('')
+  const [loadingProgramSections, setLoadingProgramSections] = useState(false)
+  
+  // Quick Bulk Enrollment State (by program/year/semester)
+  const [showQuickBulkEnrollModal, setShowQuickBulkEnrollModal] = useState(false)
+  const [quickBulkFormData, setQuickBulkFormData] = useState({
+    program_id: '',
+    year_level: '',
+    semester: '',
+    program_section_id: ''
+  })
+  const [matchingCourses, setMatchingCourses] = useState([])
+  const [availableProgramSectionsForBulk, setAvailableProgramSectionsForBulk] = useState([])
+  const [loadingMatching, setLoadingMatching] = useState(false)
+  
   // API State
   const [courses, setCourses] = useState([])
   const [allCourses, setAllCourses] = useState([]) // All courses for section creation (unpaginated)
@@ -155,7 +180,8 @@ export default function EnhancedCourseManagement() {
       const matchesSearch = searchTerm === '' ||
         course.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         course.classCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        course.instructor.toLowerCase().includes(searchTerm.toLowerCase())
+        course.subject_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        course.subject_name?.toLowerCase().includes(searchTerm.toLowerCase())
       
       const matchesProgram = programFilter === 'all' || course.program === programFilter
       // Status filter is handled server-side now, no need to filter again
@@ -657,7 +683,7 @@ export default function EnhancedCourseManagement() {
     
     try {
       setSubmitting(true)
-      await adminAPI.enrollStudents(selectedSection.id, selectedStudentIds)
+      const response = await adminAPI.enrollStudents(selectedSection.id, selectedStudentIds)
       
       // Reload section data
       const [enrolledResp, availableResp] = await Promise.all([
@@ -669,9 +695,19 @@ export default function EnhancedCourseManagement() {
       setAvailableStudents(availableResp?.data || [])
       setSelectedStudentIds([])
       
-      alert(`Successfully enrolled ${selectedStudentIds.length} student(s)!`)
+      // Reload sections list to update enrolled count on cards
+      await loadSections()
+      
+      const enrolledCount = response?.data?.enrolled_count || selectedStudentIds.length
+      const skippedCount = response?.data?.skipped_count || 0
+      const message = skippedCount > 0 
+        ? `Successfully enrolled ${enrolledCount} student(s)! (${skippedCount} already enrolled)`
+        : `Successfully enrolled ${enrolledCount} student(s)!`
+      alert(message)
     } catch (err) {
-      alert(`Failed to enroll students: ${err.message}`)
+      console.error('Enroll students error:', err)
+      const errorMsg = err.response?.data?.detail || err.message || 'Unknown error occurred'
+      alert(`Failed to enroll students: ${errorMsg}`)
     } finally {
       setSubmitting(false)
     }
@@ -693,9 +729,377 @@ export default function EnhancedCourseManagement() {
       setEnrolledStudents(enrolledResp?.data || [])
       setAvailableStudents(availableResp?.data || [])
       
+      // Reload sections list to update enrolled count on cards
+      await loadSections()
+      
       alert(`${studentName} removed successfully!`)
     } catch (err) {
       alert(`Failed to remove student: ${err.message}`)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Program Section Enrollment Functions
+  const loadProgramSections = async () => {
+    try {
+      setLoadingProgramSections(true)
+      const response = await adminAPI.getProgramSections({ isActive: true })
+      setProgramSections(response?.data || [])
+    } catch (err) {
+      console.error('Error loading program sections:', err)
+      alert(`Failed to load program sections: ${err.message}`)
+    } finally {
+      setLoadingProgramSections(false)
+    }
+  }
+
+  const openProgramSectionModal = () => {
+    setSelectedProgramSectionId('')
+    loadProgramSections()
+    setShowProgramSectionModal(true)
+  }
+
+  const handleEnrollProgramSection = async () => {
+    if (!selectedProgramSectionId) {
+      alert('Please select a program section')
+      return
+    }
+
+    const programSection = programSections.find(ps => ps.id === parseInt(selectedProgramSectionId))
+    if (!programSection) return
+
+    if (!window.confirm(
+      `Enroll all ${programSection.studentCount} student(s) from "${programSection.sectionName}" into this class section?`
+    )) return
+
+    try {
+      setSubmitting(true)
+      const response = await adminAPI.enrollProgramSectionToClass(
+        selectedSection.id,
+        parseInt(selectedProgramSectionId)
+      )
+
+      alert(response.message || 'Students enrolled successfully!')
+      setShowProgramSectionModal(false)
+
+      // Reload section data
+      const [enrolledResp, availableResp] = await Promise.all([
+        adminAPI.getSectionStudents(selectedSection.id),
+        adminAPI.getAvailableStudents(selectedSection.id)
+      ])
+
+      setEnrolledStudents(enrolledResp?.data || [])
+      setAvailableStudents(availableResp?.data || [])
+      
+      alert(`${studentName} removed successfully!`)
+    } catch (err) {
+      alert(`Failed to remove student: ${err.message}`)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Bulk Enrollment Functions
+  const downloadEnrollmentCSVTemplate = () => {
+    const csvContent = `student_identifier,section_identifier,identifier_type,notes
+student@example.com,CS101-A,email,Regular enrollment
+2021-00001,BSIT-101-1A,student_number,Transfer student
+student2@example.com,IT-PROG1-2024,email,
+2021-00002,CS101-A,student_number,Needs accommodation`
+    
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'enrollment_template.csv'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
+  const handleBulkEnrollFileChange = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setBulkEnrollFile(file)
+    const reader = new FileReader()
+
+    reader.onload = (event) => {
+      const text = event.target.result
+      const lines = text.split('\n').filter(line => line.trim())
+      
+      if (lines.length < 2) {
+        setBulkEnrollErrors(['CSV file is empty or invalid'])
+        setBulkEnrollPreview([])
+        return
+      }
+
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
+      const requiredColumns = ['student_identifier', 'section_identifier']
+      const missingColumns = requiredColumns.filter(col => !headers.includes(col))
+
+      if (missingColumns.length > 0) {
+        setBulkEnrollErrors([`Missing required columns: ${missingColumns.join(', ')}`])
+        setBulkEnrollPreview([])
+        return
+      }
+
+      const errors = []
+      const preview = []
+      const dataLines = lines.slice(1, 6) // Preview first 5 rows
+
+      dataLines.forEach((line, index) => {
+        if (!line.trim()) return
+        
+        const values = line.split(',').map(v => v.trim())
+        const enrollment = {}
+        
+        headers.forEach((header, i) => {
+          enrollment[header] = values[i] || ''
+        })
+
+        // Validation
+        const rowErrors = []
+        const rowNum = index + 2 // Account for header and 0-index
+
+        if (!enrollment.student_identifier) {
+          rowErrors.push(`Row ${rowNum}: Missing student identifier`)
+        } else {
+          // Check if it's email or student number format
+          const isEmail = enrollment.student_identifier.includes('@')
+          const isStudentNumber = /^\d{4}-\d{5}$/.test(enrollment.student_identifier)
+          
+          if (!isEmail && !isStudentNumber) {
+            rowErrors.push(`Row ${rowNum}: Invalid student identifier format (must be email or student number like 2021-00001)`)
+          }
+        }
+
+        if (!enrollment.section_identifier) {
+          rowErrors.push(`Row ${rowNum}: Missing section identifier`)
+        }
+
+        // Check identifier_type if provided
+        if (enrollment.identifier_type && !['email', 'student_number'].includes(enrollment.identifier_type.toLowerCase())) {
+          rowErrors.push(`Row ${rowNum}: Invalid identifier_type (must be 'email' or 'student_number')`)
+        }
+
+        enrollment.valid = rowErrors.length === 0
+        enrollment.errors = rowErrors
+        preview.push(enrollment)
+        errors.push(...rowErrors)
+      })
+
+      setBulkEnrollPreview(preview)
+      setBulkEnrollErrors(errors)
+    }
+
+    reader.readAsText(file)
+  }
+
+  const handleBulkEnroll = async () => {
+    if (!bulkEnrollFile) {
+      alert('Please select a CSV file first')
+      return
+    }
+
+    if (bulkEnrollErrors.length > 0) {
+      if (!window.confirm(`There are ${bulkEnrollErrors.length} validation errors. Some enrollments may fail. Continue anyway?`)) {
+        return
+      }
+    }
+
+    const reader = new FileReader()
+    reader.onload = async (event) => {
+      const text = event.target.result
+      const lines = text.split('\n').filter(line => line.trim())
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
+      const dataLines = lines.slice(1)
+
+      const enrollments = []
+      dataLines.forEach((line) => {
+        if (!line.trim()) return
+        
+        const values = line.split(',').map(v => v.trim())
+        const enrollment = {}
+        
+        headers.forEach((header, i) => {
+          enrollment[header] = values[i] || ''
+        })
+
+        // Only process rows with required fields
+        if (enrollment.student_identifier && enrollment.section_identifier) {
+          enrollments.push(enrollment)
+        }
+      })
+
+      if (enrollments.length === 0) {
+        alert('No valid enrollments found in CSV file')
+        return
+      }
+
+      // Process enrollments in batches
+      const batchSize = 10
+      let successCount = 0
+      let failCount = 0
+      const failedEnrollments = []
+
+      setEnrollmentProgress({ current: 0, total: enrollments.length, status: 'processing' })
+
+      for (let i = 0; i < enrollments.length; i += batchSize) {
+        const batch = enrollments.slice(i, i + batchSize)
+        
+        const results = await Promise.all(
+          batch.map(async (enrollment) => {
+            try {
+              // Call backend bulk enroll endpoint
+              await adminAPI.bulkEnrollStudent({
+                student_identifier: enrollment.student_identifier,
+                section_identifier: enrollment.section_identifier,
+                identifier_type: enrollment.identifier_type || 'auto', // Backend will auto-detect
+                notes: enrollment.notes || ''
+              })
+              return { success: true, enrollment }
+            } catch (error) {
+              return { 
+                success: false, 
+                enrollment, 
+                error: error.response?.data?.detail || error.message 
+              }
+            }
+          })
+        )
+
+        results.forEach(result => {
+          if (result.success) {
+            successCount++
+          } else {
+            failCount++
+            failedEnrollments.push(`${result.enrollment.student_identifier} → ${result.enrollment.section_identifier}: ${result.error}`)
+          }
+        })
+
+        setEnrollmentProgress({ 
+          current: Math.min(i + batchSize, enrollments.length), 
+          total: enrollments.length, 
+          status: 'processing' 
+        })
+      }
+
+      setEnrollmentProgress({ current: enrollments.length, total: enrollments.length, status: 'complete' })
+
+      // Show summary
+      let message = `Bulk enrollment complete!\n\nSuccessfully enrolled: ${successCount}\nFailed: ${failCount}`
+      if (failedEnrollments.length > 0) {
+        message += `\n\nFailed enrollments (first 5):\n${failedEnrollments.slice(0, 5).join('\n')}`
+      }
+      alert(message)
+
+      // Reset and refresh
+      setShowBulkEnrollModal(false)
+      setBulkEnrollFile(null)
+      setBulkEnrollPreview([])
+      setBulkEnrollErrors([])
+      setEnrollmentProgress({ current: 0, total: 0, status: '' })
+      loadSections()
+    }
+
+    reader.readAsText(bulkEnrollFile)
+  }
+
+  // Quick Bulk Enrollment Functions
+  const handleQuickBulkFormChange = async (field, value) => {
+    const newFormData = { ...quickBulkFormData, [field]: value }
+    setQuickBulkFormData(newFormData)
+
+    // When program, year, or semester changes, fetch matching courses and program sections
+    if (field === 'program_id' || field === 'year_level' || field === 'semester') {
+      if (newFormData.program_id && newFormData.year_level && newFormData.semester) {
+        try {
+          setLoadingMatching(true)
+          // Fetch both courses and program sections in parallel
+          const [coursesResp, programSectionsResp] = await Promise.all([
+            adminAPI.getCourses({
+              program_id: newFormData.program_id,
+              year_level: newFormData.year_level,
+              semester: newFormData.semester,
+              page_size: 1000
+            }),
+            adminAPI.getProgramSections({
+              program_id: newFormData.program_id,
+              year_level: newFormData.year_level,
+              semester: newFormData.semester,
+              is_active: true
+            })
+          ])
+          setMatchingCourses(coursesResp?.data || [])
+          setAvailableProgramSectionsForBulk(programSectionsResp?.data || [])
+        } catch (err) {
+          console.error('Error fetching matching data:', err)
+          setMatchingCourses([])
+          setAvailableProgramSectionsForBulk([])
+        } finally {
+          setLoadingMatching(false)
+        }
+      } else {
+        setMatchingCourses([])
+        setAvailableProgramSectionsForBulk([])
+      }
+    }
+  }
+
+  const handleQuickBulkEnroll = async () => {
+    if (!quickBulkFormData.program_section_id || matchingCourses.length === 0) {
+      alert('Please select all required fields')
+      return
+    }
+
+    const selectedProgramSection = availableProgramSectionsForBulk.find(s => s.id === parseInt(quickBulkFormData.program_section_id))
+    if (!selectedProgramSection) {
+      alert('Selected program section not found')
+      return
+    }
+
+    const confirmMsg = `Create ${matchingCourses.length} class section(s) for program section "${selectedProgramSection.sectionName}"?\n\nCourses: ${matchingCourses.map(c => c.subject_code).join(', ')}`
+    
+    if (!window.confirm(confirmMsg)) return
+
+    try {
+      setSubmitting(true)
+      let successCount = 0
+      let failCount = 0
+      const errors = []
+
+      for (const course of matchingCourses) {
+        try {
+          // Create a section for this course with program section parameters and auto-enroll students
+          const response = await adminAPI.createSection({
+            course_id: course.id,
+            class_code: `${course.subject_code}-${selectedProgramSection.sectionName}`,
+            semester: parseInt(quickBulkFormData.semester),
+            academic_year: selectedProgramSection.schoolYear || '2024-2025',
+            max_students: 40
+          }, true) // Enable auto-enrollment
+          successCount++
+          if (response.data?.enrolled_count > 0) {
+            console.log(`Auto-enrolled ${response.data.enrolled_count} students into ${course.subject_code}`)
+          }
+        } catch (err) {
+          failCount++
+          errors.push(`${course.subject_code}: ${err.response?.data?.detail || err.message}`)
+        }
+      }
+
+      alert(`✅ Quick Bulk Enrollment Complete!\n\nSuccessfully created: ${successCount} sections\nFailed: ${failCount}\n\n${errors.length > 0 ? `Errors:\n${errors.slice(0, 5).join('\n')}` : ''}`)
+      
+      setShowQuickBulkEnrollModal(false)
+      setQuickBulkFormData({ program_id: '', year_level: '', semester: '', program_section_id: '' })
+      setMatchingCourses([])
+      setAvailableProgramSectionsForBulk([])
+      loadSections()
+    } catch (err) {
+      alert(`Failed to process bulk enrollment: ${err.message}`)
     } finally {
       setSubmitting(false)
     }
@@ -721,7 +1125,9 @@ export default function EnhancedCourseManagement() {
     e.preventDefault()
     try {
       setSubmitting(true)
-      await adminAPI.updateSection(selectedSection.id, sectionFormData)
+      // Remove instructor_id from the update payload since it's not needed
+      const { instructor_id, ...updateData } = sectionFormData
+      await adminAPI.updateSection(selectedSection.id, updateData)
       await loadSections()
       setShowEditSectionModal(false)
       alert('Section updated successfully!')
@@ -740,11 +1146,13 @@ export default function EnhancedCourseManagement() {
     
     try {
       setSubmitting(true)
-      await adminAPI.deleteSection(section.id)
+      const response = await adminAPI.deleteSection(section.id)
       await loadSections()
-      alert('Section deleted successfully!')
+      alert(response?.data?.message || 'Section deleted successfully!')
     } catch (err) {
-      alert(`Failed to delete section: ${err.response?.data?.detail || err.message}`)
+      console.error('Delete section error:', err)
+      const errorMsg = err.response?.data?.detail || err.message || 'Unknown error occurred'
+      alert(`Failed to delete section: ${errorMsg}`)
     } finally {
       setSubmitting(false)
     }
@@ -780,20 +1188,6 @@ export default function EnhancedCourseManagement() {
                 <p className="text-indigo-100 text-sm mt-1">Comprehensive course administration and analytics</p>
               </div>
             </div>
-            <div className="flex space-x-2">
-              <button onClick={() => setShowBulkImportModal(true)} className="bg-white/20 hover:bg-white/30 text-white font-semibold px-4 py-3 rounded-xl transition-all flex items-center space-x-2">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-                </svg>
-                <span>Bulk Import</span>
-              </button>
-              <button onClick={() => setShowAddModal(true)} className="bg-white hover:bg-indigo-50 text-indigo-600 font-semibold px-6 py-3 rounded-xl shadow-lg transition-all flex items-center space-x-2">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
-                </svg>
-                <span>Add Course</span>
-              </button>
-            </div>
           </div>
         </div>
       </header>
@@ -810,16 +1204,6 @@ export default function EnhancedCourseManagement() {
             }`}
           >
             📚 Course List
-          </button>
-          <button
-            onClick={() => setActiveTab('analytics')}
-            className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
-              activeTab === 'analytics'
-                ? 'bg-indigo-600 text-white shadow-lg'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            📊 Analytics
           </button>
           <button
             onClick={() => setActiveTab('enrollment')}
@@ -1033,7 +1417,7 @@ export default function EnhancedCourseManagement() {
                             <button
                               onClick={() => navigate(`/courses`)}
                               className="p-2 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg transition-all"
-                              title="View Details"
+                              title="View Course Details"
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
@@ -1047,24 +1431,6 @@ export default function EnhancedCourseManagement() {
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                              </svg>
-                            </button>
-                            <button
-                              onClick={(e) => handleDeleteCourse(course, e)}
-                              className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-all"
-                              title="Delete Course"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                              </svg>
-                            </button>
-                            <button
-                              onClick={(e) => handleArchiveCourse(course, e)}
-                              className="p-2 bg-orange-100 hover:bg-orange-200 text-orange-600 rounded-lg transition-all"
-                              title="Archive Course"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
                               </svg>
                             </button>
                           </div>
@@ -1120,92 +1486,6 @@ export default function EnhancedCourseManagement() {
           </>
         )}
 
-        {/* Analytics Tab */}
-        {activeTab === 'analytics' && (
-          <div className="space-y-6">
-            {/* Trend Chart */}
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">📈 Course Trends Over Time</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={analytics.trendChartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="semester" />
-                  <YAxis yAxisId="left" />
-                  <YAxis yAxisId="right" orientation="right" domain={[0, 5]} />
-                  <Tooltip />
-                  <Legend />
-                  <Line yAxisId="left" type="monotone" dataKey="courses" stroke="#6366f1" strokeWidth={2} name="Courses" />
-                  <Line yAxisId="right" type="monotone" dataKey="avgRating" stroke="#f59e0b" strokeWidth={2} name="Avg Rating" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-6">
-              {/* By Program */}
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <h3 className="text-xl font-bold text-gray-900 mb-4">📊 Courses by Program</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={analytics.programChartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="courses" fill="#6366f1" name="Courses" />
-                    <Bar dataKey="students" fill="#10b981" name="Students" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* By Year Level */}
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <h3 className="text-xl font-bold text-gray-900 mb-4">📚 Distribution by Year Level</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={analytics.yearLevelData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="courses" fill="#8b5cf6" name="Courses" />
-                    <Bar dataKey="students" fill="#ec4899" name="Students" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Top Performers */}
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">🏆 Top Rated Courses</h3>
-              <div className="grid md:grid-cols-3 gap-4">
-                {filteredCourses
-                  .sort((a, b) => b.avgRating - a.avgRating)
-                  .slice(0, 3)
-                  .map((course, idx) => (
-                    <div key={course.id} className="border-2 border-gray-200 rounded-xl p-4 hover:shadow-lg transition-all">
-                      <div className="flex items-center mb-2">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white mr-3 ${
-                          idx === 0 ? 'bg-yellow-400' : idx === 1 ? 'bg-gray-400' : 'bg-orange-400'
-                        }`}>
-                          {idx + 1}
-                        </div>
-                        <div className="flex items-center">
-                          <svg className="w-5 h-5 text-yellow-400 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
-                          </svg>
-                          <span className="text-2xl font-bold text-gray-900">{course.avgRating}</span>
-                        </div>
-                      </div>
-                      <h4 className="font-bold text-gray-900 mb-1">{course.name}</h4>
-                      <p className="text-sm text-gray-600">{course.instructor}</p>
-                      <p className="text-xs text-gray-500 mt-1">{course.evaluationCount} evaluations</p>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Enrollment Tab - Section Management */}
         {activeTab === 'enrollment' && (
           <div className="bg-white rounded-xl shadow-md p-6">
@@ -1215,6 +1495,24 @@ export default function EnhancedCourseManagement() {
                 <p className="text-gray-600">Manage student enrollments by class section</p>
               </div>
               <div className="flex gap-2">
+                <button
+                  onClick={() => setShowQuickBulkEnrollModal(true)}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-all flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                  </svg>
+                  Quick Bulk Enroll
+                </button>
+                <button
+                  onClick={() => setShowBulkEnrollModal(true)}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-all flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                  </svg>
+                  CSV Bulk Enroll
+                </button>
                 <button
                   onClick={handleOpenCreateSectionModal}
                   className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all flex items-center gap-2"
@@ -1349,9 +1647,6 @@ export default function EnhancedCourseManagement() {
                         </span>
                       </div>
                       <div className="mt-3 pt-3 border-t border-gray-200">
-                        <p className="text-xs text-gray-600">
-                          {section.instructor_name || 'No instructor assigned'}
-                        </p>
                         <p className="text-xs text-gray-500">
                           Semester {section.semester === 3 ? 'Summer' : section.semester} • {section.academic_year}
                         </p>
@@ -1962,9 +2257,9 @@ export default function EnhancedCourseManagement() {
                   <div className="mb-4">
                     <h3 className="text-lg font-bold text-gray-900 mb-2 flex items-center">
                       <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg mr-2">
-                        {availableStudents.length}
+                        {availableStudents.length} {availableStudents.length === 1 ? 'student' : 'students'}
                       </span>
-                      Available Students
+                      Available to Enroll
                     </h3>
                     <input
                       type="text"
@@ -2011,7 +2306,7 @@ export default function EnhancedCourseManagement() {
                   <button
                     onClick={handleEnrollStudents}
                     disabled={selectedStudentIds.length === 0 || submitting}
-                    className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center"
+                    className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center mb-2"
                   >
                     {submitting ? (
                       <>
@@ -2022,7 +2317,132 @@ export default function EnhancedCourseManagement() {
                       <span>Enroll {selectedStudentIds.length > 0 ? `(${selectedStudentIds.length})` : ''} Students</span>
                     )}
                   </button>
+                  
+                  <button
+                    onClick={openProgramSectionModal}
+                    disabled={submitting}
+                    className="w-full px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-all disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                    Enroll Program Section
+                  </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Program Section Enrollment Modal */}
+      {showProgramSectionModal && selectedSection && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="bg-gradient-to-r from-purple-600 to-purple-700 p-6 border-b-4 border-purple-800">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold text-white">
+                    📚 Enroll Program Section
+                  </h2>
+                  <p className="text-purple-100">
+                    Bulk enroll students from a program section into {selectedSection.class_code}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowProgramSectionModal(false)}
+                  className="w-10 h-10 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
+                >
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <p className="text-sm text-purple-900">
+                  <span className="font-semibold">💡 Tip:</span> Select a program section to enroll all its students at once.
+                  Students already enrolled will be skipped automatically.
+                </p>
+              </div>
+
+              {loadingProgramSections ? (
+                <div className="text-center py-8">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                  <p className="mt-2 text-gray-600">Loading program sections...</p>
+                </div>
+              ) : programSections.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No program sections found.</p>
+                  <p className="text-sm mt-2">Create program sections in User Management first.</p>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      Select Program Section *
+                    </label>
+                    <select
+                      value={selectedProgramSectionId}
+                      onChange={(e) => setSelectedProgramSectionId(e.target.value)}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    >
+                      <option value="">Choose a program section...</option>
+                      {programSections.map(section => (
+                        <option key={section.id} value={section.id}>
+                          {section.sectionName} - {section.programCode} Year {section.yearLevel} Sem {section.semester} ({section.schoolYear}) - {section.studentCount} students
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {selectedProgramSectionId && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      {(() => {
+                        const section = programSections.find(ps => ps.id === parseInt(selectedProgramSectionId))
+                        return section ? (
+                          <div>
+                            <p className="font-semibold text-green-900">{section.sectionName}</p>
+                            <p className="text-sm text-green-700 mt-1">
+                              {section.programName} • {section.studentCount} student{section.studentCount !== 1 ? 's' : ''}
+                            </p>
+                          </div>
+                        ) : null
+                      })()}
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => setShowProgramSectionModal(false)}
+                  disabled={submitting}
+                  className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold transition-all disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleEnrollProgramSection}
+                  disabled={!selectedProgramSectionId || submitting}
+                  className="flex-1 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-all disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  {submitting ? (
+                    <>
+                      <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      <span>Enrolling...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
+                      </svg>
+                      Enroll Section
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>
@@ -2269,24 +2689,6 @@ export default function EnhancedCourseManagement() {
             </div>
 
             <form onSubmit={handleUpdateSection} className="p-6 space-y-4">
-              {/* Instructor Selection */}
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Instructor *</label>
-                <select
-                  required
-                  value={sectionFormData.instructor_id}
-                  onChange={(e) => setSectionFormData({ ...sectionFormData, instructor_id: parseInt(e.target.value) })}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Select an instructor</option>
-                  {instructors.map(instructor => (
-                    <option key={instructor.id} value={instructor.id}>
-                      {instructor.first_name} {instructor.last_name} ({instructor.email})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
               {/* Section Code */}
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Section Code *</label>
@@ -2356,6 +2758,412 @@ export default function EnhancedCourseManagement() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Enrollment Modal */}
+      {showBulkEnrollModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-purple-700 text-white p-6 rounded-t-2xl">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold">📤 Bulk Student Enrollment</h2>
+                  <p className="text-purple-100 mt-1">Enroll multiple students to sections via CSV upload</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowBulkEnrollModal(false)
+                    setBulkEnrollFile(null)
+                    setBulkEnrollPreview([])
+                    setBulkEnrollErrors([])
+                    setEnrollmentProgress({ current: 0, total: 0, status: '' })
+                  }}
+                  className="text-white hover:bg-white/20 rounded-lg p-2 transition-all"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Template Download Section */}
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <svg className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-blue-900 mb-2">CSV Format Instructions</h3>
+                    <p className="text-sm text-blue-800 mb-3">
+                      Download the template to see the required format. Your CSV must include these columns:
+                    </p>
+                    <div className="grid md:grid-cols-2 gap-2 text-sm mb-3">
+                      <div>
+                        <span className="font-semibold text-red-600">Required:</span>
+                        <ul className="list-disc list-inside text-blue-800 ml-2">
+                          <li><code className="bg-blue-100 px-1 rounded">student_identifier</code> - Email or student number</li>
+                          <li><code className="bg-blue-100 px-1 rounded">section_identifier</code> - Class code or section ID</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <span className="font-semibold text-gray-600">Optional:</span>
+                        <ul className="list-disc list-inside text-blue-800 ml-2">
+                          <li><code className="bg-blue-100 px-1 rounded">identifier_type</code> - 'email' or 'student_number'</li>
+                          <li><code className="bg-blue-100 px-1 rounded">notes</code> - Any enrollment notes</li>
+                        </ul>
+                      </div>
+                    </div>
+                    <button
+                      onClick={downloadEnrollmentCSVTemplate}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all flex items-center gap-2"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                      </svg>
+                      Download CSV Template
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* File Upload */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Upload Enrollment CSV File *
+                </label>
+                <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-purple-500 transition-all bg-gray-50">
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleBulkEnrollFileChange}
+                    className="hidden"
+                    id="bulk-enroll-file"
+                  />
+                  <label htmlFor="bulk-enroll-file" className="cursor-pointer">
+                    <div className="flex flex-col items-center gap-3">
+                      <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                      </svg>
+                      <div>
+                        <p className="text-lg font-semibold text-gray-700">
+                          {bulkEnrollFile ? bulkEnrollFile.name : 'Click to upload or drag and drop'}
+                        </p>
+                        <p className="text-sm text-gray-500">CSV file format only</p>
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Validation Errors */}
+              {bulkEnrollErrors.length > 0 && (
+                <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4">
+                  <h3 className="font-semibold text-red-900 mb-2 flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Validation Errors ({bulkEnrollErrors.length})
+                  </h3>
+                  <div className="max-h-32 overflow-y-auto">
+                    <ul className="list-disc list-inside text-sm text-red-800 space-y-1">
+                      {bulkEnrollErrors.slice(0, 10).map((error, idx) => (
+                        <li key={idx}>{error}</li>
+                      ))}
+                      {bulkEnrollErrors.length > 10 && (
+                        <li className="font-semibold">... and {bulkEnrollErrors.length - 10} more errors</li>
+                      )}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
+              {/* Preview Table */}
+              {bulkEnrollPreview.length > 0 && (
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-3">📋 Preview (First 5 rows)</h3>
+                  <div className="overflow-x-auto border-2 border-gray-200 rounded-lg">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Student</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Section</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Type</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {bulkEnrollPreview.map((enrollment, idx) => (
+                          <tr key={idx} className={enrollment.valid ? 'bg-green-50' : 'bg-red-50'}>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              {enrollment.valid ? (
+                                <span className="px-2 py-1 text-xs font-semibold text-green-800 bg-green-200 rounded-full">✓ Valid</span>
+                              ) : (
+                                <span className="px-2 py-1 text-xs font-semibold text-red-800 bg-red-200 rounded-full">✗ Invalid</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-900">{enrollment.student_identifier || '-'}</td>
+                            <td className="px-4 py-3 text-sm text-gray-900">{enrollment.section_identifier || '-'}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{enrollment.identifier_type || 'auto'}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{enrollment.notes || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Progress Bar */}
+              {enrollmentProgress.status === 'processing' && (
+                <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-blue-900">Processing enrollments...</span>
+                    <span className="text-sm font-semibold text-blue-900">
+                      {enrollmentProgress.current} / {enrollmentProgress.total}
+                    </span>
+                  </div>
+                  <div className="w-full bg-blue-200 rounded-full h-3">
+                    <div
+                      className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                      style={{ width: `${(enrollmentProgress.current / enrollmentProgress.total) * 100}%` }}
+                    ></div>
+                  </div>
+                  <p className="text-xs text-blue-700 mt-2">
+                    {Math.round((enrollmentProgress.current / enrollmentProgress.total) * 100)}% complete
+                  </p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowBulkEnrollModal(false)
+                    setBulkEnrollFile(null)
+                    setBulkEnrollPreview([])
+                    setBulkEnrollErrors([])
+                    setEnrollmentProgress({ current: 0, total: 0, status: '' })
+                  }}
+                  disabled={enrollmentProgress.status === 'processing'}
+                  className="px-6 py-3 bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 disabled:text-gray-400 text-gray-800 rounded-lg font-semibold transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBulkEnroll}
+                  disabled={!bulkEnrollFile || enrollmentProgress.status === 'processing'}
+                  className="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white rounded-lg font-semibold transition-all flex items-center gap-2"
+                >
+                  {enrollmentProgress.status === 'processing' ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Enrolling...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
+                      </svg>
+                      <span>Enroll Students ({bulkEnrollPreview.filter(e => e.valid).length} valid)</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Bulk Enrollment Modal */}
+      {showQuickBulkEnrollModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white p-6 rounded-t-2xl">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold">⚡ Quick Bulk Section Creation</h2>
+                  <p className="text-indigo-100 mt-1">Create sections for all courses in a program/year/semester</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowQuickBulkEnrollModal(false)
+                    setQuickBulkFormData({ program_id: '', year_level: '', semester: '', program_section_id: '' })
+                    setMatchingCourses([])
+                    setAvailableProgramSectionsForBulk([])
+                  }}
+                  className="text-white hover:bg-white/20 rounded-lg p-2 transition-all"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Info Box */}
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <svg className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-blue-900 mb-2">How it works</h3>
+                    <p className="text-sm text-blue-800">
+                      Select a program, year level, and semester. The system will find all courses matching those criteria 
+                      and create class sections for each course based on a template section you select.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Form */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Program *</label>
+                  <select
+                    required
+                    value={quickBulkFormData.program_id}
+                    onChange={(e) => handleQuickBulkFormChange('program_id', e.target.value)}
+                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  >
+                    <option value="">Select program...</option>
+                    {apiData?.programs?.map(program => (
+                      <option key={program.id} value={program.id}>{program.code} - {program.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Year Level *</label>
+                  <select
+                    required
+                    value={quickBulkFormData.year_level}
+                    onChange={(e) => handleQuickBulkFormChange('year_level', e.target.value)}
+                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  >
+                    <option value="">Select year...</option>
+                    <option value="1">1st Year</option>
+                    <option value="2">2nd Year</option>
+                    <option value="3">3rd Year</option>
+                    <option value="4">4th Year</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Semester *</label>
+                  <select
+                    required
+                    value={quickBulkFormData.semester}
+                    onChange={(e) => handleQuickBulkFormChange('semester', e.target.value)}
+                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  >
+                    <option value="">Select semester...</option>
+                    <option value="1">1st Semester</option>
+                    <option value="2">2nd Semester</option>
+                    <option value="3">Summer</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Program Section *</label>
+                  <select
+                    required
+                    value={quickBulkFormData.program_section_id}
+                    onChange={(e) => handleQuickBulkFormChange('program_section_id', e.target.value)}
+                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  >
+                    <option value="">Select program section...</option>
+                    {availableProgramSectionsForBulk.map(section => (
+                      <option key={section.id} value={section.id}>
+                        {section.sectionName} ({section.studentCount} students)
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Class sections will be created for this student group (e.g., BSCS-DS-3A)
+                  </p>
+                </div>
+              </div>
+
+              {/* Matching Courses Preview */}
+              {loadingMatching ? (
+                <div className="bg-gray-50 border-2 border-gray-300 rounded-xl p-8 text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Loading matching courses...</p>
+                </div>
+              ) : matchingCourses.length > 0 ? (
+                <div className="bg-green-50 border-2 border-green-200 rounded-xl p-4">
+                  <h3 className="font-semibold text-green-900 mb-3">
+                    ✅ Found {matchingCourses.length} matching course(s)
+                  </h3>
+                  <div className="max-h-48 overflow-y-auto space-y-2">
+                    {matchingCourses.map(course => (
+                      <div key={course.id} className="bg-white p-3 rounded-lg flex justify-between items-center">
+                        <div>
+                          <span className="font-semibold text-gray-900">{course.subject_code}</span>
+                          <span className="text-gray-600 ml-2">{course.subject_name}</span>
+                        </div>
+                        <span className="text-sm text-gray-500">{course.units} units</span>
+                      </div>
+                    ))}
+                  </div>
+                  {quickBulkFormData.program_section_id && (
+                    <p className="text-sm text-green-700 mt-3">
+                      📝 Sections will be named: [SUBJECT_CODE]-{availableProgramSectionsForBulk.find(s => s.id === parseInt(quickBulkFormData.program_section_id))?.sectionName}
+                    </p>
+                  )}
+                </div>
+              ) : quickBulkFormData.program_id && quickBulkFormData.year_level && quickBulkFormData.semester ? (
+                <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-4">
+                  <p className="text-yellow-800">⚠️ No courses found for the selected criteria</p>
+                </div>
+              ) : null}
+
+              {/* Action Buttons */}
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowQuickBulkEnrollModal(false)
+                    setQuickBulkFormData({ program_id: '', year_level: '', semester: '', program_section_id: '' })
+                    setMatchingCourses([])
+                    setAvailableProgramSectionsForBulk([])
+                  }}
+                  disabled={submitting}
+                  className="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 text-gray-800 rounded-lg font-semibold transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleQuickBulkEnroll}
+                  disabled={!quickBulkFormData.program_section_id || matchingCourses.length === 0 || submitting}
+                  className="flex-1 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
+                >
+                  {submitting ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Creating Sections...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                      </svg>
+                      <span>Create {matchingCourses.length} Section(s)</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

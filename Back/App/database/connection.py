@@ -17,7 +17,7 @@ load_dotenv(dotenv_path=env_path)
 # Reads from .env file first, falls back to Session Pooler
 DATABASE_URL = os.getenv(
     "DATABASE_URL", 
-    "postgresql://postgres.esdohggqyckrtlpzbyhh:Napakabangis0518@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
+    "postgresql+psycopg://postgres.esdohggqyckrtlpzbyhh:Napakabangis0518@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
 )
 
 # Alternative format if needed:
@@ -31,7 +31,8 @@ engine = create_engine(
     pool_size=5,             # Maximum number of permanent connections (reduced for Supabase)
     max_overflow=10,         # Maximum number of temporary connections
     pool_timeout=30,         # Timeout for getting connection from pool
-    echo=False               # Set to True for SQL debugging
+    echo=False,              # Set to True for SQL debugging
+    connect_args={"prepare_threshold": None}  # Disable prepared statement cache to avoid DuplicatePreparedStatement errors
 )
 
 # Create SessionLocal class

@@ -8,35 +8,11 @@ import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/use
 export default function SystemSettings() {
   const navigate = useNavigate()
   const { user: currentUser } = useAuth()
-  const [activeTab, setActiveTab] = useState('general')
+  const [activeTab, setActiveTab] = useState('security')
   const [saved, setSaved] = useState(false)
   
   // API State
   const [submitting, setSubmitting] = useState(false)
-
-  // General Settings State
-  const [generalSettings, setGeneralSettings] = useState({
-    institutionName: 'Lyceum of the Philippines University - Batangas',
-    institutionShortName: 'LPU Batangas',
-    academicYear: '2024-2025',
-    currentSemester: 'First Semester',
-    ratingScale: 5,
-    timezone: 'Asia/Manila',
-    dateFormat: 'MM/DD/YYYY',
-    language: 'English'
-  })
-
-  // Email Settings State
-  const [emailSettings, setEmailSettings] = useState({
-    smtpHost: 'smtp.gmail.com',
-    smtpPort: '587',
-    smtpUsername: 'noreply@lpubatangas.edu.ph',
-    smtpPassword: '••••••••',
-    fromEmail: 'noreply@lpubatangas.edu.ph',
-    fromName: 'LPU Evaluation System',
-    enableNotifications: true,
-    reminderFrequency: '3' // days
-  })
 
   // Security Settings State
   const [securitySettings, setSecuritySettings] = useState({
@@ -75,8 +51,6 @@ export default function SystemSettings() {
   // Update settings when data changes
   useEffect(() => {
     if (settingsData) {
-      if (settingsData.general) setGeneralSettings(settingsData.general)
-      if (settingsData.email) setEmailSettings(settingsData.email)
       if (settingsData.security) setSecuritySettings(settingsData.security)
       if (settingsData.backup) setBackupSettings(settingsData.backup)
     }
@@ -113,16 +87,74 @@ export default function SystemSettings() {
     alert('Test email sent to ' + currentUser.email)
   }
 
-  const handleBackupNow = () => {
-    if (window.confirm('Create a manual backup now?')) {
-      alert('Backup initiated. This may take several minutes.')
+  const handleBackupNow = async () => {
+    if (!window.confirm('Create a manual backup now?\n\nThis may take several minutes.')) {
+      return
+    }
+    
+    try {
+      setLoading(true)
+      const response = await adminAPI.createBackup()
+      
+      if (response.success) {
+        alert(`✅ Backup created successfully!\n\nFilename: ${response.data.filename}\nSize: ${(response.data.file_size / 1024 / 1024).toFixed(2)} MB\n\nBackup has been saved to the server.`)
+        
+        // Update last backup time in state
+        setBackupSettings({
+          ...backupSettings,
+          lastBackup: new Date().toLocaleString()
+        })
+      } else {
+        throw new Error(response.message || 'Backup failed')
+      }
+    } catch (err) {
+      console.error('Backup error:', err)
+      alert(`❌ Backup failed: ${err.message}`)
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleRestoreBackup = () => {
-    if (window.confirm('⚠️ WARNING: Restoring a backup will overwrite current data.\n\nAre you sure you want to continue?')) {
-      alert('Please select a backup file to restore...')
+  const handleRestoreBackup = async () => {
+    if (!window.confirm('⚠️ CRITICAL WARNING\n\nRestoring a backup will PERMANENTLY OVERWRITE all current data in the database.\n\nThis action CANNOT be undone!\n\nAre you absolutely sure you want to continue?')) {
+      return
     }
+    
+    // Double confirmation for critical action
+    const confirmText = prompt('Type "RESTORE" in all caps to confirm:')
+    if (confirmText !== 'RESTORE') {
+      alert('Restore cancelled - confirmation text did not match.')
+      return
+    }
+    
+    // Create file input to select backup
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.sql'
+    
+    input.onchange = async (e) => {
+      const file = e.target.files[0]
+      if (!file) return
+      
+      try {
+        setLoading(true)
+        
+        // For now, just show the selected file info
+        // In production, this would upload and restore the backup
+        alert(`⚠️ Backup restore is a critical operation.\n\nSelected file: ${file.name}\n\nThis feature requires server-side implementation to safely restore the database.\n\nPlease contact your system administrator to perform database restoration.`)
+        
+        // TODO: Implement actual restore when ready
+        // const response = await adminAPI.restoreBackup(file)
+        
+      } catch (err) {
+        console.error('Restore error:', err)
+        alert(`❌ Restore failed: ${err.message}`)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    input.click()
   }
 
   if (!currentUser || !isSystemAdmin(currentUser)) return null
@@ -162,37 +194,7 @@ export default function SystemSettings() {
 
       <div className="container mx-auto px-6 py-8">
         {/* Tabs */}
-        <div className="bg-white rounded-xl shadow-md mb-6 p-2 grid grid-cols-4 gap-2">
-          <button
-            onClick={() => setActiveTab('general')}
-            className={`py-3 px-4 rounded-lg font-semibold transition-all ${
-              activeTab === 'general'
-                ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            <div className="flex items-center justify-center space-x-2">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
-              </svg>
-              <span>General</span>
-            </div>
-          </button>
-          <button
-            onClick={() => setActiveTab('email')}
-            className={`py-3 px-4 rounded-lg font-semibold transition-all ${
-              activeTab === 'email'
-                ? 'bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            <div className="flex items-center justify-center space-x-2">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-              </svg>
-              <span>Email</span>
-            </div>
-          </button>
+        <div className="bg-white rounded-xl shadow-md mb-6 p-2 grid grid-cols-2 gap-2">
           <button
             onClick={() => setActiveTab('security')}
             className={`py-3 px-4 rounded-lg font-semibold transition-all ${
@@ -224,227 +226,6 @@ export default function SystemSettings() {
             </div>
           </button>
         </div>
-
-        {/* General Settings Tab */}
-        {activeTab === 'general' && (
-          <div className="bg-white rounded-xl shadow-md p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">⚙️ General Settings</h2>
-            
-            <div className="space-y-6">
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Institution Name</label>
-                  <input
-                    type="text"
-                    value={generalSettings.institutionName}
-                    onChange={(e) => setGeneralSettings({...generalSettings, institutionName: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Short Name</label>
-                  <input
-                    type="text"
-                    value={generalSettings.institutionShortName}
-                    onChange={(e) => setGeneralSettings({...generalSettings, institutionShortName: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Academic Year</label>
-                  <input
-                    type="text"
-                    value={generalSettings.academicYear}
-                    onChange={(e) => setGeneralSettings({...generalSettings, academicYear: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Current Semester</label>
-                  <select
-                    value={generalSettings.currentSemester}
-                    onChange={(e) => setGeneralSettings({...generalSettings, currentSemester: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="First Semester">First Semester</option>
-                    <option value="Second Semester">Second Semester</option>
-                    <option value="Summer">Summer</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid md:grid-cols-3 gap-6">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Rating Scale</label>
-                  <select
-                    value={generalSettings.ratingScale}
-                    onChange={(e) => setGeneralSettings({...generalSettings, ratingScale: parseInt(e.target.value)})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value={5}>5-Point Scale</option>
-                    <option value={10}>10-Point Scale</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Timezone</label>
-                  <select
-                    value={generalSettings.timezone}
-                    onChange={(e) => setGeneralSettings({...generalSettings, timezone: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="Asia/Manila">Asia/Manila (PHT)</option>
-                    <option value="UTC">UTC</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Date Format</label>
-                  <select
-                    value={generalSettings.dateFormat}
-                    onChange={(e) => setGeneralSettings({...generalSettings, dateFormat: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                    <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                    <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-                  </select>
-                </div>
-              </div>
-
-              <button
-                onClick={() => handleSaveSettings('General')}
-                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                disabled={submitting}
-              >
-                {submitting ? (
-                  <>
-                    <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    <span>Saving...</span>
-                  </>
-                ) : (
-                  <span>💾 Save General Settings</span>
-                )}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Email Settings Tab */}
-        {activeTab === 'email' && (
-          <div className="bg-white rounded-xl shadow-md p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">📧 Email Settings</h2>
-            
-            <div className="space-y-6">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                <p className="text-sm text-blue-900 font-semibold mb-1">📋 SMTP Configuration</p>
-                <p className="text-sm text-blue-700">Configure your email server settings for sending notifications and reminders.</p>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">SMTP Host</label>
-                  <input
-                    type="text"
-                    value={emailSettings.smtpHost}
-                    onChange={(e) => setEmailSettings({...emailSettings, smtpHost: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">SMTP Port</label>
-                  <input
-                    type="text"
-                    value={emailSettings.smtpPort}
-                    onChange={(e) => setEmailSettings({...emailSettings, smtpPort: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">SMTP Username</label>
-                  <input
-                    type="email"
-                    value={emailSettings.smtpUsername}
-                    onChange={(e) => setEmailSettings({...emailSettings, smtpUsername: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">SMTP Password</label>
-                  <input
-                    type="password"
-                    value={emailSettings.smtpPassword}
-                    onChange={(e) => setEmailSettings({...emailSettings, smtpPassword: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">From Email</label>
-                  <input
-                    type="email"
-                    value={emailSettings.fromEmail}
-                    onChange={(e) => setEmailSettings({...emailSettings, fromEmail: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">From Name</label>
-                  <input
-                    type="text"
-                    value={emailSettings.fromName}
-                    onChange={(e) => setEmailSettings({...emailSettings, fromName: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Reminder Frequency (days)</label>
-                <input
-                  type="number"
-                  value={emailSettings.reminderFrequency}
-                  onChange={(e) => setEmailSettings({...emailSettings, reminderFrequency: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                />
-                <p className="text-xs text-gray-500 mt-1">Send reminder emails every N days for pending evaluations</p>
-              </div>
-
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={emailSettings.enableNotifications}
-                    onChange={(e) => setEmailSettings({...emailSettings, enableNotifications: e.target.checked})}
-                    className="w-4 h-4 text-green-600 rounded focus:ring-2 focus:ring-green-500 mr-3"
-                  />
-                  <span className="text-sm font-semibold text-gray-700">Enable automatic email notifications</span>
-                </label>
-              </div>
-
-              <div className="flex space-x-4">
-                <button
-                  onClick={handleTestEmail}
-                  className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-3 px-6 rounded-lg transition-all"
-                >
-                  📨 Send Test Email
-                </button>
-                <button
-                  onClick={() => handleSaveSettings('Email')}
-                  className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition-all"
-                >
-                  💾 Save Email Settings
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Security Settings Tab */}
         {activeTab === 'security' && (

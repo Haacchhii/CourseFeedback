@@ -316,53 +316,6 @@ async def get_all_students(
             "message": "Error loading students"
         }
 
-@router.get("/instructors")
-async def get_all_instructors(
-    department_id: Optional[int] = Query(None),
-    db: Session = Depends(get_db)
-):
-    """Get all instructors/department heads"""
-    try:
-        # Query from users table, instructors may not have department_id
-        base_query = """
-            SELECT 
-                u.id, u.first_name, u.last_name, u.email, u.role
-            FROM users u
-            WHERE u.role IN ('department_head', 'instructor')
-        """
-        
-        params = {}
-        base_query += " ORDER BY u.last_name, u.first_name"
-        
-        result = db.execute(text(base_query), params)
-        
-        instructors = []
-        for row in result:
-            instructors.append({
-                "id": row[0],
-                "first_name": row[1],
-                "last_name": row[2],
-                "email": row[3],
-                "role": row[4],
-                "department_name": "Academic Affairs"  # Default department
-            })
-        
-        return {
-            "success": True,
-            "data": instructors
-        }
-        
-    except Exception as e:
-        logger.error(f"Error getting instructors: {e}")
-        import traceback
-        traceback.print_exc()
-        # Return empty array instead of error
-        return {
-            "success": True,
-            "data": [],
-            "message": "Error loading instructors"
-        }
-
 @router.get("/evaluations")
 async def get_all_evaluations(
     course_id: Optional[int] = Query(None),
@@ -742,12 +695,12 @@ async def get_completion_rates(
         sections_query = text("""
             SELECT 
                 cs.id as section_id,
-                cs.section_code as class_code,
+                cs.class_code,
                 c.id as course_id,
                 c.subject_code,
                 c.subject_name,
                 c.year_level,
-                COALESCE(u.full_name, 'No Instructor') as instructor_name,
+                COALESCE(CONCAT(u.first_name, ' ', u.last_name), 'No Instructor') as instructor_name,
                 cs.semester,
                 cs.academic_year,
                 COUNT(DISTINCT en.student_id) as enrolled_students,
@@ -762,8 +715,8 @@ async def get_completion_rates(
             LEFT JOIN users u ON cs.instructor_id = u.id
             LEFT JOIN enrollments en ON cs.id = en.class_section_id AND en.status = 'active'
             LEFT JOIN evaluations e ON cs.id = e.class_section_id AND en.student_id = e.student_id
-            GROUP BY cs.id, cs.section_code, c.id, c.subject_code, c.subject_name, 
-                     c.year_level, u.full_name, cs.semester, cs.academic_year
+            GROUP BY cs.id, cs.class_code, c.id, c.subject_code, c.subject_name, 
+                     c.year_level, u.first_name, u.last_name, cs.semester, cs.academic_year
             ORDER BY completion_rate ASC, c.subject_name
         """)
         
@@ -848,11 +801,12 @@ async def submit_support_request(
             raise HTTPException(status_code=404, detail="User not found")
         
         # Log the support request (in a real system, you would store this in a database)
+        full_name = f"{user.first_name} {user.last_name}"
         logger.info(f"""
         ========================================
         NEW SUPPORT REQUEST
         ========================================
-        From: {user.full_name} ({user.email})
+        From: {full_name} ({user.email})
         Role: {user.role}
         Issue Type: {request.issueType}
         Subject: {request.subject}

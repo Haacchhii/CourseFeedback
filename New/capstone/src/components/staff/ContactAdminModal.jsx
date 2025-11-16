@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import { adminAPI, secretaryAPI, deptHeadAPI } from '../../services/api';
 
 const ContactAdminModal = ({ isOpen, onClose, prefilledCourse = null, prefilledStudent = null }) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     issueType: 'general',
     courseId: prefilledCourse?.id || '',
@@ -48,8 +50,8 @@ const ContactAdminModal = ({ isOpen, onClose, prefilledCourse = null, prefilledS
     }
 
     try {
-      // Get user role from localStorage
-      const userRole = localStorage.getItem('userRole');
+      // Get user role from AuthContext
+      const userRole = user?.role;
       
       let api;
       if (userRole === 'admin' || userRole === 'system_admin') {
@@ -58,6 +60,8 @@ const ContactAdminModal = ({ isOpen, onClose, prefilledCourse = null, prefilledS
         api = secretaryAPI;
       } else if (userRole === 'department_head') {
         api = deptHeadAPI;
+      } else {
+        throw new Error('Invalid user role or not authenticated');
       }
 
       // Send the support request

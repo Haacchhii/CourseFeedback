@@ -40,6 +40,7 @@ apiClient.interceptors.response.use(
       const { status, data } = error.response
       
       console.error('API Error Response:', { status, data }) // Debug log
+      console.error('Full error details:', JSON.stringify(data, null, 2)) // More detailed logging
       
       // Handle specific error codes
       if (status === 401) {
@@ -128,6 +129,55 @@ export const authAPI = {
   isAuthenticated: () => {
     return !!localStorage.getItem('token')
   },
+
+  /**
+   * Request password reset email
+   * @param {string} email - User email
+   * @returns {Promise} Response with success message
+   */
+  forgotPassword: async (email) => {
+    try {
+      return await apiClient.post('/auth/forgot-password', { email })
+    } catch (error) {
+      console.error('Forgot password error:', error)
+      throw error
+    }
+  },
+
+  /**
+   * Reset password with token
+   * @param {string} token - Reset token from email
+   * @param {string} newPassword - New password
+   * @returns {Promise} Response with success message
+   */
+  resetPassword: async (token, newPassword) => {
+    try {
+      return await apiClient.post('/auth/reset-password', { token, new_password: newPassword })
+    } catch (error) {
+      console.error('Reset password error:', error)
+      throw error
+    }
+  },
+
+  /**
+   * Change password for first-time login users
+   * @param {number} userId - User ID
+   * @param {string} currentPassword - Current/temporary password
+   * @param {string} newPassword - New password
+   * @returns {Promise} Response with success message
+   */
+  changePassword: async (userId, currentPassword, newPassword) => {
+    try {
+      return await apiClient.post('/auth/change-password', {
+        user_id: userId,
+        current_password: currentPassword,
+        new_password: newPassword
+      })
+    } catch (error) {
+      console.error('Change password error:', error)
+      throw error
+    }
+  },
 }
 
 // ============================================
@@ -168,7 +218,8 @@ export const adminAPI = {
    * @returns {Promise} Updated user data
    */
   updateUser: async (userId, userData) => {
-    return apiClient.put(`/admin/users/${userId}`, userData)
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.put(`/admin/users/${userId}?current_user_id=${currentUser?.id}`, userData)
   },
 
   /**
@@ -177,7 +228,8 @@ export const adminAPI = {
    * @returns {Promise} Success message
    */
   deleteUser: async (userId) => {
-    return apiClient.delete(`/admin/users/${userId}`)
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.delete(`/admin/users/${userId}?current_user_id=${currentUser?.id}`)
   },
 
   /**
@@ -187,7 +239,8 @@ export const adminAPI = {
    * @returns {Promise} Success message
    */
   resetPassword: async (userId, newPassword) => {
-    return apiClient.post(`/admin/users/${userId}/reset-password`, { new_password: newPassword })
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.post(`/admin/users/${userId}/reset-password?current_user_id=${currentUser?.id}`, { new_password: newPassword })
   },
 
   /**
@@ -217,7 +270,15 @@ export const adminAPI = {
    */
   createPeriod: async (periodData) => {
     const currentUser = authAPI.getCurrentUser()
-    return apiClient.post(`/admin/evaluation-periods?current_user_id=${currentUser?.id}`, periodData)
+    // Map camelCase to snake_case for backend
+    const backendData = {
+      name: periodData.name,
+      semester: periodData.semester,
+      academic_year: periodData.academicYear || periodData.academic_year,
+      start_date: periodData.startDate || periodData.start_date,
+      end_date: periodData.endDate || periodData.end_date
+    }
+    return apiClient.post(`/admin/evaluation-periods?current_user_id=${currentUser?.id}`, backendData)
   },
 
   /**
@@ -239,6 +300,57 @@ export const adminAPI = {
     return apiClient.get('/admin/evaluation-periods/active')
   },
 
+  /**
+   * Enroll class section in evaluation period
+   * @param {number} periodId - Period ID
+   * @param {number} sectionId - Class section ID
+   * @returns {Promise} Enrollment result
+   */
+  enrollSectionInPeriod: async (periodId, sectionId) => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.post(`/admin/evaluation-periods/${periodId}/enroll-section?current_user_id=${currentUser?.id}`, { section_id: sectionId })
+  },
+
+  /**
+   * Get enrolled sections for an evaluation period
+   * @param {number} periodId - Period ID
+   * @returns {Promise} List of enrolled class sections
+   */
+  getPeriodEnrolledSections: async (periodId) => {
+    return apiClient.get(`/admin/evaluation-periods/${periodId}/enrolled-sections`)
+  },
+
+  /**
+   * Remove program section enrollment from period
+   * @param {number} periodId - Period ID
+   * @param {number} enrollmentId - Enrollment ID
+   * @returns {Promise} Success message
+   */
+  removePeriodEnrollment: async (periodId, enrollmentId) => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.delete(`/admin/evaluation-periods/${periodId}/enrolled-sections/${enrollmentId}?current_user_id=${currentUser?.id}`)
+  },
+
+  /**
+   * Enroll program section in evaluation period
+   * @param {number} periodId - Period ID
+   * @param {number} programSectionId - Program section ID
+   * @returns {Promise} Enrollment result with student and evaluation counts
+   */
+  enrollProgramSectionInPeriod: async (periodId, programSectionId) => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.post(`/admin/evaluation-periods/${periodId}/enroll-program-section?current_user_id=${currentUser?.id}`, { program_section_id: programSectionId })
+  },
+
+  /**
+   * Get enrolled program sections for an evaluation period
+   * @param {number} periodId - Period ID
+   * @returns {Promise} List of enrolled program sections
+   */
+  getPeriodEnrolledProgramSections: async (periodId) => {
+    return apiClient.get(`/admin/evaluation-periods/${periodId}/enrolled-program-sections`)
+  },
+
   // ============================================
   // COURSES
   // ============================================
@@ -253,6 +365,9 @@ export const adminAPI = {
     if (params.search) queryParams.append('search', params.search)
     if (params.status) queryParams.append('status', params.status)
     if (params.department) queryParams.append('department', params.department)
+    if (params.program_id) queryParams.append('program_id', params.program_id)
+    if (params.year_level) queryParams.append('year_level', params.year_level)
+    if (params.semester) queryParams.append('semester', params.semester)
     // Use pagination instead of loading all courses at once
     if (params.page) queryParams.append('page', params.page)
     if (params.page_size) queryParams.append('page_size', params.page_size)
@@ -475,8 +590,9 @@ export const adminAPI = {
    * @param {Object} sectionData - Section data (course_id, instructor_id, class_code, semester, academic_year, max_students)
    * @returns {Promise} Created section data
    */
-  createSection: async (sectionData) => {
-    return apiClient.post('/admin/sections', sectionData)
+  createSection: async (sectionData, autoEnroll = false) => {
+    const url = autoEnroll ? '/admin/sections?auto_enroll=true' : '/admin/sections'
+    return apiClient.post(url, sectionData)
   },
 
   /**
@@ -531,6 +647,23 @@ export const adminAPI = {
     return apiClient.post(
       `/admin/sections/${sectionId}/enroll?current_user_id=${currentUser?.id}`,
       { student_ids: studentIds }
+    )
+  },
+
+  /**
+   * Bulk enroll a single student to a section (used for CSV bulk enrollment)
+   * @param {Object} enrollmentData - Enrollment data
+   * @param {string} enrollmentData.student_identifier - Student email or student number
+   * @param {string} enrollmentData.section_identifier - Section class code or ID
+   * @param {string} enrollmentData.identifier_type - 'email', 'student_number', or 'auto'
+   * @param {string} enrollmentData.notes - Optional enrollment notes
+   * @returns {Promise} Success message
+   */
+  bulkEnrollStudent: async (enrollmentData) => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.post(
+      `/admin/sections/bulk-enroll?current_user_id=${currentUser?.id}`,
+      enrollmentData
     )
   },
 
@@ -600,6 +733,31 @@ export const adminAPI = {
   },
 
   /**
+   * Export audit logs
+   * @param {Object} options - Export options (format, filters)
+   * @returns {Promise} Export data
+   */
+  exportAuditLogs: async (options = {}) => {
+    const format = options.format || 'json'
+    const params = new URLSearchParams({ format })
+    if (options.dateRange) {
+      if (options.dateRange.start) params.append('start_date', options.dateRange.start)
+      if (options.dateRange.end) params.append('end_date', options.dateRange.end)
+    }
+    return apiClient.get(`/admin/export/audit-logs?${params.toString()}`)
+  },
+
+  /**
+   * Export full system data (all tables)
+   * @param {Object} options - Export options (format)
+   * @returns {Promise} Export data
+   */
+  exportFullSystem: async (options = {}) => {
+    const format = options.format || 'json'
+    return apiClient.get(`/admin/export/full-system?format=${format}`)
+  },
+
+  /**
    * Export custom query data
    * @param {Object} options - Custom export options
    * @returns {Promise} Export data
@@ -652,6 +810,202 @@ export const adminAPI = {
   submitSupportRequest: async (requestData) => {
     const currentUser = authAPI.getCurrentUser()
     return apiClient.post(`/admin/support-request?user_id=${currentUser?.id}`, requestData)
+  },
+
+  /**
+   * Schedule automatic data export
+   * @param {Object} scheduleData - Schedule configuration (frequency, time, format, recipients, etc.)
+   * @returns {Promise} Success response with schedule details
+   */
+  scheduleExport: async (scheduleData) => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.post(`/admin/export/schedule?user_id=${currentUser?.id}`, scheduleData)
+  },
+
+  /**
+   * Get all scheduled exports
+   * @returns {Promise} List of scheduled exports
+   */
+  getScheduledExports: async () => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.get(`/admin/export/schedules?user_id=${currentUser?.id}`)
+  },
+
+  /**
+   * Delete a scheduled export
+   * @param {number} scheduleId - Schedule ID to delete
+   * @returns {Promise} Success response
+   */
+  deleteScheduledExport: async (scheduleId) => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.delete(`/admin/export/schedule/${scheduleId}?user_id=${currentUser?.id}`)
+  },
+
+  /**
+   * Create database backup
+   * @returns {Promise} Backup file or success message
+   */
+  createBackup: async () => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.post(`/admin/backup/create?user_id=${currentUser?.id}`)
+  },
+
+  /**
+   * Restore database from backup
+   * @param {File} backupFile - Backup file to restore
+   * @returns {Promise} Success response
+   */
+  restoreBackup: async (backupFile) => {
+    const currentUser = authAPI.getCurrentUser()
+    const formData = new FormData()
+    formData.append('backup_file', backupFile)
+    
+    return axios.post(`${API_BASE_URL}/admin/backup/restore?user_id=${currentUser?.id}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
+      },
+    })
+  },
+
+  /**
+   * Get list of available backups
+   * @returns {Promise} List of backup files with metadata
+   */
+  getBackupHistory: async () => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.get(`/admin/backup/history?user_id=${currentUser?.id}`)
+  },
+
+  // ============================================
+  // PROGRAM SECTIONS MANAGEMENT
+  // ============================================
+
+  /**
+   * Get all program sections with optional filters
+   * @param {Object} filters - Filter options (programId, yearLevel, semester, schoolYear, isActive)
+   * @returns {Promise} List of program sections
+   */
+  getProgramSections: async (filters = {}) => {
+    const currentUser = authAPI.getCurrentUser()
+    const queryParams = new URLSearchParams()
+    if (filters.programId) queryParams.append('program_id', filters.programId)
+    if (filters.yearLevel) queryParams.append('year_level', filters.yearLevel)
+    if (filters.semester) queryParams.append('semester', filters.semester)
+    if (filters.schoolYear) queryParams.append('school_year', filters.schoolYear)
+    if (filters.isActive !== undefined) queryParams.append('is_active', filters.isActive)
+    
+    const queryString = queryParams.toString()
+    return apiClient.get(`/admin/program-sections${queryString ? '?' + queryString : ''}`)
+  },
+
+  /**
+   * Create a new program section
+   * @param {Object} sectionData - Section data (sectionName, programId, yearLevel, semester, schoolYear)
+   * @returns {Promise} Created section
+   */
+  createProgramSection: async (sectionData) => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.post(`/admin/program-sections?current_user_id=${currentUser?.id}`, {
+      section_name: sectionData.sectionName,
+      program_id: sectionData.programId,
+      year_level: sectionData.yearLevel,
+      semester: sectionData.semester,
+      school_year: sectionData.schoolYear
+    })
+  },
+
+  /**
+   * Update a program section
+   * @param {number} sectionId - Section ID
+   * @param {Object} sectionData - Updated section data
+   * @returns {Promise} Success response
+   */
+  updateProgramSection: async (sectionId, sectionData) => {
+    const currentUser = authAPI.getCurrentUser()
+    const updateData = {}
+    if (sectionData.sectionName !== undefined) updateData.section_name = sectionData.sectionName
+    if (sectionData.programId !== undefined) updateData.program_id = sectionData.programId
+    if (sectionData.yearLevel !== undefined) updateData.year_level = sectionData.yearLevel
+    if (sectionData.semester !== undefined) updateData.semester = sectionData.semester
+    if (sectionData.schoolYear !== undefined) updateData.school_year = sectionData.schoolYear
+    if (sectionData.isActive !== undefined) updateData.is_active = sectionData.isActive
+    
+    return apiClient.put(`/admin/program-sections/${sectionId}?current_user_id=${currentUser?.id}`, updateData)
+  },
+
+  /**
+   * Delete a program section
+   * @param {number} sectionId - Section ID
+   * @returns {Promise} Success response
+   */
+  deleteProgramSection: async (sectionId) => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.delete(`/admin/program-sections/${sectionId}?current_user_id=${currentUser?.id}`)
+  },
+
+  /**
+   * Get students assigned to a section
+   * @param {number} sectionId - Section ID
+   * @returns {Promise} List of students
+   */
+  getSectionStudents: async (sectionId) => {
+    return apiClient.get(`/admin/program-sections/${sectionId}/students`)
+  },
+
+  /**
+   * Get students available for assignment with filters
+   * @param {Object} filters - Filter options (programId, yearLevel, search, excludeSectionId)
+   * @returns {Promise} List of students
+   */
+  getStudentsForAssignment: async (filters = {}) => {
+    const queryParams = new URLSearchParams()
+    if (filters.programId) queryParams.append('program_id', filters.programId)
+    if (filters.yearLevel) queryParams.append('year_level', filters.yearLevel)
+    if (filters.search) queryParams.append('search', filters.search)
+    if (filters.excludeSectionId) queryParams.append('exclude_section_id', filters.excludeSectionId)
+    
+    const queryString = queryParams.toString()
+    return apiClient.get(`/admin/students-for-assignment${queryString ? '?' + queryString : ''}`)
+  },
+
+  /**
+   * Assign students to a section
+   * @param {number} sectionId - Section ID
+   * @param {Array<number>} studentIds - Array of student IDs
+   * @returns {Promise} Success response
+   */
+  assignStudentsToSection: async (sectionId, studentIds) => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.post(
+      `/admin/program-sections/${sectionId}/assign-students?current_user_id=${currentUser?.id}`,
+      { student_ids: studentIds }
+    )
+  },
+
+  /**
+   * Remove a student from a section
+   * @param {number} sectionId - Section ID
+   * @param {number} studentId - Student ID
+   * @returns {Promise} Success response
+   */
+  removeStudentFromSection: async (sectionId, studentId) => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.delete(`/admin/program-sections/${sectionId}/students/${studentId}?current_user_id=${currentUser?.id}`)
+  },
+
+  /**
+   * Bulk enroll all students from a program section into a class section
+   * @param {number} classSectionId - Class section ID
+   * @param {number} programSectionId - Program section ID
+   * @returns {Promise} Success response with enrollment counts
+   */
+  enrollProgramSectionToClass: async (classSectionId, programSectionId) => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.post(
+      `/admin/sections/${classSectionId}/enroll-program-section?current_user_id=${currentUser?.id}`,
+      { program_section_id: programSectionId }
+    )
   },
 }
 
@@ -737,7 +1091,7 @@ export const deptHeadAPI = {
    */
   getEvaluations: async (params = {}) => {
     const currentUser = authAPI.getCurrentUser()
-    const queryParams = new URLSearchParams({ user_id: currentUser?.id, ...params })
+    const queryParams = new URLSearchParams({ user_id: currentUser?.id, page_size: 100, ...params })
     return apiClient.get(`/dept-head/evaluations?${queryParams.toString()}`)
   },
 
@@ -1119,7 +1473,7 @@ export const secretaryAPI = {
    */
   getEvaluations: async (params = {}) => {
     const currentUser = authAPI.getCurrentUser()
-    const queryParams = new URLSearchParams({ user_id: currentUser?.id, ...params })
+    const queryParams = new URLSearchParams({ user_id: currentUser?.id, page_size: 100, ...params })
     return apiClient.get(`/secretary/evaluations?${queryParams.toString()}`)
   },
 

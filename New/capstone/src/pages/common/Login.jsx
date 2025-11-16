@@ -3,14 +3,47 @@ import { useNavigate } from 'react-router-dom'
 import { Link } from 'react-router-dom'
 import { authAPI } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
+import ChangePasswordModal from '../../components/ChangePasswordModal'
 
 export default function Login(){
   const [id, setId] = useState('')
   const [pw, setPw] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showChangePassword, setShowChangePassword] = useState(false)
+  const [tempUser, setTempUser] = useState(null)
+  const [tempToken, setTempToken] = useState(null)
   const nav = useNavigate()
   const { login } = useAuth()
+
+  const handlePasswordChangeSuccess = () => {
+    // Password changed successfully, now proceed with normal login flow
+    if (tempUser && tempToken) {
+      // Update user object to clear mustChangePassword flag
+      const updatedUser = { ...tempUser, mustChangePassword: false }
+      
+      // Use AuthContext login to store token and user
+      login(tempToken, updatedUser)
+      
+      // Navigate based on role
+      const role = updatedUser.role.toLowerCase()
+      
+      if (role === 'admin') {
+        nav('/admin/dashboard')
+      } else if (role === 'student') {
+        nav('/student/courses')
+      } else if (role === 'secretary' || role === 'department_head' || role === 'instructor') {
+        nav('/dashboard')
+      } else {
+        setError('Unknown role. Please contact administrator.')
+      }
+    }
+    
+    // Clean up
+    setShowChangePassword(false)
+    setTempUser(null)
+    setTempToken(null)
+  }
 
   async function submit(){
     setError('')
@@ -31,6 +64,16 @@ export default function Login(){
       const response = await authAPI.login(lower, pw)
       
       if (response.success && response.token && response.user) {
+        // Check if user must change password on first login
+        if (response.user.mustChangePassword) {
+          // Store temp data and show password change modal
+          setTempUser(response.user)
+          setTempToken(response.token)
+          setShowChangePassword(true)
+          setLoading(false)
+          return
+        }
+
         // Use AuthContext login to store token and user
         login(response.token, response.user)
         
@@ -221,6 +264,15 @@ export default function Login(){
           </div>
         </div>
       </div>
+
+      {/* Change Password Modal */}
+      {showChangePassword && tempUser && (
+        <ChangePasswordModal
+          user={tempUser}
+          onSuccess={handlePasswordChangeSuccess}
+          onCancel={null}  // Cannot cancel on first login
+        />
+      )}
     </div>
   )
 }

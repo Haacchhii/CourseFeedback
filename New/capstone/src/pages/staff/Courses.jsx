@@ -176,13 +176,18 @@ export default function Courses() {
   // Enhance courses with evaluation data
   const enhancedCourses = useMemo(() => {
     return courses.map(course => {
-      const courseEvaluations = evaluations.filter(e => e.courseId === course.id)
-      const evaluationCount = courseEvaluations.length
+      // Match evaluations by sectionId (since course.id is actually section_id)
+      const courseEvaluations = evaluations.filter(e => e.sectionId === course.id || e.courseId === course.id)
+      
+      // Use data from API response first, fallback to calculation
+      const evaluationCount = course.evaluations_count || courseEvaluations.length
       const enrollmentCount = course.enrolledStudents || 0
       
-      // Calculate overall rating from evaluations
-      let overallRating = 0
-      if (courseEvaluations.length > 0) {
+      // Use overallRating from API (already calculated in backend)
+      let overallRating = course.overallRating || 0
+      
+      // Only recalculate if API didn't provide it and we have evaluations
+      if (!overallRating && courseEvaluations.length > 0) {
         const totalRating = courseEvaluations.reduce((sum, e) => {
           const ratings = Object.values(e.ratings || {})
           const avgRating = ratings.length > 0 ? ratings.reduce((a, b) => a + b) / ratings.length : 0

@@ -667,3 +667,172 @@ async def get_course_details(course_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Error getting course details: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch course details")
+
+
+@router.get("/{student_id}/evaluation-periods")
+async def get_student_evaluation_periods(student_id: int, db: Session = Depends(get_db)):
+    """Get active evaluation periods where student has pending evaluations"""
+    try:
+        periods_result = db.execute(text("""
+            SELECT DISTINCT
+                ep.id, ep.name, ep.semester, ep.academic_year,
+                ep.start_date, ep.end_date, ep.status,
+                COUNT(DISTINCT ev.id) as pending_count
+            FROM evaluation_periods ep
+            JOIN evaluations ev ON ev.evaluation_period_id = ep.id
+            WHERE ev.student_id = :student_id
+            AND ev.status = 'pending'
+            AND ep.status = 'active'
+            GROUP BY ep.id, ep.name, ep.semester, ep.academic_year, 
+                     ep.start_date, ep.end_date, ep.status
+            ORDER BY ep.start_date DESC
+        """), {"student_id": student_id})
+        
+        periods = []
+        for row in periods_result:
+            periods.append({
+                "id": row[0],
+                "name": row[1],
+                "semester": row[2],
+                "academic_year": row[3],
+                "start_date": row[4].isoformat() if row[4] else None,
+                "end_date": row[5].isoformat() if row[5] else None,
+                "status": row[6],
+                "pending_evaluations": row[7]
+            })
+        
+        return {
+            "success": True,
+            "data": periods
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting evaluation periods for student: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch evaluation periods")
+
+
+@router.get("/{student_id}/pending-evaluations")
+async def get_student_pending_evaluations(
+    student_id: int, 
+    period_id: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    """Get all pending evaluations for a student"""
+    try:
+        query = """
+            SELECT 
+                ev.id, ev.class_section_id, ev.evaluation_period_id,
+                c.subject_code, c.subject_name,
+                cs.class_code,
+                u.first_name || ' ' || u.last_name as instructor_name,
+                ep.name as period_name, ep.end_date,
+                p.program_name
+            FROM evaluations ev
+            JOIN class_sections cs ON ev.class_section_id = cs.id
+            JOIN courses c ON cs.course_id = c.id
+            LEFT JOIN users u ON cs.instructor_id = u.id
+            LEFT JOIN evaluation_periods ep ON ev.evaluation_period_id = ep.id
+            LEFT JOIN programs p ON c.program_id = p.id
+            WHERE ev.student_id = :student_id
+            AND ev.status = 'pending'
+        """
+        
+        params = {"student_id": student_id}
+        
+        if period_id:
+            query += " AND ev.evaluation_period_id = :period_id"
+            params["period_id"] = period_id
+        
+        query += " ORDER BY ep.end_date ASC, c.subject_name"
+        
+        evaluations_result = db.execute(text(query), params)
+        
+        evaluations = []
+        for row in evaluations_result:
+            evaluations.append({
+                "evaluation_id": row[0],
+                "class_section_id": row[1],
+                "period_id": row[2],
+                "subject_code": row[3],
+                "subject_name": row[4],
+                "class_code": row[5],
+                "instructor_name": row[6],
+                "period_name": row[7],
+                "due_date": row[8].isoformat() if row[8] else None,
+                "program_name": row[9]
+            })
+        
+        return {
+            "success": True,
+            "data": evaluations
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting pending evaluations: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch pending evaluations")
+
+
+@router.put("/evaluations/{evaluation_id}/submit")
+async def submit_evaluation(
+    evaluation_id: int,
+    evaluation_data: EvaluationSubmission,
+    db: Session = Depends(get_db)
+):
+    """Submit a completed evaluation"""
+    try:
+        # Verify evaluation exists and is pending
+        check_query = text("""
+            SELECT id, student_id, status FROM evaluations
+            WHERE id = :evaluation_id
+        """)
+        
+        evaluation = db.execute(check_query, {"evaluation_id": evaluation_id}).fetchone()
+        
+        if not evaluation:
+            raise HTTPException(status_code=404, detail="Evaluation not found")
+        
+        if evaluation[2] != 'pending':
+            raise HTTPException(status_code=400, detail="Evaluation has already been submitted")
+        
+        # Update evaluation with ratings and mark as completed
+        update_query = text("""
+            UPDATE evaluations
+            SET 
+                rating_overall = :rating_overall,
+                rating_teaching = :rating_teaching,
+                rating_communication = :rating_communication,
+                rating_materials = :rating_materials,
+                rating_assessment = :rating_assessment,
+                rating_responsiveness = :rating_responsiveness,
+                rating_organization = :rating_organization,
+                comment = :comment,
+                status = 'completed',
+                submitted_at = NOW()
+            WHERE id = :evaluation_id
+        """)
+        
+        db.execute(update_query, {
+            "evaluation_id": evaluation_id,
+            "rating_overall": evaluation_data.ratings.get("overall", 0),
+            "rating_teaching": evaluation_data.ratings.get("teaching", 0),
+            "rating_communication": evaluation_data.ratings.get("communication", 0),
+            "rating_materials": evaluation_data.ratings.get("materials", 0),
+            "rating_assessment": evaluation_data.ratings.get("assessment", 0),
+            "rating_responsiveness": evaluation_data.ratings.get("responsiveness", 0),
+            "rating_organization": evaluation_data.ratings.get("organization", 0),
+            "comment": evaluation_data.comment
+        })
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "Evaluation submitted successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error submitting evaluation: {e}")
+        raise HTTPException(status_code=500, detail="Failed to submit evaluation")

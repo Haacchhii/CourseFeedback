@@ -1,11 +1,17 @@
 # Configuration settings for the Course Feedback System
 
 import os
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     # Database Configuration
     DATABASE_URL: str = "postgresql://postgres:password@localhost/course_feedback_db"
+    
+    # Debug Configuration
+    DEBUG: bool = False
+    
+    # CORS Configuration (from .env)
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
     
     # JWT Configuration
     SECRET_KEY: str = "your-secret-key-here-change-in-production"
@@ -41,7 +47,36 @@ class Settings(BaseSettings):
     SMTP_FROM_NAME: str = os.getenv("SMTP_FROM_NAME", "LPU Course Feedback System")
     EMAIL_ENABLED: bool = os.getenv("EMAIL_ENABLED", "false").lower() == "true"
     
-    class Config:
-        env_file = ".env"
+    # Timezone Configuration
+    TIMEZONE: str = os.getenv("TIMEZONE", "Asia/Manila")  # Philippines Time (UTC+8)
+    
+    model_config = {
+        "env_file": ".env",
+        "extra": "ignore"  # Ignore extra fields from .env
+    }
 
 settings = Settings()
+
+# Timezone utility functions
+from datetime import datetime, timezone as dt_timezone
+from zoneinfo import ZoneInfo
+
+def get_local_timezone():
+    """Get the configured local timezone"""
+    return ZoneInfo(settings.TIMEZONE)
+
+def now_local():
+    """Get current datetime in local timezone"""
+    return datetime.now(get_local_timezone())
+
+def utc_to_local(utc_dt):
+    """Convert UTC datetime to local timezone"""
+    if utc_dt.tzinfo is None:
+        utc_dt = utc_dt.replace(tzinfo=dt_timezone.utc)
+    return utc_dt.astimezone(get_local_timezone())
+
+def local_to_utc(local_dt):
+    """Convert local datetime to UTC"""
+    if local_dt.tzinfo is None:
+        local_dt = local_dt.replace(tzinfo=get_local_timezone())
+    return local_dt.astimezone(dt_timezone.utc)

@@ -1,91 +1,23 @@
-# FastAPI and Server# Core FastAPI dependencies# FastAPI and Server
-
+﻿# FastAPI and Server
 fastapi==0.104.1
-
-uvicorn[standard]==0.24.0fastapi==0.104.1fastapi==0.104.1
-
+uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 
-uvicorn[standard]==0.24.0uvicorn[standard]==0.24.0
+# Database - Using psycopg v3 (supports Python 3.13)
+psycopg[binary]>=3.2.0
+psycopg-binary>=3.2.0
+sqlalchemy>=2.0.36
+alembic==1.12.1
 
-# Database - PostgreSQL
-
-psycopg2-binary==2.9.9python-multipart==0.0.6
-
-sqlalchemy==2.0.23
-
-alembic==1.12.1# Machine Learning
-
-
-
-# Authentication & Security# Database dependenciesscikit-learn==1.3.2
-
-python-jose[cryptography]==3.3.0
-
-passlib[bcrypt]==1.7.4sqlalchemy==2.0.23spacy==3.7.2
-
+# Authentication & Security
+python-jose==3.3.0
+passlib[bcrypt]==1.7.4
 bcrypt==4.1.2
-
-psycopg2-binary==2.9.9numpy==1.24.4
 
 # Data Validation & Configuration
-
-pydantic==2.5.2alembic==1.12.1pandas==2.1.4
-
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
 python-dotenv==1.0.0
 
-
-
 # HTTP & API
-
-requests==2.31.0# Authentication & Security# Database - PostgreSQL
-
-
-
-# Optional: Machine Learning (Install separately if needed)python-jose[cryptography]==3.3.0psycopg2-binary==2.9.9
-
-# scikit-learn==1.3.2
-
-# numpy==1.24.4passlib[bcrypt]==1.7.4sqlalchemy==2.0.23
-
-# pandas==2.1.4
-
-# spacy==3.7.2python-jwt==4.0.0
-
-# nltk==3.8.1
-
-# Machine Learning dependencies
-scikit-learn==1.3.2
-
-pandas==2.1.3# Authentication & Security
-
-numpy==1.25.2python-jose[cryptography]==3.3.0
-
-spacy==3.7.2passlib[bcrypt]==1.7.4
-
-bcrypt==4.1.2
-
-# Text processing and NLP
-
-nltk==3.8.1# API & Request Handling
-
-python-multipart==0.0.6
-
-# Data validationrequests==2.31.0
-
-pydantic==2.5.0
-
-# Configuration & Environment
-
-# Environment managementpython-dotenv==1.0.0
-
-python-dotenv==1.0.0pydantic==2.5.2
-
-
-# Async support
-asyncio
-
-# Development dependencies
-pytest==7.4.3
-pytest-asyncio==0.21.1
-httpx==0.25.2
+requests==2.31.0

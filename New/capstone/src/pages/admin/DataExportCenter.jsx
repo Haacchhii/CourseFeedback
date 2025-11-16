@@ -30,6 +30,34 @@ export default function DataExportCenter() {
     recipients: currentUser?.email || ''
   })
   
+  // Export Modal State
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [selectedExportType, setSelectedExportType] = useState('')
+  const [modalFormat, setModalFormat] = useState('csv')
+  const [exportFilters, setExportFilters] = useState({
+    // User filters
+    userRole: 'all',
+    userProgram: 'all',
+    userStatus: 'all',
+    // Evaluation filters
+    evalDateRange: 'all',
+    evalProgram: 'all',
+    evalSemester: 'all',
+    evalInstructor: 'all',
+    // Course filters
+    courseProgram: 'all',
+    courseStatus: 'all',
+    courseYearLevel: 'all',
+    // Analytics filters
+    analyticsReportType: 'summary',
+    analyticsDateRange: 'semester',
+    // Audit log filters
+    auditDateRange: 'all',
+    auditAction: 'all',
+    auditUser: 'all',
+    auditCategory: 'all'
+  })
+  
   // API State
   const [exportHistory, setExportHistory] = useState([])
   const [loading, setLoading] = useState(true)
@@ -84,45 +112,100 @@ export default function DataExportCenter() {
     fetchStats()
   }, [])
 
-  const handleQuickExport = async (type) => {
+  const handleQuickExport = (type) => {
+    // Open export modal with selected type
+    setSelectedExportType(type)
+    setModalFormat('csv') // Reset to default
+    // Reset filters to defaults
+    setExportFilters({
+      userRole: 'all',
+      userProgram: 'all',
+      userStatus: 'all',
+      evalDateRange: 'all',
+      evalProgram: 'all',
+      evalSemester: 'all',
+      evalInstructor: 'all',
+      courseProgram: 'all',
+      courseStatus: 'all',
+      courseYearLevel: 'all',
+      analyticsReportType: 'summary',
+      analyticsDateRange: 'semester',
+      auditDateRange: 'all',
+      auditAction: 'all',
+      auditUser: 'all',
+      auditCategory: 'all'
+    })
+    setShowExportModal(true)
+  }
+
+  const handleConfirmExport = async () => {
     try {
       setExporting(true)
       let data
       const timestamp = new Date().toISOString().split('T')[0]
       
       // Convert frontend formats to backend-compatible formats
-      // Backend only supports 'json' and 'csv'
-      const backendFormat = (exportFormat === 'excel' || exportFormat === 'pdf') 
-        ? (exportFormat === 'excel' ? 'csv' : 'json') 
-        : exportFormat
+      const backendFormat = (modalFormat === 'excel' || modalFormat === 'pdf') 
+        ? (modalFormat === 'excel' ? 'csv' : 'json') 
+        : modalFormat
       
-      if (type === 'All Users') {
-        data = await adminAPI.exportUsers({ format: backendFormat })
-        downloadData(data, `users_export_${timestamp}.${exportFormat}`, exportFormat)
-      } else if (type === 'All Evaluations') {
-        data = await adminAPI.exportEvaluations({ format: backendFormat, dateRange })
-        downloadData(data, `evaluations_export_${timestamp}.${exportFormat}`, exportFormat)
-      } else if (type === 'All Courses') {
-        data = await adminAPI.exportCourses({ format: backendFormat })
-        downloadData(data, `courses_export_${timestamp}.${exportFormat}`, exportFormat)
-      } else if (type === 'Analytics Report') {
-        data = await adminAPI.exportAnalytics({ format: backendFormat, dateRange })
-        downloadData(data, `analytics_export_${timestamp}.${exportFormat}`, exportFormat)
+      // Build options object with filters
+      const options = { format: backendFormat }
+      
+      if (selectedExportType === 'All Users') {
+        if (exportFilters.userRole !== 'all') options.role = exportFilters.userRole
+        if (exportFilters.userProgram !== 'all') options.program = exportFilters.userProgram
+        if (exportFilters.userStatus !== 'all') options.status = exportFilters.userStatus
+        data = await adminAPI.exportUsers(options)
+        downloadData(data, `users_export_${timestamp}.${modalFormat}`, modalFormat)
+      } else if (selectedExportType === 'All Evaluations') {
+        if (exportFilters.evalDateRange !== 'all') options.dateRange = exportFilters.evalDateRange
+        if (exportFilters.evalProgram !== 'all') options.program = exportFilters.evalProgram
+        if (exportFilters.evalSemester !== 'all') options.semester = exportFilters.evalSemester
+        if (exportFilters.evalInstructor !== 'all') options.instructor = exportFilters.evalInstructor
+        data = await adminAPI.exportEvaluations(options)
+        downloadData(data, `evaluations_export_${timestamp}.${modalFormat}`, modalFormat)
+      } else if (selectedExportType === 'All Courses') {
+        if (exportFilters.courseProgram !== 'all') options.program = exportFilters.courseProgram
+        if (exportFilters.courseStatus !== 'all') options.status = exportFilters.courseStatus
+        if (exportFilters.courseYearLevel !== 'all') options.yearLevel = exportFilters.courseYearLevel
+        data = await adminAPI.exportCourses(options)
+        downloadData(data, `courses_export_${timestamp}.${modalFormat}`, modalFormat)
+      } else if (selectedExportType === 'Analytics Report') {
+        options.reportType = exportFilters.analyticsReportType
+        options.dateRange = exportFilters.analyticsDateRange
+        data = await adminAPI.exportAnalytics(options)
+        downloadData(data, `analytics_export_${timestamp}.${modalFormat}`, modalFormat)
+      } else if (selectedExportType === 'Audit Logs') {
+        if (exportFilters.auditDateRange !== 'all') options.dateRange = exportFilters.auditDateRange
+        if (exportFilters.auditAction !== 'all') options.action = exportFilters.auditAction
+        if (exportFilters.auditUser !== 'all') options.user = exportFilters.auditUser
+        if (exportFilters.auditCategory !== 'all') options.category = exportFilters.auditCategory
+        data = await adminAPI.exportAuditLogs(options)
+        downloadData(data, `audit_logs_export_${timestamp}.${modalFormat}`, modalFormat)
+      } else if (selectedExportType === 'Full System') {
+        data = await adminAPI.exportFullSystem(options)
+        downloadData(data, `full_system_export_${timestamp}.${modalFormat}`, modalFormat)
       }
       
-      // Refresh history
-      try {
-        const updatedHistory = await adminAPI.getExportHistory()
-        const historyData = updatedHistory?.data || updatedHistory
-        setExportHistory(historyData?.exports || [])
-      } catch (historyErr) {
-        console.log('Could not refresh export history:', historyErr)
-      }
+      // Close modal first
+      setShowExportModal(false)
       
-      alert(`${type} exported successfully!`)
+      // Show success message
+      alert(`${selectedExportType} exported successfully!`)
+      
+      // Force refresh history after a short delay to allow backend to save export record
+      setTimeout(async () => {
+        try {
+          const updatedHistory = await adminAPI.getExportHistory()
+          const historyData = updatedHistory?.data || updatedHistory
+          setExportHistory(historyData?.exports || [])
+        } catch (historyErr) {
+          console.error('Could not refresh export history:', historyErr)
+        }
+      }, 500)
     } catch (err) {
       console.error('Export error:', err)
-      // Extract meaningful error message
       let errorMessage = 'Unknown error occurred'
       if (err?.response?.data?.detail) {
         errorMessage = err.response.data.detail
@@ -441,10 +524,36 @@ export default function DataExportCenter() {
     }
   }
 
-  const handleScheduleExport = (e) => {
+  const handleScheduleExport = async (e) => {
     e.preventDefault()
-    alert(`Scheduled ${scheduleSettings.frequency} exports to ${scheduleSettings.recipients}`)
-    setShowScheduleModal(false)
+    
+    try {
+      setLoading(true)
+      
+      const scheduleData = {
+        frequency: scheduleSettings.frequency,
+        time: scheduleSettings.time,
+        format: scheduleSettings.format,
+        recipients: scheduleSettings.recipients,
+        day_of_week: scheduleSettings.frequency === 'weekly' ? scheduleSettings.dayOfWeek : null,
+        day_of_month: scheduleSettings.frequency === 'monthly' ? parseInt(scheduleSettings.dayOfMonth) : null,
+        is_active: true
+      }
+      
+      const response = await adminAPI.scheduleExport(scheduleData)
+      
+      if (response.success) {
+        alert(`✅ Export scheduled successfully!\n\nFrequency: ${scheduleSettings.frequency}\nTime: ${scheduleSettings.time}\nRecipients: ${scheduleSettings.recipients}`)
+        setShowScheduleModal(false)
+      } else {
+        throw new Error(response.message || 'Failed to schedule export')
+      }
+    } catch (err) {
+      console.error('Schedule export error:', err)
+      alert(`Failed to schedule export: ${err.message}`)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleDownload = (file) => {
@@ -517,7 +626,7 @@ export default function DataExportCenter() {
 
       <div className="container mx-auto px-6 py-8">
         {/* Tabs */}
-        <div className="bg-white rounded-xl shadow-md mb-6 p-2 grid grid-cols-3 gap-2">
+        <div className="bg-white rounded-xl shadow-md mb-6 p-2 grid grid-cols-2 gap-2">
           <button
             onClick={() => setActiveTab('quick')}
             className={`py-3 px-4 rounded-lg font-semibold transition-all ${
@@ -527,16 +636,6 @@ export default function DataExportCenter() {
             }`}
           >
             ⚡ Quick Export
-          </button>
-          <button
-            onClick={() => setActiveTab('custom')}
-            className={`py-3 px-4 rounded-lg font-semibold transition-all ${
-              activeTab === 'custom'
-                ? 'bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            🎯 Custom Export
           </button>
           <button
             onClick={() => setActiveTab('history')}
@@ -558,31 +657,8 @@ export default function DataExportCenter() {
               <p className="text-sm text-blue-700">Export commonly requested data sets with one click.</p>
             </div>
 
-            {/* Format Selector */}
-            <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">Select Export Format</h3>
-              <div className="grid md:grid-cols-4 gap-4">
-                {['csv', 'excel', 'pdf', 'json'].map(format => (
-                  <button
-                    key={format}
-                    onClick={() => setExportFormat(format)}
-                    className={`p-6 rounded-xl border-2 transition-all ${
-                      exportFormat === format
-                        ? 'border-green-500 bg-green-50'
-                        : 'border-gray-200 hover:border-green-300'
-                    }`}
-                  >
-                    <div className="text-4xl mb-2">
-                      {format === 'csv' && '📊'}
-                      {format === 'excel' && '📈'}
-                      {format === 'pdf' && '📄'}
-                      {format === 'json' && '🔧'}
-                    </div>
-                    <p className="font-bold text-gray-900">{format.toUpperCase()}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* Format Selector - REMOVED: Will be replaced with modal in Phase 4 */}
+            {/* Format selection will be per-export via modal pop-up */}
 
             {/* Quick Export Cards */}
             <div className="grid md:grid-cols-2 gap-6">
@@ -723,8 +799,8 @@ export default function DataExportCenter() {
           </>
         )}
 
-        {/* Custom Export Tab */}
-        {activeTab === 'custom' && (
+        {/* Custom Export Tab - REMOVED */}
+        {false && activeTab === 'custom' && (
           <div className="bg-white rounded-xl shadow-md p-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">🎯 Custom Export Configuration</h2>
             
@@ -909,6 +985,396 @@ export default function DataExportCenter() {
           </div>
         )}
       </div>
+
+      {/* Export Configuration Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-700 p-6 rounded-t-2xl">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold text-white">📥 Configure Export: {selectedExportType}</h2>
+                  <p className="text-blue-100 mt-1">Select format and apply filters</p>
+                </div>
+                <button
+                  onClick={() => setShowExportModal(false)}
+                  className="text-white hover:bg-white/20 rounded-lg p-2 transition-all"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Format Selection */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-3">Export Format *</label>
+                <div className="grid grid-cols-4 gap-3">
+                  {['csv', 'excel', 'json', 'pdf'].map((format) => (
+                    <button
+                      key={format}
+                      type="button"
+                      onClick={() => setModalFormat(format)}
+                      className={`p-4 rounded-lg border-2 transition-all ${
+                        modalFormat === format
+                          ? 'border-blue-600 bg-blue-50 shadow-md'
+                          : 'border-gray-300 hover:border-blue-300'
+                      }`}
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <svg className={`w-8 h-8 ${modalFormat === format ? 'text-blue-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <span className={`text-sm font-semibold uppercase ${modalFormat === format ? 'text-blue-600' : 'text-gray-600'}`}>
+                          {format}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Category-Specific Filters */}
+              {selectedExportType === 'All Users' && (
+                <div className="bg-gray-50 rounded-xl p-4 space-y-4">
+                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+                    </svg>
+                    User Filters
+                  </h3>
+                  <div className="grid md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
+                      <select
+                        value={exportFilters.userRole}
+                        onChange={(e) => setExportFilters({...exportFilters, userRole: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="all">All Roles</option>
+                        <option value="student">Students</option>
+                        <option value="instructor">Instructors</option>
+                        <option value="secretary">Secretaries</option>
+                        <option value="department_head">Department Heads</option>
+                        <option value="admin">Admins</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Program</label>
+                      <select
+                        value={exportFilters.userProgram}
+                        onChange={(e) => setExportFilters({...exportFilters, userProgram: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="all">All Programs</option>
+                        <option value="BSIT">BSIT</option>
+                        <option value="BSCS-DS">BSCS-DS</option>
+                        <option value="BS-CYBER">BS-CYBER</option>
+                        <option value="BSPSY">BSPSY</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                      <select
+                        value={exportFilters.userStatus}
+                        onChange={(e) => setExportFilters({...exportFilters, userStatus: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="all">All Status</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {selectedExportType === 'All Evaluations' && (
+                <div className="bg-gray-50 rounded-xl p-4 space-y-4">
+                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+                    </svg>
+                    Evaluation Filters
+                  </h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
+                      <select
+                        value={exportFilters.evalDateRange}
+                        onChange={(e) => setExportFilters({...exportFilters, evalDateRange: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="all">All Time</option>
+                        <option value="current_semester">Current Semester</option>
+                        <option value="last_semester">Last Semester</option>
+                        <option value="current_year">Current Year</option>
+                        <option value="last_30_days">Last 30 Days</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Program</label>
+                      <select
+                        value={exportFilters.evalProgram}
+                        onChange={(e) => setExportFilters({...exportFilters, evalProgram: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="all">All Programs</option>
+                        <option value="BSIT">BSIT</option>
+                        <option value="BSCS-DS">BSCS-DS</option>
+                        <option value="BS-CYBER">BS-CYBER</option>
+                        <option value="BSPSY">BSPSY</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Semester</label>
+                      <select
+                        value={exportFilters.evalSemester}
+                        onChange={(e) => setExportFilters({...exportFilters, evalSemester: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="all">All Semesters</option>
+                        <option value="1st Semester">1st Semester</option>
+                        <option value="2nd Semester">2nd Semester</option>
+                        <option value="Summer">Summer</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Instructor</label>
+                      <input
+                        type="text"
+                        placeholder="Instructor name (optional)"
+                        value={exportFilters.evalInstructor}
+                        onChange={(e) => setExportFilters({...exportFilters, evalInstructor: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {selectedExportType === 'All Courses' && (
+                <div className="bg-gray-50 rounded-xl p-4 space-y-4">
+                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+                    </svg>
+                    Course Filters
+                  </h3>
+                  <div className="grid md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Program</label>
+                      <select
+                        value={exportFilters.courseProgram}
+                        onChange={(e) => setExportFilters({...exportFilters, courseProgram: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="all">All Programs</option>
+                        <option value="BSIT">BSIT</option>
+                        <option value="BSCS-DS">BSCS-DS</option>
+                        <option value="BS-CYBER">BS-CYBER</option>
+                        <option value="BSPSY">BSPSY</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                      <select
+                        value={exportFilters.courseStatus}
+                        onChange={(e) => setExportFilters({...exportFilters, courseStatus: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="all">All Status</option>
+                        <option value="Active">Active</option>
+                        <option value="Archived">Archived</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Year Level</label>
+                      <select
+                        value={exportFilters.courseYearLevel}
+                        onChange={(e) => setExportFilters({...exportFilters, courseYearLevel: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="all">All Years</option>
+                        <option value="1">1st Year</option>
+                        <option value="2">2nd Year</option>
+                        <option value="3">3rd Year</option>
+                        <option value="4">4th Year</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {selectedExportType === 'Analytics Report' && (
+                <div className="bg-gray-50 rounded-xl p-4 space-y-4">
+                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+                    </svg>
+                    Analytics Options
+                  </h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Report Type</label>
+                      <select
+                        value={exportFilters.analyticsReportType}
+                        onChange={(e) => setExportFilters({...exportFilters, analyticsReportType: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="summary">Summary Report</option>
+                        <option value="detailed">Detailed Report</option>
+                        <option value="trends">Trend Analysis</option>
+                        <option value="sentiment">Sentiment Analysis</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
+                      <select
+                        value={exportFilters.analyticsDateRange}
+                        onChange={(e) => setExportFilters({...exportFilters, analyticsDateRange: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="semester">Current Semester</option>
+                        <option value="year">Current Year</option>
+                        <option value="all">All Time</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {selectedExportType === 'Audit Logs' && (
+                <div className="bg-gray-50 rounded-xl p-4 space-y-4">
+                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+                    </svg>
+                    Audit Log Filters
+                  </h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
+                      <select
+                        value={exportFilters.auditDateRange}
+                        onChange={(e) => setExportFilters({...exportFilters, auditDateRange: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="all">All Time</option>
+                        <option value="today">Today</option>
+                        <option value="last_7_days">Last 7 Days</option>
+                        <option value="last_30_days">Last 30 Days</option>
+                        <option value="current_month">Current Month</option>
+                        <option value="last_month">Last Month</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Action Type</label>
+                      <select
+                        value={exportFilters.auditAction}
+                        onChange={(e) => setExportFilters({...exportFilters, auditAction: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="all">All Actions</option>
+                        <option value="CREATE">Create</option>
+                        <option value="UPDATE">Update</option>
+                        <option value="DELETE">Delete</option>
+                        <option value="LOGIN">Login</option>
+                        <option value="LOGOUT">Logout</option>
+                        <option value="EXPORT">Export</option>
+                        <option value="IMPORT">Import</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">User Role</label>
+                      <select
+                        value={exportFilters.auditUser}
+                        onChange={(e) => setExportFilters({...exportFilters, auditUser: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="all">All Users</option>
+                        <option value="admin">Admins</option>
+                        <option value="secretary">Secretaries</option>
+                        <option value="department_head">Department Heads</option>
+                        <option value="instructor">Instructors</option>
+                        <option value="student">Students</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                      <select
+                        value={exportFilters.auditCategory}
+                        onChange={(e) => setExportFilters({...exportFilters, auditCategory: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="all">All Categories</option>
+                        <option value="User Management">User Management</option>
+                        <option value="Course Management">Course Management</option>
+                        <option value="Evaluation">Evaluation</option>
+                        <option value="Section Management">Section Management</option>
+                        <option value="System Settings">System Settings</option>
+                        <option value="Security">Security</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Info Box */}
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  <div>
+                    <p className="text-sm font-semibold text-blue-900">Export Information</p>
+                    <p className="text-sm text-blue-800 mt-1">
+                      Format: <span className="font-semibold uppercase">{modalFormat}</span> | 
+                      Type: <span className="font-semibold">{selectedExportType}</span>
+                      {selectedExportType === 'All Users' && exportFilters.userRole !== 'all' && ` | Role: ${exportFilters.userRole}`}
+                      {selectedExportType === 'All Courses' && exportFilters.courseStatus !== 'all' && ` | Status: ${exportFilters.courseStatus}`}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setShowExportModal(false)}
+                  disabled={exporting}
+                  className="px-6 py-3 bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 disabled:text-gray-400 text-gray-800 rounded-lg font-semibold transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmExport}
+                  disabled={exporting}
+                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg font-semibold transition-all flex items-center gap-2"
+                >
+                  {exporting ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Exporting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                      </svg>
+                      <span>Export Data</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Schedule Export Modal */}
       {showScheduleModal && (

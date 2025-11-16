@@ -65,13 +65,51 @@ async def get_secretary_dashboard(
         
         total_evaluations = db.query(func.count(Evaluation.id)).scalar() or 0
         
+        # Average rating - department-wide
+        avg_rating = db.query(func.avg(Evaluation.rating_overall)).scalar() or 0.0
+        
+        # Sentiment distribution - department-wide
+        sentiment_dist = db.query(
+            Evaluation.sentiment,
+            func.count(Evaluation.id).label('count')
+        ).group_by(Evaluation.sentiment).all()
+        
+        sentiment_data = {
+            "positive": 0,
+            "neutral": 0,
+            "negative": 0
+        }
+        for sentiment, count in sentiment_dist:
+            if sentiment:
+                sentiment_data[sentiment.lower()] = count
+        
+        # Anomaly count - department-wide
+        anomaly_count = db.query(func.count(Evaluation.id)).filter(
+            Evaluation.is_anomaly == True
+        ).scalar() or 0
+        
+        # Calculate participation rate (students who submitted / total enrolled)
+        from models.enhanced_models import Enrollment
+        total_enrolled_students = db.query(func.count(Enrollment.id.distinct())).filter(
+            Enrollment.status == 'active'
+        ).scalar() or 0
+        
+        students_who_evaluated = db.query(func.count(Evaluation.student_id.distinct())).scalar() or 0
+        
+        participation_rate = round((students_who_evaluated / total_enrolled_students * 100), 1) if total_enrolled_students > 0 else 0
+        
         return {
             "success": True,
             "data": {
                 "department": "Academic Department",  # Single department system
                 "total_courses": total_courses,
                 "total_sections": total_sections,
-                "total_evaluations": total_evaluations
+                "total_evaluations": total_evaluations,
+                "total_enrolled_students": total_enrolled_students,
+                "participation_rate": participation_rate,
+                "average_rating": round(avg_rating, 2),
+                "sentiment": sentiment_data,
+                "anomalies": anomaly_count
             }
         }
         
@@ -114,8 +152,7 @@ async def get_courses(
                 or_(
                     Course.subject_code.ilike(search_filter),
                     Course.subject_name.ilike(search_filter),
-                    ClassSection.class_code.ilike(search_filter),
-                    ClassSection.instructor_name.ilike(search_filter)
+                    ClassSection.class_code.ilike(search_filter)
                 )
             )
         
@@ -133,6 +170,8 @@ async def get_courses(
                 "data": []
             }
         
+        from models.enhanced_models import Enrollment
+        
         courses_data = []
         for section, course, program in results:
             # Get evaluation count for this section
@@ -144,6 +183,12 @@ async def get_courses(
             avg_rating = db.query(func.avg(Evaluation.rating_overall)).filter(
                 Evaluation.class_section_id == section.id
             ).scalar() or 0.0
+            
+            # Get actual enrolled students count
+            enrolled_count = db.query(func.count(Enrollment.id)).filter(
+                Enrollment.class_section_id == section.id,
+                Enrollment.status == 'active'
+            ).scalar() or 0
             
             # Construct instructor full name
             instructor_full_name = "N/A"
@@ -167,7 +212,7 @@ async def get_courses(
                 "semester": section.semester or "Unknown",
                 "academic_year": section.academic_year or "Unknown",
                 "evaluations_count": eval_count,
-                "enrolled_students": section.max_students or 0,
+                "enrolled_students": enrolled_count,
                 "status": "Active",  # Default status
                 "overallRating": float(avg_rating) if avg_rating else 0.0
             })
@@ -399,13 +444,18 @@ async def get_course_sections(
                 Evaluation.class_section_id == section.id
             ).scalar() or 0
             
+            # Get instructor name from user relationship
+            instructor_name = "Not Assigned"
+            if section.instructor:
+                instructor_name = f"{section.instructor.first_name} {section.instructor.last_name}"
+            
             sections_data.append({
                 "id": section.id,
                 "class_code": section.class_code,
-                "instructor_name": section.instructor_name,
+                "instructor_name": instructor_name,
                 "instructor_id": section.instructor_id,
-                "schedule": section.schedule,
-                "room": section.room,
+                "schedule": getattr(section, 'schedule', 'TBD'),
+                "room": getattr(section, 'room', 'TBD'),
                 "max_students": section.max_students,
                 "current_enrollments": enrollments,
                 "semester": section.semester,
@@ -455,11 +505,8 @@ async def create_class_section(
         new_section = ClassSection(
             course_id=section_data.course_id,
             class_code=section_data.class_code,
-            instructor_name=section_data.instructor_name,
             instructor_id=section_data.instructor_id,
-            schedule=section_data.schedule,
-            room=section_data.room,
-            max_students=section_data.max_students,
+            max_students=section_data.max_students or 40,
             semester=section_data.semester,
             academic_year=section_data.academic_year
         )
@@ -476,37 +523,6 @@ async def create_class_section(
         raise
     except Exception as e:
         logger.error(f"Error creating class section: {e}")
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.put("/sections/{section_id}/assign-instructor")
-async def assign_instructor(
-    section_id: int,
-    instructor_name: str = Body(...),
-    instructor_id: Optional[int] = Body(None),
-    user_id: int = Query(...),
-    db: Session = Depends(get_db)
-):
-    """Assign instructor to a class section"""
-    try:
-        section = db.query(ClassSection).filter(ClassSection.id == section_id).first()
-        if not section:
-            raise HTTPException(status_code=404, detail="Class section not found")
-        
-        # Update instructor
-        section.instructor_name = instructor_name
-        section.instructor_id = instructor_id
-        db.commit()
-        
-        return {
-            "success": True,
-            "message": "Instructor assigned successfully"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error assigning instructor: {e}")
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -687,27 +703,62 @@ async def get_secretary_evaluations(
         total = query.count()
         
         # Apply pagination
-        evaluations = query.order_by(Evaluation.created_at.desc()).offset(
+        evaluations = query.order_by(Evaluation.submission_date.desc()).offset(
             (page - 1) * page_size
         ).limit(page_size).all()
         
         # Format response
+        from models.enhanced_models import Student
+        
         result = []
         for evaluation in evaluations:
             class_section = evaluation.class_section
             course = class_section.course if class_section else None
             
+            # Get instructor name from user relationship
+            instructor_name = "Unknown"
+            if class_section and class_section.instructor:
+                instructor_name = f"{class_section.instructor.first_name} {class_section.instructor.last_name}"
+            
+            # Get student info via user relationship
+            student = db.query(Student).filter(Student.id == evaluation.student_id).first()
+            student_name = "Unknown Student"
+            if student and student.user:
+                student_name = f"{student.user.first_name} {student.user.last_name}" if student.user.first_name and student.user.last_name else (student.user.email or "Unknown Student")
+            elif student:
+                student_name = student.student_number or "Unknown Student"
+            
             result.append({
                 "id": evaluation.id,
-                "course_name": course.course_name if course else "Unknown",
-                "course_code": course.course_code if course else "Unknown",
+                "courseId": course.id if course else None,
+                "sectionId": class_section.id if class_section else None,
+                "course_name": course.subject_name if course else "Unknown",
+                "course_code": course.subject_code if course else "Unknown",
                 "class_code": class_section.class_code if class_section else "Unknown",
-                "instructor_name": class_section.instructor_name if class_section else "Unknown",
+                "instructor_name": instructor_name,
+                "instructor": instructor_name,
+                "student": student_name,
                 "student_id": evaluation.student_id,
-                "rating": evaluation.average_rating,
+                "rating": evaluation.rating_overall if hasattr(evaluation, 'rating_overall') else evaluation.average_rating,
+                "rating_overall": evaluation.rating_overall if hasattr(evaluation, 'rating_overall') else 0,
+                "rating_teaching": evaluation.rating_teaching if hasattr(evaluation, 'rating_teaching') else 0,
+                "rating_content": evaluation.rating_content if hasattr(evaluation, 'rating_content') else 0,
+                "rating_engagement": evaluation.rating_engagement if hasattr(evaluation, 'rating_engagement') else 0,
+                "ratings": {
+                    "overall": evaluation.rating_overall if hasattr(evaluation, 'rating_overall') else 0,
+                    "teaching": evaluation.rating_teaching if hasattr(evaluation, 'rating_teaching') else 0,
+                    "content": evaluation.rating_content if hasattr(evaluation, 'rating_content') else 0,
+                    "engagement": evaluation.rating_engagement if hasattr(evaluation, 'rating_engagement') else 0
+                },
                 "sentiment": evaluation.sentiment,
-                "created_at": evaluation.created_at.isoformat() if evaluation.created_at else None,
-                "comment": evaluation.comment
+                "is_anomaly": evaluation.is_anomaly if hasattr(evaluation, 'is_anomaly') else False,
+                "anomaly": evaluation.is_anomaly if hasattr(evaluation, 'is_anomaly') else False,
+                "text_feedback": evaluation.text_feedback if hasattr(evaluation, 'text_feedback') else (evaluation.comment if hasattr(evaluation, 'comment') else ""),
+                "comment": evaluation.text_feedback if hasattr(evaluation, 'text_feedback') else (evaluation.comment if hasattr(evaluation, 'comment') else ""),
+                "submission_date": evaluation.submission_date.isoformat() if evaluation.submission_date else None,
+                "created_at": evaluation.submission_date.isoformat() if evaluation.submission_date else None,
+                "semester": class_section.semester if class_section else "N/A",
+                "academic_year": class_section.academic_year if class_section else "N/A"
             })
         
         return {
@@ -753,16 +804,18 @@ async def get_sentiment_analysis(
             start_date = now - timedelta(days=365)
         
         # Get sentiment distribution over time (all programs - secretary has full access)
+        from sqlalchemy import cast, Date
+        date_col = cast(func.date_trunc('day', Evaluation.submission_date), Date)
         sentiments = db.query(
-            func.date_trunc('day', Evaluation.submission_date).label('date'),
+            date_col.label('date'),
             Evaluation.sentiment,
             func.count(Evaluation.id).label('count')
         ).filter(
             Evaluation.submission_date >= start_date
         ).group_by(
-            func.date_trunc('day', Evaluation.submission_date),
+            date_col,
             Evaluation.sentiment
-        ).order_by('date').all()
+        ).order_by(date_col).all()
         
         # Format data for charts
         sentiment_trends = {}
@@ -842,11 +895,16 @@ async def get_anomalies(
             class_section = db.query(ClassSection).filter(ClassSection.id == e.class_section_id).first()
             course = db.query(Course).filter(Course.id == class_section.course_id).first() if class_section else None
             
+            # Get instructor name from user relationship
+            instructor_name = "N/A"
+            if class_section and class_section.instructor:
+                instructor_name = f"{class_section.instructor.first_name} {class_section.instructor.last_name}"
+            
             anomaly_data.append({
                 "id": e.id,
                 "course_code": course.subject_code if course else "N/A",
                 "course_name": course.subject_name if course else "N/A",
-                "instructor": class_section.instructor_name if class_section else "N/A",
+                "instructor": instructor_name,
                 "rating_overall": e.rating_overall,
                 "anomaly_score": e.anomaly_score,
                 "comments": e.comments,
@@ -1104,12 +1162,12 @@ async def get_completion_rates(
         sections_query = text("""
             SELECT 
                 cs.id as section_id,
-                cs.section_code as class_code,
+                cs.class_code,
                 c.id as course_id,
                 c.subject_code,
                 c.subject_name,
                 c.year_level,
-                COALESCE(u.full_name, 'No Instructor') as instructor_name,
+                COALESCE(CONCAT(u.first_name, ' ', u.last_name), 'No Instructor') as instructor_name,
                 cs.semester,
                 cs.academic_year,
                 COUNT(DISTINCT en.student_id) as enrolled_students,
@@ -1124,8 +1182,8 @@ async def get_completion_rates(
             LEFT JOIN users u ON cs.instructor_id = u.id
             LEFT JOIN enrollments en ON cs.id = en.class_section_id AND en.status = 'active'
             LEFT JOIN evaluations e ON cs.id = e.class_section_id AND en.student_id = e.student_id
-            GROUP BY cs.id, cs.section_code, c.id, c.subject_code, c.subject_name, 
-                     c.year_level, u.full_name, cs.semester, cs.academic_year
+            GROUP BY cs.id, cs.class_code, c.id, c.subject_code, c.subject_name, 
+                     c.year_level, u.first_name, u.last_name, cs.semester, cs.academic_year
             ORDER BY completion_rate ASC, c.subject_name
         """)
         
@@ -1210,11 +1268,12 @@ async def submit_support_request(
             raise HTTPException(status_code=404, detail="User not found")
         
         # Log the support request (in a real system, you would store this in a database)
+        full_name = f"{user.first_name} {user.last_name}"
         logger.info(f"""
         ========================================
         NEW SUPPORT REQUEST
         ========================================
-        From: {user.full_name} ({user.email})
+        From: {full_name} ({user.email})
         Role: {user.role}
         Issue Type: {request.issueType}
         Subject: {request.subject}

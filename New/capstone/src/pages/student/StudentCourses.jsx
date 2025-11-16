@@ -80,147 +80,122 @@ export default function StudentCourses(){
   if (error) return <ErrorDisplay error={error} onRetry={retry} />
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
-      <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-4 sm:mb-6 gap-4">
-          <div className="flex-1">
-            <h1 className="text-xl sm:text-2xl font-semibold mb-2">My Courses</h1>
-            <p className="text-xs sm:text-sm text-gray-500">
-              {currentStudent.name} - {currentStudent.program} Year {currentStudent.yearLevel}
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto">
+        {/* Header Section */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6 mb-4 md:mb-6">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">My Courses</h1>
+            <p className="text-sm md:text-base text-gray-600">
+              {currentStudent.name} • {currentStudent.program} • Year {currentStudent.year_level || currentStudent.yearLevel}
             </p>
-            <p className="text-xs text-gray-400 mt-1">Select a course to evaluate</p>
-          </div>
-          <div className="flex items-center justify-end sm:justify-start">
-            <button className="text-sm text-white bg-[#7a0000] hover:bg-[#8f0000] px-4 py-2 rounded transition-colors whitespace-nowrap" onClick={logout}>
-              Logout
-            </button>
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 mb-4">
-          <input
-            type="search"
-            name="course-search"
-            autoComplete="off"
-            spellCheck={false}
-            className="flex-1 border border-gray-200 rounded px-3 py-2 text-sm shadow-inner min-w-0"
-            placeholder="Search courses..."
-            value={query}
-            onChange={e=>setQuery(e.target.value)}
-          />
-          <select
-            className="border border-gray-200 rounded px-3 py-2 text-sm min-w-0 sm:w-auto"
-            value={semester}
-            onChange={e=>setSemester(e.target.value)}
-          >
-            {semesters.map(s => (
-              <option key={s} value={s === 'All' ? 'All' : s}>{s}</option>
-            ))}
-          </select>
+        {/* Filters Section */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4 md:mb-6">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex-1">
+              <input
+                type="search"
+                name="course-search"
+                autoComplete="off"
+                spellCheck={false}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Search by course code or name..."
+                value={query}
+                onChange={e=>setQuery(e.target.value)}
+              />
+            </div>
+            <div className="sm:w-48">
+              <select
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                value={semester}
+                onChange={e=>setSemester(e.target.value)}
+              >
+                {semesters.map(s => (
+                  <option key={s} value={s === 'All' ? 'All' : s}>
+                    {s === 'All' ? 'All Semesters' : `Semester ${s}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
 
-        {/* Mobile Card View */}
-        <div className="block md:hidden space-y-3">
-          {filtered.length === 0 && (
-            <div className="py-8 text-center text-sm text-gray-500">
-              No courses found for your program and year level.
+        {/* Courses List */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          {filtered.length === 0 ? (
+            <div className="text-center py-12">
+              <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+              </svg>
+              <p className="text-gray-500 text-sm">No courses found</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider w-32">Course Code</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider w-56">Class Code</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">Subject Name</th>
+                    <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider w-32">Semester</th>
+                    <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider w-56">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {filtered.map(c => (
+                    <tr 
+                      key={c.id} 
+                      onClick={() => nav(`/student/evaluate/${c.class_section_id || c.id}`)}
+                      className={`cursor-pointer transition-all hover:bg-gray-50 ${
+                        c.already_evaluated ? 'bg-green-50/30' : ''
+                      }`}
+                    >
+                      <td className="px-6 py-5 whitespace-nowrap">
+                        <span className="text-base font-semibold text-blue-600">{c.code}</span>
+                      </td>
+                      <td className="px-6 py-5 whitespace-nowrap">
+                        <span className="text-base font-mono text-gray-700">{c.class_code}</span>
+                      </td>
+                      <td className="px-6 py-5">
+                        <span className="text-base font-medium text-gray-900">{c.name}</span>
+                      </td>
+                      <td className="px-6 py-5 text-center whitespace-nowrap">
+                        <span className="text-base text-gray-600">{c.semester}</span>
+                      </td>
+                      <td className="px-6 py-5 text-center whitespace-nowrap">
+                        {c.already_evaluated ? (
+                          <div className="flex items-center justify-center gap-3">
+                            <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                              <svg className="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+                              </svg>
+                              Evaluated
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                nav(`/student/evaluate/${c.class_section_id || c.id}`)
+                              }}
+                              className="text-sm text-blue-600 hover:text-blue-800 font-medium hover:underline"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-orange-100 text-orange-800">
+                            Pending
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
-          {filtered.map(c => (
-            <div key={c.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-              <div className="flex justify-between items-start mb-2">
-                <div>
-                  <div className="font-semibold text-sm text-blue-600">{c.id}</div>
-                  <div className="text-xs text-gray-500 font-mono mt-1">{c.class_code}</div>
-                </div>
-                {c.already_evaluated ? (
-                  <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-medium">✓ Evaluated</span>
-                ) : (
-                  <span className="inline-block bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full font-medium">Evaluate</span>
-                )}
-              </div>
-              <div className="font-medium text-sm mb-2">{c.name}</div>
-              <div className="text-xs text-gray-600 mb-2">
-                <div>{c.instructor_name}</div>
-                <div className="mt-1">{c.semester}</div>
-              </div>
-              {c.already_evaluated ? (
-                <Link 
-                  to={`/student/evaluate/${c.class_section_id || c.id}`}
-                  className="block w-full text-center px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
-                >
-                  Edit Evaluation
-                </Link>
-              ) : (
-                <Link 
-                  to={`/student/evaluate/${c.class_section_id || c.id}`}
-                  className="block w-full text-center px-3 py-2 bg-[#7a0000] text-white rounded text-sm hover:bg-[#8f0000] transition-colors"
-                >
-                  Evaluate Now
-                </Link>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Desktop Table View */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="min-w-full border-collapse table-auto">
-            <thead>
-              <tr className="text-left text-xs lg:text-sm text-gray-600">
-                <th className="py-2 lg:py-3 px-2 lg:px-4 border-b whitespace-nowrap">Course Code</th>
-                <th className="py-2 lg:py-3 px-2 lg:px-4 border-b whitespace-nowrap">Class Code</th>
-                <th className="py-2 lg:py-3 px-2 lg:px-4 border-b">Subject Name</th>
-                <th className="py-2 lg:py-3 px-2 lg:px-4 border-b">Instructor</th>
-                <th className="py-2 lg:py-3 px-2 lg:px-4 border-b whitespace-nowrap">Semester</th>
-                <th className="py-2 lg:py-3 px-2 lg:px-4 border-b">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="py-6 px-4 text-center text-sm text-gray-500">No courses found for your program and year level.</td>
-                </tr>
-              )}
-              {filtered.map(c => (
-                <tr 
-                  key={c.id} 
-                  onClick={() => nav(`/student/evaluate/${c.class_section_id || c.id}`)}
-                  className={`align-top cursor-pointer transition-all ${
-                    c.already_evaluated 
-                      ? 'hover:bg-green-50 border-l-4 border-l-green-500' 
-                      : 'hover:bg-orange-50 border-l-4 border-l-orange-500'
-                  }`}
-                >
-                  <td className="py-3 lg:py-4 px-2 lg:px-4 border-b font-semibold text-xs lg:text-sm text-blue-600 whitespace-nowrap">{c.code}</td>
-                  <td className="py-3 lg:py-4 px-2 lg:px-4 border-b text-xs lg:text-sm font-mono text-gray-700 whitespace-nowrap">{c.class_code}</td>
-                  <td className="py-3 lg:py-4 px-2 lg:px-4 border-b text-xs lg:text-sm font-medium">{c.name}</td>
-                  <td className="py-3 lg:py-4 px-2 lg:px-4 border-b text-xs lg:text-sm text-gray-600">{c.instructor_name}</td>
-                  <td className="py-3 lg:py-4 px-2 lg:px-4 border-b text-xs lg:text-sm text-gray-600 whitespace-nowrap">{c.semester}</td>
-                  <td className="py-3 lg:py-4 px-2 lg:px-4 border-b text-xs lg:text-sm">
-                    <div className="flex items-center gap-2">
-                      {c.already_evaluated ? (
-                        <>
-                          <span className="inline-block bg-green-100 text-green-800 text-xs px-2.5 py-1 rounded-full whitespace-nowrap font-medium">✓ Evaluated</span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              nav(`/student/evaluate/${c.class_section_id || c.id}`)
-                            }}
-                            className="text-xs text-blue-600 hover:text-blue-800 font-medium underline whitespace-nowrap"
-                          >
-                            Edit
-                          </button>
-                        </>
-                      ) : (
-                        <span className="inline-block bg-orange-100 text-orange-800 text-xs px-2.5 py-1 rounded-full whitespace-nowrap font-medium">Evaluate</span>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       </div>
     </div>

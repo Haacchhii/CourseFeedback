@@ -1,54 +1,55 @@
-# LPU Batangas Course Feedback System with ML Integration
+# LPU Batangas Course Feedback System
 
-**Status:** ✅ 100% COMPLETE - Ready for Thesis Defense  
-**Branch:** `final-version`  
-**Completion Date:** November 13, 2025
+**Status:** ✅ Production Ready  
+**Branch:** `feature/secretary-depthead-overhaul`  
+**Last Updated:** November 17, 2025
 
-## 🎓 Thesis Project
+## 🎓 About
 
-**Title:** Enhanced Sentiment Analysis and Anomaly Detection for Student Course Evaluations using Support Vector Machine and DBSCAN Approach
+A comprehensive course evaluation system designed for Lyceum of the Philippines University - Batangas with integrated machine learning for sentiment analysis and anomaly detection.
 
-**Institution:** Lyceum of the Philippines University - Batangas  
-**Developer:** Jose Iturralde
+**Developer:** Jose Iturralde  
+**Institution:** Lyceum of the Philippines University - Batangas
 
 ---
 
 ## 📋 Overview
 
-A comprehensive course evaluation system with machine learning integration for sentiment analysis and anomaly detection. Built with modern web technologies and implements real ML algorithms for educational data analysis.
+A modern web-based course evaluation system featuring automated enrollment, real-time analytics, and machine learning capabilities for educational feedback management.
 
-### Key Features:
-- ✅ **31-Question LPU Batangas Standard Evaluation Form**
-- ✅ **SVM Sentiment Analysis** (Thesis Core)
-- ✅ **DBSCAN Anomaly Detection** (Thesis Core)
-- ✅ **Email Notification System** (6 automated templates)
-- ✅ **Course Management with CSV Bulk Import**
-- ✅ **Role-Based Access Control** (5 roles)
-- ✅ **Audit Logging System**
-- ✅ **Data Export & Analytics**
+### Core Features:
+- ✅ **Automated Student Enrollment** - Auto-enroll students by program section
+- ✅ **Course Evaluation System** - Comprehensive evaluation form
+- ✅ **SVM Sentiment Analysis** - Machine learning-powered sentiment detection
+- ✅ **Anomaly Detection** - DBSCAN-based response pattern analysis
+- ✅ **Program Section Management** - Organize students by program and year
+- ✅ **Role-Based Access Control** - Admin, Student, Department Head, Secretary, Instructor
+- ✅ **Audit Logging** - Complete activity tracking
+- ✅ **Responsive Design** - Optimized for all screen sizes
 
 ---
 
 ## 🛠 Tech Stack
 
 ### Frontend:
-- **Framework:** React 18 with Vite
+- **Framework:** React 18.3 with Vite 5.x
 - **Routing:** React Router v6
-- **Styling:** Tailwind CSS
-- **Charts:** Recharts
+- **Styling:** Tailwind CSS 3.x
 - **HTTP Client:** Axios
+- **State Management:** React Hooks (useState, useEffect)
 
 ### Backend:
-- **Framework:** FastAPI (Python)
-- **Database:** PostgreSQL with SQLAlchemy ORM
-- **Authentication:** JWT tokens, bcrypt
+- **Framework:** FastAPI (Python 3.13)
+- **Database:** PostgreSQL via Supabase
+- **ORM:** SQLAlchemy 2.0.44
+- **Authentication:** JWT tokens with bcrypt hashing
 - **ML Libraries:** scikit-learn, numpy, pandas, scipy
-- **Email:** SMTP with SSL/TLS
 
 ### Machine Learning:
-- **Sentiment Analysis:** SVM (Support Vector Machine) with TF-IDF
-- **Anomaly Detection:** Rule-based DBSCAN approach
-- **Model Persistence:** joblib/pickle
+- **Sentiment Analysis:** SVM (Support Vector Machine) with TF-IDF vectorization
+- **Anomaly Detection:** DBSCAN-based pattern detection
+- **Model Persistence:** pickle/joblib
+- **Real-time Processing:** Automatic ML analysis on evaluation submission
 
 ---
 
@@ -150,40 +151,40 @@ git checkout final-version
 ```
 
 ### 2. Backend Setup:
-```bash
-cd Back
+```powershell
+cd Back\App
 
 # Create virtual environment
 python -m venv venv
-venv\Scripts\activate  # Windows
-# source venv/bin/activate  # Linux/Mac
+.\venv\Scripts\Activate.ps1  # PowerShell
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Configure .env (copy from .env.example)
-# Update DATABASE_URL, SMTP settings
+# Configure config.py with your Supabase credentials
+# SUPABASE_URL, SUPABASE_SERVICE_KEY, JWT_SECRET, etc.
 
-# Run database setup
-psql -U postgres -d course_feedback_db -f database_schema/DATABASE_COMPLETE_SETUP.sql
+# Initialize database (run in Supabase SQL Editor)
+# database_schema/DATABASE_COMPLETE_SETUP.sql
 
 # Train ML models
-cd App
 python train_ml_models.py
 
 # Start server
-uvicorn main:app --reload --port 8000
+python main.py
+# Backend runs on http://localhost:8000
 ```
 
 ### 3. Frontend Setup:
-```bash
-cd New/capstone
+```powershell
+cd New\capstone
 
 # Install dependencies
 npm install
 
 # Start development server
 npm run dev
+# Frontend runs on http://localhost:5173
 ```
 
 ### 4. Access Application:
@@ -205,47 +206,33 @@ npm run dev
 
 ---
 
-## 📧 Email Configuration (Optional)
+## 🧪 Machine Learning Features
 
-To enable email notifications:
+### Automated Training & Loading:
+```powershell
+# Navigate to backend
+cd Back\App
 
-1. **For Gmail** (Testing):
-   - Enable 2FA on Google Account
-   - Generate App Password: https://myaccount.google.com/apppasswords
-   - Update `.env`:
-     ```bash
-     EMAIL_ENABLED=true
-     SMTP_SERVER=smtp.gmail.com
-     SMTP_PORT=587
-     SMTP_USERNAME=your-email@gmail.com
-     SMTP_PASSWORD=your-16-char-app-password
-     SMTP_FROM_EMAIL=your-email@gmail.com
-     ```
-
-2. **Test Configuration**:
-   - Login as admin
-   - Go to Email Notifications
-   - Send test email
-
----
-
-## 🧪 ML Features
-
-### SVM Sentiment Analysis:
-```bash
-# Train model
-cd Back/App
+# Train both models
 python train_ml_models.py
 
-# Model saved to: ml_services/models/svm_sentiment_model.pkl
-# Automatically loads on evaluation submission
+# Models saved to ml_services/models/
+# - svm_sentiment_model.pkl (SVM with TF-IDF)
+# - Automatically loads on server start
 ```
 
-### Anomaly Detection:
-- Detects straight-lining (all same ratings)
-- Detects suspicious patterns (all 1s or 4s)
+### Sentiment Analysis (SVM):
+- TF-IDF vectorization of text comments
+- Classifies feedback as Positive/Negative/Neutral
+- Real-time classification on evaluation submission
+- Results stored in evaluations.ml_sentiment
+
+### Anomaly Detection (DBSCAN):
+- Detects straight-lining patterns (all same ratings)
+- Identifies suspicious response patterns
 - Detects low variance responses
-- Detects alternating patterns
+- Flags alternating/sequential patterns
+- Results stored in evaluations.ml_anomaly_score
 - Real-time detection on submission
 
 ---
@@ -254,91 +241,78 @@ python train_ml_models.py
 
 | Document | Description |
 |----------|-------------|
-| [THESIS_PROJECT_COMPLETE.md](THESIS_PROJECT_COMPLETE.md) | 📊 Complete project summary with all features |
-| [SETUP_GUIDE.md](SETUP_GUIDE.md) | 🔧 Detailed installation and configuration |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | 🏗️ System architecture and design patterns |
-| [LPU_EVALUATION_FORM_STRUCTURE.md](LPU_EVALUATION_FORM_STRUCTURE.md) | 📝 31-question evaluation structure |
-| [EMAIL_NOTIFICATION_SYSTEM_COMPLETE.md](EMAIL_NOTIFICATION_SYSTEM_COMPLETE.md) | 📧 Email system documentation |
-| [COURSE_MANAGEMENT_CRUD_COMPLETE.md](COURSE_MANAGEMENT_CRUD_COMPLETE.md) | 📚 Course management features |
+| [SETUP_GUIDE.md](SETUP_GUIDE.md) | 🔧 Complete installation and setup instructions |
+| readme.md | 📖 This file - project overview and quick start |
 
 ---
 
-## 🎯 Key Implementations
+## 🎯 Key Features
 
-### 1. Machine Learning (Thesis Core):
-- ✅ SVM with TF-IDF for sentiment classification
-- ✅ Rule-based anomaly detection
-- ✅ Real-time ML processing on evaluation submission
-- ✅ Model persistence and loading
-- ✅ Database storage of ML results
+### 1. Automated Enrollment System:
+- ✅ Quick Bulk Enrollment by program section
+- ✅ Auto-enrollment of students when creating class sections
+- ✅ Program-based student filtering
+- ✅ Batch section creation with automatic student assignment
 
-### 2. Email Automation:
-- ✅ 6 HTML email templates
-- ✅ Automated confirmation on evaluation submit
-- ✅ Period start/reminder/ending notifications
-- ✅ Admin summary reports
-- ✅ SMTP with SSL/TLS
+### 2. Machine Learning Integration:
+- ✅ SVM sentiment analysis with TF-IDF vectorization
+- ✅ DBSCAN anomaly detection for response patterns
+- ✅ Real-time ML processing on submission
+- ✅ Persistent model storage
+- ✅ Analytics dashboard with ML insights
 
-### 3. Course Management:
-- ✅ Full CRUD operations
-- ✅ CSV bulk import with validation
-- ✅ Batch instructor assignment
-- ✅ Edit/Delete with confirmations
+### 3. Course & Section Management:
+- ✅ Program section organization (e.g., BSCS-DS-3A)
+- ✅ Class section creation with auto-enrollment
+- ✅ Individual student enrollment management
+- ✅ Section overview with enrolled counts
+- ✅ No instructor requirement (evaluation-only system)
 
 ### 4. System Administration:
-- ✅ User management (5 roles)
-- ✅ Audit logging (all admin actions)
-- ✅ Data export (JSON/CSV)
-- ✅ System settings
+- ✅ User management across 5 roles
+- ✅ Program section management
 - ✅ Evaluation period management
+- ✅ Audit logging for all critical actions
+- ✅ System settings and configuration
 
 ---
 
-## 🏆 Thesis Requirements Met
+## 📊 System Capabilities
 
-✅ **Machine Learning Integration:** SVM + DBSCAN implemented  
-✅ **Real-time Processing:** ML runs on every evaluation  
-✅ **Database Integration:** ML results stored in PostgreSQL  
-✅ **Web Application:** Full-stack React + FastAPI  
-✅ **Institutional Alignment:** 31-question LPU standard  
-✅ **Automated Notifications:** Email system with 6 templates  
-✅ **Data Quality:** Anomaly detection ensures validity  
-✅ **Analytics Dashboard:** ML-powered insights  
-✅ **Role-Based Access:** 5 user roles implemented  
-✅ **Audit Trail:** All actions logged  
+### Enrollment & Management:
+- Automated student enrollment by program section
+- Quick bulk section creation with auto-enrollment
+- Individual enrollment management
+- Program section tracking (e.g., BSCS-DS-3A, BSIT-2B)
+
+### Machine Learning:
+- SVM sentiment analysis with TF-IDF (Positive/Negative/Neutral)
+- DBSCAN anomaly detection for response patterns
+- Real-time processing on evaluation submission
+- Persistent model storage and loading
+
+### Administration:
+- 5 role-based access levels (System Admin, Admin, Secretary, Dept Head, Student)
+- Evaluation period management
+- User management and program section assignment
+- Audit logging for critical actions
+
+### Analytics:
+- ML-powered insights dashboard
+- Sentiment distribution analysis
+- Anomaly detection reports
+- Export functionality (JSON/CSV)
 
 ---
 
 ## 📊 Project Statistics
 
-- **Total Features:** 11/11 Complete (100%)
 - **Backend Files:** 15+ Python modules
 - **Frontend Components:** 25+ React components
 - **API Endpoints:** 50+ RESTful endpoints
-- **Database Tables:** 12+ tables
-- **ML Models:** 2 (SVM, Anomaly Detector)
-- **Email Templates:** 6 HTML templates
+- **Database Tables:** 12+ tables with migrations
+- **ML Models:** 2 (SVM with TF-IDF, DBSCAN Anomaly Detection)
 - **Lines of Code:** ~15,000+
-
----
-
-## 🎓 For Thesis Defense
-
-**Demonstration Flow:**
-1. System overview and architecture
-2. Admin features (user/course management, email)
-3. **ML Core - SVM Sentiment Analysis** (live demo)
-4. **ML Core - Anomaly Detection** (live demo)
-5. Student evaluation submission (31 questions)
-6. Email notification system (live send)
-7. Analytics and reporting
-
-**Key Talking Points:**
-- SVM for text classification with TF-IDF
-- Rule-based anomaly detection for interpretability
-- Real-time ML processing on evaluation submission
-- LPU institutional alignment (31-question standard)
-- Production-ready with email automation
 
 ---
 

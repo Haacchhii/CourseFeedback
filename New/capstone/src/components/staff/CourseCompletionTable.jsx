@@ -51,7 +51,6 @@ export default function CourseCompletionTable() {
       const matchesSearch = 
         course.course_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         course.course_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        course.instructor.toLowerCase().includes(searchTerm.toLowerCase()) ||
         course.class_code.toLowerCase().includes(searchTerm.toLowerCase())
 
       const matchesFilter = 
@@ -131,7 +130,7 @@ export default function CourseCompletionTable() {
           <div className="relative">
             <input
               type="text"
-              placeholder="Search courses, instructors..."
+              placeholder="Search courses..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="lpu-input pl-10"
@@ -149,7 +148,6 @@ export default function CourseCompletionTable() {
           >
             <option value="completion_rate">Sort by: Completion Rate</option>
             <option value="course_name">Sort by: Course Name</option>
-            <option value="instructor">Sort by: Instructor</option>
           </select>
 
           {/* Filter */}
@@ -176,7 +174,6 @@ export default function CourseCompletionTable() {
           <thead className="bg-gray-50 border-b-2 border-gray-200">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Course</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Instructor</th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">Enrolled</th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">Submitted</th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">Pending</th>
@@ -201,9 +198,6 @@ export default function CourseCompletionTable() {
                           {course.course_code} • {course.class_code}
                         </div>
                       </div>
-                    </td>
-                    <td className="px-4 py-4 text-sm text-gray-700">
-                      {course.instructor}
                     </td>
                     <td className="px-4 py-4 text-center">
                       <span className="text-lg font-semibold text-gray-900">
@@ -262,7 +256,7 @@ export default function CourseCompletionTable() {
               })
             ) : (
               <tr>
-                <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
                   <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                   </svg>

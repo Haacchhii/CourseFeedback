@@ -15,15 +15,16 @@ from sqlalchemy import text, func, and_, or_
 from database.connection import get_db
 from models.enhanced_models import (
     User, Student, DepartmentHead, Secretary, Course, ClassSection,
-    Evaluation, EvaluationPeriod, AuditLog, SystemSettings, Program,
-    Enrollment, Instructor
+    Evaluation, EvaluationPeriod, AuditLog, ExportHistory, SystemSettings, Program,
+    Enrollment
 )
 from typing import Optional, List
 from pydantic import BaseModel, EmailStr
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date, timezone
 import logging
 import bcrypt
 import json
+from config import now_local
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -33,6 +34,8 @@ router = APIRouter()
 # ===========================
 
 class UserCreate(BaseModel):
+    model_config = {"extra": "ignore"}  # Ignore extra fields from frontend
+    
     email: EmailStr
     first_name: str
     last_name: str
@@ -43,6 +46,8 @@ class UserCreate(BaseModel):
     password: str
 
 class UserUpdate(BaseModel):
+    model_config = {"extra": "ignore"}  # Ignore extra fields from frontend
+    
     email: Optional[EmailStr] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
@@ -51,17 +56,23 @@ class UserUpdate(BaseModel):
     is_active: Optional[bool] = None
 
 class EvaluationPeriodCreate(BaseModel):
+    model_config = {"extra": "ignore"}  # Ignore extra fields from frontend
+    
     name: str
     semester: str
     academic_year: str
-    start_date: datetime
-    end_date: datetime
+    start_date: date  # Accept date format
+    end_date: date    # Accept date format
 
 class SystemSettingsUpdate(BaseModel):
+    model_config = {"extra": "ignore"}  # Ignore extra fields from frontend
+    
     category: str
     settings: dict
 
 class AuditLogCreate(BaseModel):
+    model_config = {"extra": "ignore"}  # Ignore extra fields from frontend
+    
     action: str
     category: str
     severity: str = "Info"
@@ -140,7 +151,7 @@ async def get_all_users(
         offset = (page - 1) * page_size
         users = query.offset(offset).limit(page_size).all()
         
-        # Format response
+        # Format response with program information
         users_data = []
         for user in users:
             user_dict = {
@@ -154,6 +165,18 @@ async def get_all_users(
                 "last_login": user.last_login.isoformat() if user.last_login else None,
                 "created_at": user.created_at.isoformat() if user.created_at else None
             }
+            
+            # Add program information for students
+            if user.role == "student":
+                student = db.query(Student).filter(Student.user_id == user.id).first()
+                if student and student.program_id:
+                    program = db.query(Program).filter(Program.id == student.program_id).first()
+                    if program:
+                        user_dict["program"] = program.program_code
+                        user_dict["program_name"] = program.program_name
+                        user_dict["year_level"] = student.year_level
+                        user_dict["student_number"] = student.student_number
+            
             users_data.append(user_dict)
         
         return {
@@ -184,8 +207,25 @@ async def create_user(
         if existing_user:
             raise HTTPException(status_code=400, detail="Email already exists")
         
+        # Determine if password should be auto-generated (for students)
+        must_change_password = False
+        actual_password = user_data.password
+        generated_password_info = None
+        
+        # Auto-generate password for students using pattern: Lpub@{student_number}
+        if user_data.role == "student":
+            # Extract student number from email or use provided student_number
+            # Email format: studentnumber@lpubatangas.edu.ph
+            email_parts = user_data.email.split('@')
+            if len(email_parts) > 0:
+                student_number = email_parts[0]  # Get the part before @
+                actual_password = f"Lpub@{student_number}"
+                must_change_password = True
+                generated_password_info = actual_password
+                logger.info(f"Auto-generated password for student: {user_data.email}")
+        
         # Hash password
-        password_hash = bcrypt.hashpw(user_data.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        password_hash = bcrypt.hashpw(actual_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         
         # Create user
         new_user = User(
@@ -195,16 +235,21 @@ async def create_user(
             last_name=user_data.last_name,
             role=user_data.role,
             department=user_data.department,
-            is_active=True
+            is_active=True,
+            must_change_password=must_change_password
         )
         db.add(new_user)
         db.flush()  # Get the user ID
         
         # Create role-specific record
         if user_data.role == "student" and user_data.program_id:
+            # Use student number from email if available
+            email_parts = user_data.email.split('@')
+            student_number = email_parts[0] if len(email_parts) > 0 else f"STU{new_user.id:05d}"
+            
             student = Student(
                 user_id=new_user.id,
-                student_number=f"STU{new_user.id:05d}",  # Fixed: was student_id
+                student_number=student_number,  # Use actual student number from email
                 program_id=user_data.program_id,
                 year_level=user_data.year_level or 1
             )
@@ -233,11 +278,19 @@ async def create_user(
             details={"email": user_data.email, "role": user_data.role}
         )
         
-        return {
+        # Build response with generated password info if applicable
+        response = {
             "success": True,
             "message": "User created successfully",
             "user_id": new_user.id
         }
+        
+        # Include generated password for admin to communicate to student
+        if generated_password_info:
+            response["generated_password"] = generated_password_info
+            response["message"] = f"User created successfully. Temporary password: {generated_password_info} (student must change on first login)"
+        
+        return response
         
     except HTTPException:
         raise
@@ -273,7 +326,7 @@ async def update_user(
         if user_data.is_active is not None:
             user.is_active = user_data.is_active
         
-        user.updated_at = datetime.utcnow()
+        user.updated_at = now_local()
         db.commit()
         
         # Log audit event
@@ -308,7 +361,7 @@ async def delete_user(
         
         # Soft delete
         user.is_active = False
-        user.updated_at = datetime.utcnow()
+        user.updated_at = now_local()
         db.commit()
         
         # Log audit event
@@ -345,7 +398,7 @@ async def reset_user_password(
         # Hash new password
         password_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         user.password_hash = password_hash
-        user.updated_at = datetime.utcnow()
+        user.updated_at = now_local()
         db.commit()
         
         # Log audit event
@@ -411,19 +464,51 @@ async def get_evaluation_periods(
         
         periods = query.order_by(EvaluationPeriod.start_date.desc()).all()
         
-        periods_data = [{
-            "id": p.id,
-            "name": p.name,
-            "semester": p.semester,
-            "academic_year": p.academic_year,
-            "start_date": p.start_date.isoformat(),
-            "end_date": p.end_date.isoformat(),
-            "status": p.status,
-            "total_students": p.total_students,
-            "completed_evaluations": p.completed_evaluations,
-            "participation_rate": (p.completed_evaluations / p.total_students * 100) if p.total_students > 0 else 0,
-            "created_at": p.created_at.isoformat()
-        } for p in periods]
+        periods_data = []
+        for p in periods:
+            # Calculate total evaluations needed (students × enrolled sections)
+            total_evaluations = db.execute(text("""
+                SELECT COUNT(DISTINCT e.id)
+                FROM enrollments e
+                WHERE e.evaluation_period_id = :period_id
+            """), {"period_id": p.id}).scalar() or 0
+            
+            # Calculate completed evaluations
+            completed_evaluations = db.execute(text("""
+                SELECT COUNT(DISTINCT ev.id)
+                FROM evaluations ev
+                JOIN enrollments e ON ev.student_id = e.student_id 
+                    AND ev.class_section_id = e.class_section_id
+                WHERE e.evaluation_period_id = :period_id
+                AND ev.submission_date IS NOT NULL
+            """), {"period_id": p.id}).scalar() or 0
+            
+            # Calculate participation rate
+            participation_rate = round((completed_evaluations / total_evaluations * 100), 1) if total_evaluations > 0 else 0
+            
+            # Calculate days remaining
+            today = date.today()
+            # Convert end_date to date object if it's datetime
+            if isinstance(p.end_date, datetime):
+                end_date = p.end_date.date()
+            else:
+                end_date = p.end_date
+            days_remaining = max(0, (end_date - today).days)
+            
+            periods_data.append({
+                "id": p.id,
+                "name": p.name,
+                "semester": p.semester,
+                "academicYear": p.academic_year,  # camelCase for frontend
+                "startDate": p.start_date.isoformat(),
+                "endDate": p.end_date.isoformat(),
+                "status": p.status,
+                "totalEvaluations": total_evaluations,
+                "completedEvaluations": completed_evaluations,
+                "participationRate": participation_rate,
+                "daysRemaining": days_remaining,
+                "createdAt": p.created_at.isoformat()
+            })
         
         return {
             "success": True,
@@ -445,13 +530,18 @@ async def create_evaluation_period(
         # Get total students for this period
         total_students = db.query(func.count(Student.id)).scalar() or 0
         
+        # Close any currently open periods
+        db.query(EvaluationPeriod).filter(
+            EvaluationPeriod.status == "Open"
+        ).update({"status": "Closed"})
+        
         new_period = EvaluationPeriod(
             name=period_data.name,
             semester=period_data.semester,
             academic_year=period_data.academic_year,
             start_date=period_data.start_date,
             end_date=period_data.end_date,
-            status="draft",
+            status="Open",
             total_students=total_students,
             created_by=current_user_id
         )
@@ -488,14 +578,20 @@ async def update_period_status(
         if not period:
             raise HTTPException(status_code=404, detail="Evaluation period not found")
         
-        # Close any other active periods if opening this one
-        if status == "active":
+        # Validate status values
+        valid_statuses = ["Open", "Closed"]
+        if status not in valid_statuses:
+            raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
+        
+        # Close any other open periods if opening this one
+        if status == "Open":
             db.query(EvaluationPeriod).filter(
-                EvaluationPeriod.status == "active"
-            ).update({"status": "closed"})
+                EvaluationPeriod.status == "Open",
+                EvaluationPeriod.id != period_id
+            ).update({"status": "Closed"})
         
         period.status = status
-        period.updated_at = datetime.utcnow()
+        period.updated_at = now_local()
         db.commit()
         
         # Log audit event
@@ -558,6 +654,528 @@ async def get_active_period(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 # ===========================
+# PERIOD ENROLLMENT MANAGEMENT
+# ===========================
+
+@router.post("/evaluation-periods/{period_id}/enroll-section")
+async def enroll_section_in_period(
+    period_id: int,
+    section_id: int = Body(..., embed=True),
+    current_user_id: int = Query(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Enable a class section (block section) for evaluation in a specific period
+    All students enrolled in this section will be able to evaluate during this period
+    """
+    try:
+        # Verify period exists
+        period = db.query(EvaluationPeriod).filter(EvaluationPeriod.id == period_id).first()
+        if not period:
+            raise HTTPException(status_code=404, detail="Evaluation period not found")
+        
+        # Verify section exists and get details
+        section_info = db.execute(text("""
+            SELECT 
+                cs.id, cs.class_code, cs.course_id,
+                c.subject_code, c.subject_name, c.program_id,
+                p.program_name, p.program_code
+            FROM class_sections cs
+            JOIN courses c ON cs.course_id = c.id
+            JOIN programs p ON c.program_id = p.id
+            WHERE cs.id = :section_id
+        """), {"section_id": section_id}).fetchone()
+        
+        if not section_info:
+            raise HTTPException(status_code=404, detail="Class section not found")
+        
+        # Check if already enrolled
+        existing = db.execute(text("""
+            SELECT id FROM period_enrollments 
+            WHERE evaluation_period_id = :period_id 
+            AND class_section_id = :section_id
+        """), {
+            "period_id": period_id,
+            "section_id": section_id
+        }).fetchone()
+        
+        if existing:
+            return {
+                "success": False,
+                "message": f"Section {section_info.class_code} is already enrolled in this period"
+            }
+        
+        # Get count of students in this section
+        student_count = db.execute(text("""
+            SELECT COUNT(DISTINCT e.student_id)
+            FROM enrollments e
+            WHERE e.class_section_id = :section_id
+            AND e.status = 'active'
+        """), {"section_id": section_id}).scalar() or 0
+        
+        # Update all enrollments for this section to link to the evaluation period
+        db.execute(text("""
+            UPDATE enrollments
+            SET evaluation_period_id = :period_id
+            WHERE class_section_id = :section_id
+            AND status = 'active'
+        """), {
+            "period_id": period_id,
+            "section_id": section_id
+        })
+        
+        # Create evaluation records for all enrolled students
+        # This allows students to see pending evaluations when the period becomes active
+        db.execute(text("""
+            INSERT INTO evaluations (
+                student_id, class_section_id, evaluation_period_id, status, created_at
+            )
+            SELECT 
+                e.student_id, 
+                e.class_section_id, 
+                :period_id,
+                'pending',
+                NOW()
+            FROM enrollments e
+            WHERE e.class_section_id = :section_id
+            AND e.status = 'active'
+            AND NOT EXISTS (
+                SELECT 1 FROM evaluations ev
+                WHERE ev.student_id = e.student_id
+                AND ev.class_section_id = e.class_section_id
+                AND ev.evaluation_period_id = :period_id
+            )
+        """), {
+            "period_id": period_id,
+            "section_id": section_id
+        })
+        
+        # Record this section enrollment for tracking
+        db.execute(text("""
+            INSERT INTO period_enrollments (
+                evaluation_period_id, class_section_id, enrolled_count, created_by
+            ) VALUES (:period_id, :section_id, :student_count, :created_by)
+        """), {
+            "period_id": period_id,
+            "section_id": section_id,
+            "student_count": student_count,
+            "created_by": current_user_id
+        })
+        
+        db.commit()
+        
+        # Log audit event
+        await create_audit_log(
+            db, current_user_id, "SECTION_ENROLLED_IN_PERIOD", "Evaluation Management",
+            details={
+                "period_id": period_id,
+                "section_id": section_id,
+                "class_code": section_info.class_code,
+                "subject": f"{section_info.subject_code} - {section_info.subject_name}",
+                "student_count": student_count
+            }
+        )
+        
+        return {
+            "success": True,
+            "message": f"Section {section_info.class_code} enrolled successfully",
+            "data": {
+                "students_enrolled": student_count,
+                "class_code": section_info.class_code,
+                "subject": f"{section_info.subject_code} - {section_info.subject_name}"
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error enrolling program section: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/evaluation-periods/{period_id}/enrolled-sections")
+async def get_period_enrolled_sections(
+    period_id: int,
+    db: Session = Depends(get_db)
+):
+    """Get all class sections enrolled in an evaluation period"""
+    try:
+        query = text("""
+            SELECT 
+                pe.id,
+                pe.class_section_id,
+                cs.class_code,
+                c.subject_code,
+                c.subject_name,
+                p.program_code,
+                p.program_name,
+                pe.enrolled_count,
+                pe.created_at,
+                u.first_name || ' ' || u.last_name as created_by_name
+            FROM period_enrollments pe
+            JOIN class_sections cs ON pe.class_section_id = cs.id
+            JOIN courses c ON cs.course_id = c.id
+            JOIN programs p ON c.program_id = p.id
+            LEFT JOIN users u ON pe.created_by = u.id
+            WHERE pe.evaluation_period_id = :period_id
+            ORDER BY p.program_code, c.subject_code, cs.class_code
+        """)
+        
+        result = db.execute(query, {"period_id": period_id})
+        enrolled_sections = []
+        
+        for row in result:
+            enrolled_sections.append({
+                "id": row.id,
+                "class_section_id": row.class_section_id,
+                "class_code": row.class_code,
+                "subject_code": row.subject_code,
+                "subject_name": row.subject_name,
+                "program_code": row.program_code,
+                "program_name": row.program_name,
+                "enrolled_count": row.enrolled_count,
+                "created_at": row.created_at.isoformat() if row.created_at else None,
+                "created_by_name": row.created_by_name
+            })
+        
+        return {
+            "success": True,
+            "data": enrolled_sections
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching enrolled sections: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/evaluation-periods/{period_id}/enrolled-sections/{enrollment_id}")
+async def remove_period_enrollment(
+    period_id: int,
+    enrollment_id: int,
+    current_user_id: int = Query(...),
+    db: Session = Depends(get_db)
+):
+    """Remove a class section enrollment from an evaluation period"""
+    try:
+        # Get enrollment details before deletion
+        enrollment = db.execute(text("""
+            SELECT class_section_id
+            FROM period_enrollments 
+            WHERE id = :enrollment_id AND evaluation_period_id = :period_id
+        """), {"enrollment_id": enrollment_id, "period_id": period_id}).fetchone()
+        
+        if not enrollment:
+            raise HTTPException(status_code=404, detail="Enrollment not found")
+        
+        if not enrollment:
+            raise HTTPException(status_code=404, detail="Enrollment record not found")
+        
+        # Unlink enrollments from this period (set evaluation_period_id to NULL)
+        db.execute(text("""
+            UPDATE enrollments
+            SET evaluation_period_id = NULL
+            WHERE class_section_id = :section_id
+            AND evaluation_period_id = :period_id
+        """), {
+            "section_id": enrollment.class_section_id,
+            "period_id": period_id
+        })
+        
+        # Delete the period enrollment record
+        db.execute(text("""
+            DELETE FROM period_enrollments 
+            WHERE id = :enrollment_id AND evaluation_period_id = :period_id
+        """), {"enrollment_id": enrollment_id, "period_id": period_id})
+        
+        db.commit()
+        
+        # Log audit event
+        await create_audit_log(
+            db, current_user_id, "SECTION_REMOVED_FROM_PERIOD", "Evaluation Management",
+            details={
+                "period_id": period_id,
+                "enrollment_id": enrollment_id,
+                "section_id": enrollment.class_section_id
+            }
+        )
+        
+        return {
+            "success": True,
+            "message": "Section removed from evaluation period successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error removing period enrollment: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/evaluation-periods/{period_id}/enrolled-program-sections")
+async def get_period_enrolled_program_sections(
+    period_id: int,
+    db: Session = Depends(get_db)
+):
+    """Get all program sections enrolled in an evaluation period"""
+    try:
+        query = text("""
+            SELECT 
+                pps.id,
+                pps.program_section_id,
+                ps.section_name,
+                ps.year_level,
+                ps.semester,
+                ps.school_year,
+                p.program_code,
+                p.program_name,
+                pps.enrolled_count,
+                pps.created_at,
+                u.first_name || ' ' || u.last_name as created_by_name
+            FROM period_program_sections pps
+            JOIN program_sections ps ON pps.program_section_id = ps.id
+            JOIN programs p ON ps.program_id = p.id
+            LEFT JOIN users u ON pps.created_by = u.id
+            WHERE pps.evaluation_period_id = :period_id
+            ORDER BY p.program_code, ps.section_name
+        """)
+        
+        result = db.execute(query, {"period_id": period_id})
+        enrolled_sections = []
+        
+        for row in result:
+            enrolled_sections.append({
+                "id": row[0],
+                "program_section_id": row[1],
+                "section_name": row[2],
+                "year_level": row[3],
+                "semester": row[4],
+                "school_year": row[5],
+                "program_code": row[6],
+                "program_name": row[7],
+                "enrolled_count": row[8],
+                "created_at": row[9].isoformat() if row[9] else None,
+                "created_by_name": row[10]
+            })
+        
+        return {
+            "success": True,
+            "data": enrolled_sections
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching enrolled program sections: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/evaluation-periods/{period_id}/enroll-program-section")
+async def enroll_program_section_in_period(
+    period_id: int,
+    program_section_id: int = Body(..., embed=True),
+    current_user_id: int = Query(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Enroll a program section (student group) into an evaluation period.
+    This will create evaluation records for all students in the program section
+    for ALL courses they are enrolled in.
+    """
+    try:
+        # Verify period exists
+        period = db.query(EvaluationPeriod).filter(EvaluationPeriod.id == period_id).first()
+        if not period:
+            raise HTTPException(status_code=404, detail="Evaluation period not found")
+        
+        # Verify program section exists and get details
+        section_info = db.execute(text("""
+            SELECT 
+                ps.id, ps.section_name, ps.program_id, ps.year_level, ps.semester, ps.school_year,
+                p.program_name, p.program_code
+            FROM program_sections ps
+            JOIN programs p ON ps.program_id = p.id
+            WHERE ps.id = :program_section_id
+        """), {"program_section_id": program_section_id}).fetchone()
+        
+        if not section_info:
+            raise HTTPException(status_code=404, detail="Program section not found")
+        
+        # Check if already enrolled
+        existing = db.execute(text("""
+            SELECT id FROM period_program_sections 
+            WHERE evaluation_period_id = :period_id 
+            AND program_section_id = :program_section_id
+        """), {
+            "period_id": period_id,
+            "program_section_id": program_section_id
+        }).fetchone()
+        
+        if existing:
+            return {
+                "success": False,
+                "message": f"Program section {section_info[1]} is already enrolled in this period"
+            }
+        
+        # Get all students in this program section
+        students = db.execute(text("""
+            SELECT DISTINCT ss.student_id
+            FROM section_students ss
+            JOIN users u ON ss.student_id = u.id
+            WHERE ss.section_id = :program_section_id
+            AND u.is_active = true
+            AND u.role = 'student'
+        """), {"program_section_id": program_section_id}).fetchall()
+        
+        student_ids = [row[0] for row in students]
+        
+        if not student_ids:
+            return {
+                "success": False,
+                "message": "No active students found in this program section"
+            }
+        
+        # Get all class sections these students are enrolled in
+        class_sections = db.execute(text("""
+            SELECT DISTINCT e.class_section_id
+            FROM enrollments e
+            WHERE e.student_id = ANY(:student_ids)
+            AND e.status = 'active'
+        """), {"student_ids": student_ids}).fetchall()
+        
+        class_section_ids = [row[0] for row in class_sections]
+        
+        if not class_section_ids:
+            return {
+                "success": False,
+                "message": "No course enrollments found for students in this program section"
+            }
+        
+        # Update enrollments to link to this period
+        db.execute(text("""
+            UPDATE enrollments
+            SET evaluation_period_id = :period_id
+            WHERE student_id = ANY(:student_ids)
+            AND class_section_id = ANY(:class_section_ids)
+            AND status = 'active'
+        """), {
+            "period_id": period_id,
+            "student_ids": student_ids,
+            "class_section_ids": class_section_ids
+        })
+        
+        # Create evaluation records for all student-course combinations
+        result = db.execute(text("""
+            INSERT INTO evaluations (
+                student_id, class_section_id, evaluation_period_id, status, created_at
+            )
+            SELECT 
+                e.student_id, 
+                e.class_section_id, 
+                :period_id,
+                'pending',
+                NOW()
+            FROM enrollments e
+            WHERE e.student_id = ANY(:student_ids)
+            AND e.class_section_id = ANY(:class_section_ids)
+            AND e.status = 'active'
+            AND e.evaluation_period_id = :period_id
+            AND NOT EXISTS (
+                SELECT 1 FROM evaluations ev
+                WHERE ev.student_id = e.student_id
+                AND ev.class_section_id = e.class_section_id
+                AND ev.evaluation_period_id = :period_id
+            )
+            RETURNING id
+        """), {
+            "period_id": period_id,
+            "student_ids": student_ids,
+            "class_section_ids": class_section_ids
+        })
+        
+        evaluations_created = len(result.fetchall())
+        
+        # Record this program section enrollment for tracking
+        db.execute(text("""
+            INSERT INTO period_program_sections (
+                evaluation_period_id, program_section_id, enrolled_count, created_by
+            ) VALUES (:period_id, :program_section_id, :student_count, :created_by)
+        """), {
+            "period_id": period_id,
+            "program_section_id": program_section_id,
+            "student_count": len(student_ids),
+            "created_by": current_user_id
+        })
+        
+        # Also update period_enrollments for each class section
+        for class_section_id in class_section_ids:
+            # Check if this class section is already in period_enrollments
+            existing_period_enroll = db.execute(text("""
+                SELECT id FROM period_enrollments
+                WHERE evaluation_period_id = :period_id
+                AND class_section_id = :class_section_id
+            """), {
+                "period_id": period_id,
+                "class_section_id": class_section_id
+            }).fetchone()
+            
+            if not existing_period_enroll:
+                # Count students from THIS program section in this class
+                count = db.execute(text("""
+                    SELECT COUNT(DISTINCT e.student_id)
+                    FROM enrollments e
+                    WHERE e.class_section_id = :class_section_id
+                    AND e.student_id = ANY(:student_ids)
+                    AND e.status = 'active'
+                """), {
+                    "class_section_id": class_section_id,
+                    "student_ids": student_ids
+                }).scalar() or 0
+                
+                db.execute(text("""
+                    INSERT INTO period_enrollments (
+                        evaluation_period_id, class_section_id, enrolled_count, created_by
+                    ) VALUES (:period_id, :class_section_id, :count, :created_by)
+                """), {
+                    "period_id": period_id,
+                    "class_section_id": class_section_id,
+                    "count": count,
+                    "created_by": current_user_id
+                })
+        
+        db.commit()
+        
+        # Log audit event
+        await create_audit_log(
+            db, current_user_id, "PROGRAM_SECTION_ENROLLED_IN_PERIOD", "Evaluation Management",
+            details={
+                "period_id": period_id,
+                "program_section_id": program_section_id,
+                "section_name": section_info[1],
+                "program_name": f"{section_info[7]} - {section_info[6]}",
+                "student_count": len(student_ids),
+                "class_sections_count": len(class_section_ids),
+                "evaluations_created": evaluations_created
+            }
+        )
+        
+        return {
+            "success": True,
+            "message": f"Program section {section_info[1]} enrolled successfully",
+            "data": {
+                "students_enrolled": len(student_ids),
+                "class_sections_affected": len(class_section_ids),
+                "evaluations_created": evaluations_created,
+                "section_name": section_info[1],
+                "program_name": f"{section_info[7]} - {section_info[6]}"
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error enrolling program section in period: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to enroll program section: {str(e)}")
+
+# ===========================
 # COURSE MANAGEMENT
 # ===========================
 
@@ -568,6 +1186,7 @@ async def get_all_courses(
     search: Optional[str] = None,
     program_id: Optional[int] = None,
     year_level: Optional[int] = None,
+    semester: Optional[int] = None,
     status: Optional[str] = None,  # Add status filter (Active, Archived)
     db: Session = Depends(get_db)
 ):
@@ -605,6 +1224,10 @@ async def get_all_courses(
             query_str += " AND c.year_level = :year_level"
             params['year_level'] = year_level
         
+        if semester:
+            query_str += " AND c.semester = :semester"
+            params['semester'] = semester
+        
         # Add status filter
         if status:
             if status == "Archived":
@@ -631,8 +1254,10 @@ async def get_all_courses(
                 "id": row[0],
                 "course_code": row[1] or "",
                 "classCode": row[1] or "",  # Alternative field name
+                "subject_code": row[1] or "",  # Subject code
                 "course_name": row[2] or "",
                 "name": row[2] or "",  # Alternative field name
+                "subject_name": row[2] or "",  # Subject name
                 "program_id": row[3],
                 "program": row[8] or "Unknown",  # program code
                 "year_level": row[4],
@@ -640,7 +1265,7 @@ async def get_all_courses(
                 "semester": row[5],
                 "units": row[6],
                 "created_at": row[7].isoformat() if row[7] else None,
-                "instructor": "Not assigned",  # Simplified - no per-course query
+                # Instructor removed - course evaluation only
                 "sectionCount": 0,  # Simplified for performance
                 "enrolledStudents": 0,  # Simplified for performance
                 "enrolled_students": 0,  # Alternative field name
@@ -665,7 +1290,7 @@ async def get_all_courses(
 class CourseCreate(BaseModel):
     name: str
     classCode: str
-    instructor: Optional[str] = None
+    # instructor removed - evaluating courses not instructors
     program: str
     yearLevel: int
     semester: str
@@ -770,7 +1395,7 @@ async def update_course(
         
         # Only set updated_at if column exists
         try:
-            course.updated_at = datetime.utcnow()
+            course.updated_at = now_local()
         except:
             pass  # Column doesn't exist in database
         
@@ -865,7 +1490,7 @@ async def get_sections(
 ):
     """Get all class sections with enrollment counts"""
     try:
-        # Query class sections with course and enrollment details
+        # Query class sections with course and enrollment details (instructor removed)
         query = text("""
             SELECT 
                 cs.id,
@@ -878,12 +1503,9 @@ async def get_sections(
                 cs.semester,
                 cs.academic_year,
                 cs.max_students,
-                COALESCE(i.first_name || ' ' || i.last_name, 'No instructor') as instructor_name,
                 COUNT(DISTINCT e.student_id) as enrolled_count
             FROM class_sections cs
             LEFT JOIN courses c ON cs.course_id = c.id
-            LEFT JOIN instructors ins ON cs.instructor_id = ins.id
-            LEFT JOIN users i ON ins.user_id = i.id
             LEFT JOIN enrollments e ON cs.id = e.class_section_id
             WHERE 1=1
         """)
@@ -910,8 +1532,7 @@ async def get_sections(
         query = text(str(query) + """
             GROUP BY cs.id, cs.course_id, c.subject_code, c.subject_name, 
                      cs.class_code, c.program_id, c.year_level, cs.semester, 
-                     cs.academic_year, cs.max_students, 
-                     ins.id, i.first_name, i.last_name
+                     cs.academic_year, cs.max_students
             ORDER BY c.subject_code, cs.class_code
         """)
         
@@ -929,7 +1550,7 @@ async def get_sections(
 
 class SectionCreate(BaseModel):
     course_id: int
-    instructor_id: int
+    # instructor_id removed - course evaluation only
     class_code: str
     semester: int
     academic_year: str
@@ -938,22 +1559,17 @@ class SectionCreate(BaseModel):
 @router.post("/sections")
 async def create_section(
     section_data: SectionCreate,
+    auto_enroll: bool = Query(False, description="Auto-enroll students from matching program/year"),
     db: Session = Depends(get_db)
 ):
-    """Create a new class section"""
+    """Create a new class section with optional auto-enrollment"""
     try:
         # Verify course exists
         course = db.query(Course).filter(Course.id == section_data.course_id).first()
         if not course:
             raise HTTPException(status_code=404, detail="Course not found")
         
-        # Verify instructor exists
-        instructor = db.query(User).filter(
-            User.id == section_data.instructor_id,
-            User.role == 'instructor'
-        ).first()
-        if not instructor:
-            raise HTTPException(status_code=404, detail="Instructor not found")
+        # Instructor validation removed - course evaluation only
         
         # Check if class code already exists
         existing = db.query(ClassSection).filter(
@@ -969,7 +1585,7 @@ async def create_section(
         # Create section
         new_section = ClassSection(
             course_id=section_data.course_id,
-            instructor_id=section_data.instructor_id,
+            instructor_id=None,  # No instructor assignment needed
             class_code=section_data.class_code,
             semester=section_data.semester,
             academic_year=section_data.academic_year,
@@ -979,17 +1595,52 @@ async def create_section(
         db.commit()
         db.refresh(new_section)
         
+        enrolled_count = 0
+        
+        # Auto-enroll students if requested
+        if auto_enroll:
+            try:
+                # Find all students matching the course's program and year level
+                matching_students = db.query(Student).filter(
+                    Student.program_id == course.program_id,
+                    Student.year_level == course.year_level
+                ).all()
+                
+                for student in matching_students:
+                    # Check if not already enrolled
+                    existing_enrollment = db.query(Enrollment).filter(
+                        Enrollment.class_section_id == new_section.id,
+                        Enrollment.student_id == student.id
+                    ).first()
+                    
+                    if not existing_enrollment:
+                        new_enrollment = Enrollment(
+                            student_id=student.id,
+                            class_section_id=new_section.id,
+                            enrolled_at=now_local(),
+                            status='active'
+                        )
+                        db.add(new_enrollment)
+                        enrolled_count += 1
+                
+                db.commit()
+                logger.info(f"Auto-enrolled {enrolled_count} students into section {new_section.id}")
+            except Exception as enroll_error:
+                logger.error(f"Error during auto-enrollment: {enroll_error}")
+                # Don't fail the section creation if auto-enrollment fails
+        
         return {
             "success": True,
             "message": "Section created successfully",
             "data": {
                 "id": new_section.id,
                 "course_id": new_section.course_id,
-                "instructor_id": new_section.instructor_id,
+                # instructor_id removed
                 "class_code": new_section.class_code,
                 "semester": new_section.semester,
                 "academic_year": new_section.academic_year,
-                "max_students": new_section.max_students
+                "max_students": new_section.max_students,
+                "enrolled_count": enrolled_count
             }
         }
         
@@ -1020,14 +1671,7 @@ async def update_section(
                 raise HTTPException(status_code=404, detail="Course not found")
             section.course_id = section_data["course_id"]
         
-        if "instructor_id" in section_data:
-            instructor = db.query(User).filter(
-                User.id == section_data["instructor_id"],
-                User.role == 'instructor'
-            ).first()
-            if not instructor:
-                raise HTTPException(status_code=404, detail="Instructor not found")
-            section.instructor_id = section_data["instructor_id"]
+        # instructor_id update removed - course evaluation only
         
         if "class_code" in section_data:
             # Check if class code already exists (excluding current section)
@@ -1084,10 +1728,20 @@ async def delete_section(
         if not section:
             raise HTTPException(status_code=404, detail="Section not found")
         
-        # Delete all enrollments first
+        # Delete related records in order (to avoid foreign key constraint errors)
+        # 1. Delete evaluations for this section
+        db.execute(text("DELETE FROM evaluations WHERE class_section_id = :section_id"), {"section_id": section_id})
+        
+        # 2. Delete analysis results
+        db.execute(text("DELETE FROM analysis_results WHERE class_section_id = :section_id"), {"section_id": section_id})
+        
+        # 3. Delete period section enrollments if they exist
+        db.execute(text("DELETE FROM period_section_enrollments WHERE class_section_id = :section_id"), {"section_id": section_id})
+        
+        # 4. Delete all enrollments
         db.query(Enrollment).filter(Enrollment.class_section_id == section_id).delete()
         
-        # Delete the section
+        # 5. Finally delete the section
         db.delete(section)
         db.commit()
         
@@ -1123,7 +1777,7 @@ async def get_section_students(section_id: int, db: Session = Depends(get_db)):
                 u.email,
                 p.program_code as program_code,
                 s.year_level,
-                e.enrollment_date
+                e.enrolled_at as enrollment_date
             FROM enrollments e
             JOIN students s ON e.student_id = s.id
             JOIN users u ON s.user_id = u.id
@@ -1249,8 +1903,8 @@ async def enroll_students(
             enrollment = Enrollment(
                 student_id=student_id,
                 class_section_id=section_id,
-                enrollment_date=datetime.utcnow(),
-                status='enrolled'
+                enrolled_at=now_local(),
+                status='active'
             )
             db.add(enrollment)
             enrolled_count += 1
@@ -1274,6 +1928,126 @@ async def enroll_students(
         raise
     except Exception as e:
         logger.error(f"Error enrolling students: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+class BulkEnrollmentRequest(BaseModel):
+    student_identifier: str
+    section_identifier: str
+    identifier_type: Optional[str] = "auto"  # 'email', 'student_number', or 'auto'
+    notes: Optional[str] = ""
+
+@router.post("/sections/bulk-enroll")
+async def bulk_enroll_student(
+    enrollment: BulkEnrollmentRequest,
+    current_user_id: int = Query(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Bulk enroll a single student to a section (designed for CSV batch processing)
+    Supports flexible identifiers for both students and sections
+    """
+    try:
+        # Find student by identifier
+        student = None
+        identifier_type = enrollment.identifier_type.lower()
+        
+        if identifier_type == "auto":
+            # Auto-detect: email has @, student number has hyphen pattern
+            if "@" in enrollment.student_identifier:
+                identifier_type = "email"
+            elif enrollment.student_identifier.replace("-", "").isdigit():
+                identifier_type = "student_number"
+            else:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Cannot auto-detect identifier type for: {enrollment.student_identifier}"
+                )
+        
+        if identifier_type == "email":
+            user = db.query(User).filter(User.email == enrollment.student_identifier).first()
+            if user and user.role == "student":
+                student = db.query(Student).filter(Student.user_id == user.id).first()
+        elif identifier_type == "student_number":
+            student = db.query(Student).filter(Student.student_number == enrollment.student_identifier).first()
+        else:
+            raise HTTPException(status_code=400, detail=f"Invalid identifier_type: {identifier_type}")
+        
+        if not student:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Student not found with {identifier_type}: {enrollment.student_identifier}"
+            )
+        
+        # Find section by identifier (can be class_code or section ID)
+        section = None
+        
+        # Try as class_code first (most common in CSV)
+        section = db.query(ClassSection).filter(ClassSection.class_code == enrollment.section_identifier).first()
+        
+        # If not found, try as numeric ID
+        if not section and enrollment.section_identifier.isdigit():
+            section = db.query(ClassSection).filter(ClassSection.id == int(enrollment.section_identifier)).first()
+        
+        if not section:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Section not found: {enrollment.section_identifier}"
+            )
+        
+        # Check if already enrolled
+        existing = db.query(Enrollment).filter(
+            Enrollment.class_section_id == section.id,
+            Enrollment.student_id == student.id
+        ).first()
+        
+        if existing:
+            return {
+                "success": True,
+                "message": "Student already enrolled in section",
+                "already_enrolled": True
+            }
+        
+        # Verify student program matches section (optional validation)
+        if student.program_id != section.program_id:
+            logger.warning(
+                f"Program mismatch: Student {student.id} (program {student.program_id}) "
+                f"enrolling in section {section.id} (program {section.program_id})"
+            )
+        
+        # Create enrollment
+        new_enrollment = Enrollment(
+            student_id=student.id,
+            class_section_id=section.id,
+            enrollment_date=now_local(),
+            status='enrolled'
+        )
+        db.add(new_enrollment)
+        db.commit()
+        
+        # Log audit event
+        await create_audit_log(
+            db, current_user_id, "BULK_ENROLL_STUDENT", "Section Management",
+            details={
+                "student_id": student.id,
+                "student_identifier": enrollment.student_identifier,
+                "section_id": section.id,
+                "section_identifier": enrollment.section_identifier,
+                "notes": enrollment.notes
+            }
+        )
+        
+        return {
+            "success": True,
+            "message": f"Student enrolled successfully",
+            "student_id": student.id,
+            "section_id": section.id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in bulk enrollment: {e}")
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1630,9 +2404,10 @@ async def get_audit_log_stats(db: Session = Depends(get_db)):
 # DATA EXPORT
 # ===========================
 
-def log_export(db: Session, user_id: int, export_type: str, format: str, record_count: int):
-    """Helper function to log export actions to audit log"""
+def log_export(db: Session, user_id: int, export_type: str, format: str, record_count: int, filters: dict = None):
+    """Helper function to log export actions to both audit log and export history"""
     try:
+        # Log to audit log
         audit_entry = AuditLog(
             user_id=user_id,
             action=f"EXPORT_{export_type.upper()}",
@@ -1643,10 +2418,22 @@ def log_export(db: Session, user_id: int, export_type: str, format: str, record_
                 "export_type": export_type,
                 "format": format,
                 "record_count": record_count,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": now_local().isoformat()
             }
         )
         db.add(audit_entry)
+        
+        # Log to export history
+        export_entry = ExportHistory(
+            user_id=user_id,
+            export_type=export_type,
+            format=format,
+            filters=filters or {},
+            record_count=record_count,
+            status="completed"
+        )
+        db.add(export_entry)
+        
         db.commit()
     except Exception as e:
         logger.error(f"Failed to log export: {e}")
@@ -1723,6 +2510,175 @@ async def get_export_history(
             }
         }
 
+
+class ScheduleExportRequest(BaseModel):
+    frequency: str  # daily, weekly, monthly
+    time: str  # HH:MM format
+    format: str  # csv, json, excel
+    recipients: str  # comma-separated emails
+    day_of_week: Optional[str] = None  # For weekly schedules
+    day_of_month: Optional[int] = None  # For monthly schedules
+    is_active: bool = True
+
+
+@router.post("/export/schedule")
+async def schedule_export(
+    schedule: ScheduleExportRequest,
+    user_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Schedule automatic exports"""
+    try:
+        # Create scheduled export entry
+        insert_query = text("""
+            INSERT INTO scheduled_exports 
+            (user_id, frequency, time, format, recipients, day_of_week, day_of_month, is_active, created_at, updated_at)
+            VALUES (:user_id, :frequency, :time, :format, :recipients, :day_of_week, :day_of_month, :is_active, :created_at, :updated_at)
+            RETURNING id
+        """)
+        
+        result = db.execute(insert_query, {
+            "user_id": user_id,
+            "frequency": schedule.frequency,
+            "time": schedule.time,
+            "format": schedule.format,
+            "recipients": schedule.recipients,
+            "day_of_week": schedule.day_of_week,
+            "day_of_month": schedule.day_of_month,
+            "is_active": schedule.is_active,
+            "created_at": now_local(),
+            "updated_at": now_local()
+        })
+        
+        schedule_id = result.fetchone()[0]
+        db.commit()
+        
+        # Log audit
+        await create_audit_log(
+            db, user_id, "SCHEDULE_EXPORT", "Data Export", severity="Info",
+            details={
+                "schedule_id": schedule_id,
+                "frequency": schedule.frequency,
+                "format": schedule.format,
+                "recipients": schedule.recipients
+            }
+        )
+        
+        logger.info(f"✅ Export scheduled: {schedule.frequency} at {schedule.time} to {schedule.recipients}")
+        
+        return {
+            "success": True,
+            "message": f"Export scheduled successfully: {schedule.frequency} at {schedule.time}",
+            "data": {
+                "schedule_id": schedule_id,
+                "frequency": schedule.frequency,
+                "time": schedule.time,
+                "format": schedule.format,
+                "recipients": schedule.recipients
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error scheduling export: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to schedule export: {str(e)}")
+
+
+@router.get("/export/schedules")
+async def get_scheduled_exports(
+    user_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Get all scheduled exports"""
+    try:
+        query = text("""
+            SELECT 
+                se.id,
+                se.user_id,
+                COALESCE(u.first_name || ' ' || u.last_name, 'Unknown') as user_name,
+                se.frequency,
+                se.time,
+                se.format,
+                se.recipients,
+                se.day_of_week,
+                se.day_of_month,
+                se.is_active,
+                se.last_run,
+                se.next_run,
+                se.created_at
+            FROM scheduled_exports se
+            LEFT JOIN users u ON se.user_id = u.id
+            ORDER BY se.created_at DESC
+        """)
+        
+        result = db.execute(query)
+        
+        schedules = []
+        for row in result:
+            schedules.append({
+                "id": row[0],
+                "userId": row[1],
+                "userName": row[2],
+                "frequency": row[3],
+                "time": row[4],
+                "format": row[5],
+                "recipients": row[6],
+                "dayOfWeek": row[7],
+                "dayOfMonth": row[8],
+                "isActive": row[9],
+                "lastRun": row[10].isoformat() if row[10] else None,
+                "nextRun": row[11].isoformat() if row[11] else None,
+                "createdAt": row[12].isoformat() if row[12] else None
+            })
+        
+        return {
+            "success": True,
+            "data": schedules
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching scheduled exports: {e}")
+        # Return empty list if table doesn't exist yet
+        return {
+            "success": True,
+            "data": []
+        }
+
+
+@router.delete("/export/schedule/{schedule_id}")
+async def delete_scheduled_export(
+    schedule_id: int,
+    user_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Delete a scheduled export"""
+    try:
+        delete_query = text("""
+            DELETE FROM scheduled_exports
+            WHERE id = :schedule_id
+        """)
+        
+        db.execute(delete_query, {"schedule_id": schedule_id})
+        db.commit()
+        
+        # Log audit
+        await create_audit_log(
+            db, user_id, "DELETE_SCHEDULE_EXPORT", "Data Export", severity="Warning",
+            details={"schedule_id": schedule_id}
+        )
+        
+        logger.info(f"✅ Scheduled export {schedule_id} deleted")
+        
+        return {
+            "success": True,
+            "message": "Scheduled export deleted successfully"
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error deleting scheduled export: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete schedule: {str(e)}")
+
 @router.get("/export/users")
 async def export_users(
     format: str = Query("csv", regex="^(csv|json)$"),
@@ -1746,13 +2702,13 @@ async def export_users(
             } for u in users]
             
             # Log export
-            log_export(db, user_id, 'users', format, len(users_data))
+            log_export(db, user_id, 'users', format, len(users_data), {})
             
             return {"success": True, "data": users_data}
         
         # CSV format would be handled by frontend
         # Log export
-        log_export(db, user_id, 'users', format, len(users))
+        log_export(db, user_id, 'users', format, len(users), {})
         
         return {"success": True, "data": users}
         
@@ -1785,7 +2741,7 @@ async def export_evaluations(
         } for e in evaluations]
         
         # Log export
-        log_export(db, user_id, 'evaluations', format, len(eval_data))
+        log_export(db, user_id, 'evaluations', format, len(eval_data), {})
         
         return {"success": True, "data": eval_data}
         
@@ -1816,7 +2772,7 @@ async def export_courses(
         } for c in courses]
         
         # Log export
-        log_export(db, user_id, 'courses', format, len(courses_data))
+        log_export(db, user_id, 'courses', format, len(courses_data), {})
         
         return {"success": True, "data": courses_data}
         
@@ -1876,7 +2832,12 @@ async def export_analytics(
         }
         
         # Log export
-        log_export(db, user_id, 'analytics', format, total_evaluations)
+        filters = {}
+        if start_date:
+            filters['start_date'] = start_date
+        if end_date:
+            filters['end_date'] = end_date
+        log_export(db, user_id, 'analytics', format, total_evaluations, filters)
         
         return {"success": True, "data": analytics_data}
         
@@ -1929,7 +2890,8 @@ async def export_custom(
         
         # Log export
         export_type = f"custom_{'_'.join(tables)}" if tables else "custom"
-        log_export(db, user_id, export_type, format_type, total_records)
+        filters = {"tables": tables} if tables else {}
+        log_export(db, user_id, export_type, format_type, total_records, filters)
         
         return {"success": True, "data": result}
         
@@ -1950,7 +2912,7 @@ async def get_dashboard_stats(db: Session = Depends(get_db)):
         dept_heads_count = db.query(func.count(User.id)).filter(User.role == 'department_head').scalar() or 0
         secretaries_count = db.query(func.count(User.id)).filter(User.role == 'secretary').scalar() or 0
         admins_count = db.query(func.count(User.id)).filter(User.role == 'admin').scalar() or 0
-        instructors_count = db.query(func.count(User.id)).filter(User.role == 'instructor').scalar() or 0
+        # instructors_count removed - not needed for course evaluation
         
         # Course stats
         total_courses = db.query(func.count(Course.id)).scalar() or 0
@@ -2011,7 +2973,7 @@ async def get_dashboard_stats(db: Session = Depends(get_db)):
                     "departmentHeads": dept_heads_count,
                     "secretaries": secretaries_count,
                     "admins": admins_count,
-                    "instructors": instructors_count
+                    # instructors removed from stats
                 },
                 "programStats": program_stats,
                 "sentimentStats": sentiment_stats
@@ -2223,4 +3185,981 @@ async def get_email_config_status(current_user_id: int = Query(...)):
     except Exception as e:
         logger.error(f"Error checking email config: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ===========================
+# Backup & Restore Endpoints
+# ===========================
+
+@router.post("/backup/create")
+async def create_backup(
+    user_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Create a database backup"""
+    try:
+        import subprocess
+        import os
+        from pathlib import Path
+        
+        # Create backups directory if it doesn't exist
+        backup_dir = Path("backups")
+        backup_dir.mkdir(exist_ok=True)
+        
+        # Generate backup filename with timestamp
+        backup_filename = f"backup_{now_local().strftime('%Y%m%d_%H%M%S')}.sql"
+        backup_path = backup_dir / backup_filename
+        
+        # Get database connection details from environment or config
+        db_host = os.getenv("DB_HOST", "localhost")
+        db_port = os.getenv("DB_PORT", "5432")
+        db_name = os.getenv("DB_NAME", "course_feedback")
+        db_user = os.getenv("DB_USER", "postgres")
+        db_password = os.getenv("DB_PASSWORD", "")
+        
+        # Set password environment variable for pg_dump
+        env = os.environ.copy()
+        if db_password:
+            env["PGPASSWORD"] = db_password
+        
+        # Run pg_dump to create backup
+        pg_dump_cmd = [
+            "pg_dump",
+            "-h", db_host,
+            "-p", db_port,
+            "-U", db_user,
+            "-d", db_name,
+            "-F", "p",  # Plain text format
+            "-f", str(backup_path)
+        ]
+        
+        result = subprocess.run(
+            pg_dump_cmd,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=300  # 5 minute timeout
+        )
+        
+        if result.returncode != 0:
+            logger.error(f"pg_dump failed: {result.stderr}")
+            raise Exception(f"Backup failed: {result.stderr}")
+        
+        # Get file size
+        file_size = backup_path.stat().st_size
+        
+        # Store backup metadata in database
+        insert_query = text("""
+            INSERT INTO backup_history 
+            (user_id, filename, file_path, file_size, status, created_at)
+            VALUES (:user_id, :filename, :file_path, :file_size, :status, :created_at)
+            RETURNING id
+        """)
+        
+        result = db.execute(insert_query, {
+            "user_id": user_id,
+            "filename": backup_filename,
+            "file_path": str(backup_path),
+            "file_size": file_size,
+            "status": "success",
+            "created_at": now_local()
+        })
+        
+        backup_id = result.fetchone()[0]
+        db.commit()
+        
+        # Log audit
+        await create_audit_log(
+            db, user_id, "CREATE_BACKUP", "System Maintenance", severity="Info",
+            details={
+                "backup_id": backup_id,
+                "filename": backup_filename,
+                "file_size": file_size
+            }
+        )
+        
+        logger.info(f"✅ Database backup created: {backup_filename} ({file_size} bytes)")
+        
+        return {
+            "success": True,
+            "message": "Backup created successfully",
+            "data": {
+                "backup_id": backup_id,
+                "filename": backup_filename,
+                "file_size": file_size,
+                "created_at": now_local().isoformat()
+            }
+        }
+        
+    except subprocess.TimeoutExpired:
+        logger.error("Backup timeout - operation took too long")
+        raise HTTPException(status_code=500, detail="Backup operation timed out")
+    except FileNotFoundError:
+        logger.error("pg_dump not found - PostgreSQL client tools not installed")
+        raise HTTPException(
+            status_code=500, 
+            detail="Database backup tools not available. Please install PostgreSQL client tools."
+        )
+    except Exception as e:
+        logger.error(f"❌ Backup creation error: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create backup: {str(e)}")
+
+
+@router.post("/backup/restore")
+async def restore_backup(
+    backup_file: str = Body(..., embed=True),
+    user_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Restore database from backup file"""
+    try:
+        import subprocess
+        import os
+        from pathlib import Path
+        
+        # Validate backup file exists
+        backup_path = Path(backup_file)
+        if not backup_path.exists():
+            raise HTTPException(status_code=404, detail="Backup file not found")
+        
+        # Get database connection details
+        db_host = os.getenv("DB_HOST", "localhost")
+        db_port = os.getenv("DB_PORT", "5432")
+        db_name = os.getenv("DB_NAME", "course_feedback")
+        db_user = os.getenv("DB_USER", "postgres")
+        db_password = os.getenv("DB_PASSWORD", "")
+        
+        # Set password environment variable
+        env = os.environ.copy()
+        if db_password:
+            env["PGPASSWORD"] = db_password
+        
+        # Run psql to restore backup
+        psql_cmd = [
+            "psql",
+            "-h", db_host,
+            "-p", db_port,
+            "-U", db_user,
+            "-d", db_name,
+            "-f", str(backup_path)
+        ]
+        
+        result = subprocess.run(
+            psql_cmd,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=600  # 10 minute timeout for restore
+        )
+        
+        if result.returncode != 0:
+            logger.error(f"psql restore failed: {result.stderr}")
+            raise Exception(f"Restore failed: {result.stderr}")
+        
+        # Log audit
+        await create_audit_log(
+            db, user_id, "RESTORE_BACKUP", "System Maintenance", severity="Critical",
+            details={
+                "backup_file": backup_file,
+                "restored_at": now_local().isoformat()
+            }
+        )
+        
+        logger.info(f"✅ Database restored from: {backup_file}")
+        
+        return {
+            "success": True,
+            "message": "Database restored successfully",
+            "data": {
+                "backup_file": backup_file,
+                "restored_at": now_local().isoformat()
+            }
+        }
+        
+    except subprocess.TimeoutExpired:
+        logger.error("Restore timeout - operation took too long")
+        raise HTTPException(status_code=500, detail="Restore operation timed out")
+    except FileNotFoundError:
+        logger.error("psql not found - PostgreSQL client tools not installed")
+        raise HTTPException(
+            status_code=500, 
+            detail="Database restore tools not available. Please install PostgreSQL client tools."
+        )
+    except Exception as e:
+        logger.error(f"❌ Restore error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to restore backup: {str(e)}")
+
+
+@router.get("/backup/history")
+async def get_backup_history(
+    user_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Get list of available backups"""
+    try:
+        query = text("""
+            SELECT 
+                bh.id,
+                bh.filename,
+                bh.file_path,
+                bh.file_size,
+                bh.status,
+                bh.created_at,
+                COALESCE(u.first_name || ' ' || u.last_name, 'System') as created_by
+            FROM backup_history bh
+            LEFT JOIN users u ON bh.user_id = u.id
+            ORDER BY bh.created_at DESC
+            LIMIT 50
+        """)
+        
+        result = db.execute(query)
+        
+        backups = []
+        for row in result:
+            backups.append({
+                "id": row[0],
+                "filename": row[1],
+                "filePath": row[2],
+                "fileSize": row[3],
+                "status": row[4],
+                "createdAt": row[5].isoformat() if row[5] else None,
+                "createdBy": row[6]
+            })
+        
+        return {
+            "success": True,
+            "data": backups
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching backup history: {e}")
+        # Return empty list if table doesn't exist yet
+        return {
+            "success": True,
+            "data": []
+        }
+
+
+# ===========================
+# Program Sections Management
+# ===========================
+
+class ProgramSectionCreate(BaseModel):
+    section_name: str
+    program_id: int
+    year_level: int
+    semester: int
+    school_year: str
+
+class ProgramSectionUpdate(BaseModel):
+    section_name: Optional[str] = None
+    program_id: Optional[int] = None
+    year_level: Optional[int] = None
+    semester: Optional[int] = None
+    school_year: Optional[str] = None
+    is_active: Optional[bool] = None
+
+@router.get("/program-sections")
+async def get_program_sections(
+    program_id: Optional[int] = Query(None),
+    year_level: Optional[int] = Query(None),
+    semester: Optional[int] = Query(None),
+    school_year: Optional[str] = Query(None),
+    is_active: Optional[bool] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Get all program sections with optional filters"""
+    try:
+        query = """
+            SELECT 
+                ps.id,
+                ps.section_name,
+                ps.program_id,
+                p.program_code,
+                p.program_name,
+                ps.year_level,
+                ps.semester,
+                ps.school_year,
+                ps.is_active,
+                ps.created_at,
+                ps.updated_at,
+                COUNT(DISTINCT ss.student_id) as student_count
+            FROM program_sections ps
+            LEFT JOIN programs p ON ps.program_id = p.id
+            LEFT JOIN section_students ss ON ps.id = ss.section_id
+            WHERE 1=1
+        """
+        
+        params = {}
+        
+        if program_id is not None:
+            query += " AND ps.program_id = :program_id"
+            params["program_id"] = program_id
+        
+        if year_level is not None:
+            query += " AND ps.year_level = :year_level"
+            params["year_level"] = year_level
+        
+        if semester is not None:
+            query += " AND ps.semester = :semester"
+            params["semester"] = semester
+        
+        if school_year is not None:
+            query += " AND ps.school_year = :school_year"
+            params["school_year"] = school_year
+        
+        if is_active is not None:
+            query += " AND ps.is_active = :is_active"
+            params["is_active"] = is_active
+        
+        query += """
+            GROUP BY ps.id, ps.section_name, ps.program_id, p.program_code, 
+                     p.program_name, ps.year_level, ps.semester, ps.school_year,
+                     ps.is_active, ps.created_at, ps.updated_at
+            ORDER BY ps.school_year DESC, ps.year_level, ps.semester, ps.section_name
+        """
+        
+        result = db.execute(text(query), params)
+        
+        sections = []
+        for row in result:
+            sections.append({
+                "id": row[0],
+                "sectionName": row[1],
+                "programId": row[2],
+                "programCode": row[3],
+                "programName": row[4],
+                "yearLevel": row[5],
+                "semester": row[6],
+                "schoolYear": row[7],
+                "isActive": row[8],
+                "createdAt": row[9].isoformat() if row[9] else None,
+                "updatedAt": row[10].isoformat() if row[10] else None,
+                "studentCount": row[11]
+            })
+        
+        return {
+            "success": True,
+            "data": sections
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching program sections: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch program sections: {str(e)}")
+
+
+@router.post("/program-sections")
+async def create_program_section(
+    section_data: ProgramSectionCreate,
+    current_user_id: int = Query(...),
+    db: Session = Depends(get_db)
+):
+    """Create a new program section"""
+    try:
+        # Check if section already exists
+        check_query = text("""
+            SELECT id FROM program_sections
+            WHERE section_name = :section_name
+            AND program_id = :program_id
+            AND year_level = :year_level
+            AND semester = :semester
+            AND school_year = :school_year
+        """)
+        
+        existing = db.execute(check_query, {
+            "section_name": section_data.section_name,
+            "program_id": section_data.program_id,
+            "year_level": section_data.year_level,
+            "semester": section_data.semester,
+            "school_year": section_data.school_year
+        }).fetchone()
+        
+        if existing:
+            raise HTTPException(status_code=400, detail="Program section already exists")
+        
+        # Create section
+        insert_query = text("""
+            INSERT INTO program_sections 
+            (section_name, program_id, year_level, semester, school_year, is_active, created_at, updated_at)
+            VALUES (:section_name, :program_id, :year_level, :semester, :school_year, true, NOW(), NOW())
+            RETURNING id
+        """)
+        
+        result = db.execute(insert_query, {
+            "section_name": section_data.section_name,
+            "program_id": section_data.program_id,
+            "year_level": section_data.year_level,
+            "semester": section_data.semester,
+            "school_year": section_data.school_year
+        })
+        
+        section_id = result.fetchone()[0]
+        db.commit()
+        
+        # Log the action
+        audit_query = text("""
+            INSERT INTO audit_logs (user_id, action, category, entity_type, entity_id, details, timestamp)
+            VALUES (:user_id, 'CREATE', 'Program Section Management', 'program_section', :entity_id, :details, NOW())
+        """)
+        
+        db.execute(audit_query, {
+            "user_id": current_user_id,
+            "entity_id": section_id,
+            "details": json.dumps({
+                "section_name": section_data.section_name,
+                "program_id": section_data.program_id,
+                "year_level": section_data.year_level,
+                "semester": section_data.semester,
+                "school_year": section_data.school_year
+            })
+        })
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "Program section created successfully",
+            "data": {"id": section_id}
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating program section: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create program section: {str(e)}")
+
+
+@router.put("/program-sections/{section_id}")
+async def update_program_section(
+    section_id: int,
+    section_data: ProgramSectionUpdate,
+    current_user_id: int = Query(...),
+    db: Session = Depends(get_db)
+):
+    """Update a program section"""
+    try:
+        # Check if section exists
+        check_query = text("SELECT id FROM program_sections WHERE id = :section_id")
+        existing = db.execute(check_query, {"section_id": section_id}).fetchone()
+        
+        if not existing:
+            raise HTTPException(status_code=404, detail="Program section not found")
+        
+        # Build update query dynamically
+        update_fields = []
+        params = {"section_id": section_id}
+        
+        if section_data.section_name is not None:
+            update_fields.append("section_name = :section_name")
+            params["section_name"] = section_data.section_name
+        
+        if section_data.program_id is not None:
+            update_fields.append("program_id = :program_id")
+            params["program_id"] = section_data.program_id
+        
+        if section_data.year_level is not None:
+            update_fields.append("year_level = :year_level")
+            params["year_level"] = section_data.year_level
+        
+        if section_data.semester is not None:
+            update_fields.append("semester = :semester")
+            params["semester"] = section_data.semester
+        
+        if section_data.school_year is not None:
+            update_fields.append("school_year = :school_year")
+            params["school_year"] = section_data.school_year
+        
+        if section_data.is_active is not None:
+            update_fields.append("is_active = :is_active")
+            params["is_active"] = section_data.is_active
+        
+        if not update_fields:
+            raise HTTPException(status_code=400, detail="No fields to update")
+        
+        update_fields.append("updated_at = NOW()")
+        
+        update_query = text(f"""
+            UPDATE program_sections
+            SET {', '.join(update_fields)}
+            WHERE id = :section_id
+        """)
+        
+        db.execute(update_query, params)
+        db.commit()
+        
+        # Log the action
+        audit_query = text("""
+            INSERT INTO audit_logs (user_id, action, category, entity_type, entity_id, details, timestamp)
+            VALUES (:user_id, 'UPDATE', 'Program Section Management', 'program_section', :entity_id, :details, NOW())
+        """)
+        
+        db.execute(audit_query, {
+            "user_id": current_user_id,
+            "entity_id": section_id,
+            "details": json.dumps(section_data.model_dump(exclude_none=True))
+        })
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "Program section updated successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating program section: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update program section: {str(e)}")
+
+
+@router.delete("/program-sections/{section_id}")
+async def delete_program_section(
+    section_id: int,
+    current_user_id: int = Query(...),
+    db: Session = Depends(get_db)
+):
+    """Delete a program section"""
+    try:
+        # Check if section exists
+        check_query = text("SELECT section_name FROM program_sections WHERE id = :section_id")
+        existing = db.execute(check_query, {"section_id": section_id}).fetchone()
+        
+        if not existing:
+            raise HTTPException(status_code=404, detail="Program section not found")
+        
+        section_name = existing[0]
+        
+        # Delete section (CASCADE will handle section_students)
+        delete_query = text("DELETE FROM program_sections WHERE id = :section_id")
+        db.execute(delete_query, {"section_id": section_id})
+        db.commit()
+        
+        # Log the action
+        audit_query = text("""
+            INSERT INTO audit_logs (user_id, action, category, entity_type, entity_id, details, timestamp)
+            VALUES (:user_id, 'DELETE', 'Program Section Management', 'program_section', :entity_id, :details, NOW())
+        """)
+        
+        db.execute(audit_query, {
+            "user_id": current_user_id,
+            "entity_id": section_id,
+            "details": json.dumps({"section_name": section_name})
+        })
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "Program section deleted successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting program section: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete program section: {str(e)}")
+
+
+@router.get("/program-sections/{section_id}/students")
+async def get_section_students(
+    section_id: int,
+    db: Session = Depends(get_db)
+):
+    """Get all students assigned to a program section"""
+    try:
+        query = text("""
+            SELECT 
+                u.id,
+                u.email,
+                u.first_name,
+                u.last_name,
+                s.student_number,
+                s.year_level,
+                p.program_code,
+                p.program_name,
+                ss.created_at as assigned_at
+            FROM section_students ss
+            JOIN users u ON ss.student_id = u.id
+            JOIN students s ON s.user_id = u.id
+            LEFT JOIN programs p ON s.program_id = p.id
+            WHERE ss.section_id = :section_id
+            ORDER BY u.last_name, u.first_name
+        """)
+        
+        result = db.execute(query, {"section_id": section_id})
+        
+        students = []
+        for row in result:
+            students.append({
+                "id": row[0],
+                "email": row[1],
+                "firstName": row[2],
+                "lastName": row[3],
+                "studentNumber": row[4],
+                "yearLevel": row[5],
+                "programCode": row[6],
+                "programName": row[7],
+                "assignedAt": row[8].isoformat() if row[8] else None
+            })
+        
+        return {
+            "success": True,
+            "data": students
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching section students: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch section students: {str(e)}")
+
+
+@router.get("/students-for-assignment")
+async def get_students_for_assignment(
+    program_id: Optional[int] = Query(None),
+    year_level: Optional[int] = Query(None),
+    search: Optional[str] = Query(None),
+    exclude_section_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Get students available for assignment with filters"""
+    try:
+        query = """
+            SELECT 
+                u.id,
+                u.email,
+                u.first_name,
+                u.last_name,
+                s.student_number,
+                s.year_level,
+                p.program_code,
+                p.program_name,
+                CASE 
+                    WHEN ss.id IS NOT NULL THEN true
+                    ELSE false
+                END as already_assigned
+            FROM users u
+            JOIN students s ON s.user_id = u.id
+            LEFT JOIN programs p ON s.program_id = p.id
+            LEFT JOIN section_students ss ON ss.student_id = u.id 
+        """
+        
+        params = {}
+        
+        if exclude_section_id is not None:
+            query += " AND ss.section_id = :exclude_section_id"
+            params["exclude_section_id"] = exclude_section_id
+        
+        query += " WHERE u.role = 'student' AND u.is_active = true"
+        
+        if program_id is not None:
+            query += " AND s.program_id = :program_id"
+            params["program_id"] = program_id
+        
+        if year_level is not None:
+            query += " AND s.year_level = :year_level"
+            params["year_level"] = year_level
+        
+        if search:
+            query += """ AND (
+                u.first_name ILIKE :search OR 
+                u.last_name ILIKE :search OR 
+                u.email ILIKE :search OR 
+                s.student_number ILIKE :search
+            )"""
+            params["search"] = f"%{search}%"
+        
+        query += " ORDER BY u.last_name, u.first_name"
+        
+        result = db.execute(text(query), params)
+        
+        students = []
+        for row in result:
+            students.append({
+                "id": row[0],
+                "email": row[1],
+                "firstName": row[2],
+                "lastName": row[3],
+                "studentNumber": row[4],
+                "yearLevel": row[5],
+                "programCode": row[6],
+                "programName": row[7],
+                "alreadyAssigned": row[8]
+            })
+        
+        return {
+            "success": True,
+            "data": students
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching students for assignment: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch students: {str(e)}")
+
+
+class StudentAssignment(BaseModel):
+    student_ids: List[int]
+
+@router.post("/program-sections/{section_id}/assign-students")
+async def assign_students_to_section(
+    section_id: int,
+    assignment: StudentAssignment,
+    current_user_id: int = Query(...),
+    db: Session = Depends(get_db)
+):
+    """Assign multiple students to a program section"""
+    try:
+        # Check if section exists
+        check_query = text("SELECT id FROM program_sections WHERE id = :section_id")
+        existing = db.execute(check_query, {"section_id": section_id}).fetchone()
+        
+        if not existing:
+            raise HTTPException(status_code=404, detail="Program section not found")
+        
+        assigned_count = 0
+        skipped_count = 0
+        
+        for student_id in assignment.student_ids:
+            # Check if already assigned
+            check_student = text("""
+                SELECT id FROM section_students 
+                WHERE section_id = :section_id AND student_id = :student_id
+            """)
+            
+            already_assigned = db.execute(check_student, {
+                "section_id": section_id,
+                "student_id": student_id
+            }).fetchone()
+            
+            if already_assigned:
+                skipped_count += 1
+                continue
+            
+            # Assign student
+            insert_query = text("""
+                INSERT INTO section_students (section_id, student_id, created_at)
+                VALUES (:section_id, :student_id, NOW())
+            """)
+            
+            db.execute(insert_query, {
+                "section_id": section_id,
+                "student_id": student_id
+            })
+            assigned_count += 1
+        
+        db.commit()
+        
+        # Log the action
+        audit_query = text("""
+            INSERT INTO audit_logs (user_id, action, category, entity_type, entity_id, details, timestamp)
+            VALUES (:user_id, 'ASSIGN_STUDENTS', 'Program Section Management', 'program_section', :entity_id, :details, NOW())
+        """)
+        
+        db.execute(audit_query, {
+            "user_id": current_user_id,
+            "entity_id": section_id,
+            "details": json.dumps({
+                "assigned_count": assigned_count,
+                "skipped_count": skipped_count,
+                "student_ids": assignment.student_ids
+            })
+        })
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": f"Successfully assigned {assigned_count} student(s). {skipped_count} already assigned.",
+            "data": {
+                "assignedCount": assigned_count,
+                "skippedCount": skipped_count
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error assigning students: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to assign students: {str(e)}")
+
+
+@router.delete("/program-sections/{section_id}/students/{student_id}")
+async def remove_student_from_section(
+    section_id: int,
+    student_id: int,
+    current_user_id: int = Query(...),
+    db: Session = Depends(get_db)
+):
+    """Remove a student from a program section"""
+    try:
+        # Check if assignment exists
+        check_query = text("""
+            SELECT id FROM section_students 
+            WHERE section_id = :section_id AND student_id = :student_id
+        """)
+        
+        existing = db.execute(check_query, {
+            "section_id": section_id,
+            "student_id": student_id
+        }).fetchone()
+        
+        if not existing:
+            raise HTTPException(status_code=404, detail="Student assignment not found")
+        
+        # Remove assignment
+        delete_query = text("""
+            DELETE FROM section_students 
+            WHERE section_id = :section_id AND student_id = :student_id
+        """)
+        
+        db.execute(delete_query, {
+            "section_id": section_id,
+            "student_id": student_id
+        })
+        db.commit()
+        
+        # Log the action
+        audit_query = text("""
+            INSERT INTO audit_logs (user_id, action, category, entity_type, entity_id, details, timestamp)
+            VALUES (:user_id, 'REMOVE_STUDENT', 'Program Section Management', 'program_section', :entity_id, :details, NOW())
+        """)
+        
+        db.execute(audit_query, {
+            "user_id": current_user_id,
+            "entity_id": section_id,
+            "details": json.dumps({"student_id": student_id})
+        })
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "Student removed from section successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error removing student: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to remove student: {str(e)}")
+
+
+@router.post("/sections/{class_section_id}/enroll-program-section")
+async def enroll_program_section_to_class(
+    class_section_id: int,
+    program_section_id: int = Body(..., embed=True),
+    current_user_id: int = Query(...),
+    db: Session = Depends(get_db)
+):
+    """Bulk enroll all students from a program section into a class section"""
+    try:
+        # Check if class section exists
+        check_class_section = text("SELECT id FROM class_sections WHERE id = :class_section_id")
+        class_section = db.execute(check_class_section, {"class_section_id": class_section_id}).fetchone()
+        
+        if not class_section:
+            raise HTTPException(status_code=404, detail="Class section not found")
+        
+        # Check if program section exists
+        check_program_section = text("SELECT id, section_name FROM program_sections WHERE id = :program_section_id")
+        program_section = db.execute(check_program_section, {"program_section_id": program_section_id}).fetchone()
+        
+        if not program_section:
+            raise HTTPException(status_code=404, detail="Program section not found")
+        
+        section_name = program_section[1]
+        
+        # Get all students in the program section
+        get_students_query = text("""
+            SELECT DISTINCT ss.student_id
+            FROM section_students ss
+            JOIN users u ON ss.student_id = u.id
+            WHERE ss.section_id = :program_section_id
+            AND u.is_active = true
+            AND u.role = 'student'
+        """)
+        
+        student_rows = db.execute(get_students_query, {"program_section_id": program_section_id}).fetchall()
+        student_ids = [row[0] for row in student_rows]
+        
+        if not student_ids:
+            return {
+                "success": True,
+                "message": "No active students found in the program section",
+                "data": {
+                    "enrolledCount": 0,
+                    "skippedCount": 0,
+                    "totalStudents": 0
+                }
+            }
+        
+        enrolled_count = 0
+        skipped_count = 0
+        
+        for student_id in student_ids:
+            # Check if already enrolled
+            check_enrollment = text("""
+                SELECT id FROM enrollments
+                WHERE class_section_id = :class_section_id
+                AND student_id = :student_id
+            """)
+            
+            existing = db.execute(check_enrollment, {
+                "class_section_id": class_section_id,
+                "student_id": student_id
+            }).fetchone()
+            
+            if existing:
+                skipped_count += 1
+                continue
+            
+            # Enroll student
+            enroll_query = text("""
+                INSERT INTO enrollments (student_id, class_section_id, status, enrolled_at)
+                VALUES (:student_id, :class_section_id, 'active', NOW())
+            """)
+            
+            db.execute(enroll_query, {
+                "student_id": student_id,
+                "class_section_id": class_section_id
+            })
+            enrolled_count += 1
+        
+        db.commit()
+        
+        # Log the action
+        audit_query = text("""
+            INSERT INTO audit_logs (user_id, action, category, entity_type, entity_id, details, timestamp)
+            VALUES (:user_id, 'BULK_ENROLL_PROGRAM_SECTION', 'Enrollment Management', 'class_section', :entity_id, :details, NOW())
+        """)
+        
+        db.execute(audit_query, {
+            "user_id": current_user_id,
+            "entity_id": class_section_id,
+            "details": json.dumps({
+                "program_section_id": program_section_id,
+                "program_section_name": section_name,
+                "enrolled_count": enrolled_count,
+                "skipped_count": skipped_count,
+                "total_students": len(student_ids)
+            })
+        })
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": f"Successfully enrolled {enrolled_count} student(s) from {section_name}. {skipped_count} already enrolled.",
+            "data": {
+                "enrolledCount": enrolled_count,
+                "skippedCount": skipped_count,
+                "totalStudents": len(student_ids)
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error enrolling program section: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to enroll program section: {str(e)}")
 

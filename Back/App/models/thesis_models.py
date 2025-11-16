@@ -6,6 +6,7 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, 
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
+from config import now_local
 
 Base = declarative_base()
 
@@ -18,7 +19,7 @@ class Program(Base):
     program_name = Column(String(255), nullable=False)
     department = Column(String(100), nullable=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=now_local)
     
     # Relationships
     courses = relationship("Course", back_populates="program")
@@ -35,7 +36,7 @@ class Course(Base):
     year_level = Column(Integer, nullable=True)  # 1-4
     semester = Column(String(20), nullable=True)  # 1st Semester, 2nd Semester, Summer, Midyear
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=now_local)
     
     # Relationships
     program = relationship("Program", back_populates="courses")
@@ -61,7 +62,7 @@ class User(Base):
     department = Column(String(100), nullable=True)
     is_active = Column(Boolean, default=True)
     last_login = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=now_local)
     
     # Relationships
     students = relationship("Student", back_populates="user")
@@ -83,7 +84,7 @@ class Student(Base):
     program_id = Column(Integer, ForeignKey("programs.id"), nullable=True)
     year_level = Column(Integer, nullable=True)  # 1-4
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=now_local)
     
     # Relationships
     user = relationship("User", back_populates="students")
@@ -109,7 +110,7 @@ class ClassSection(Base):
     semester = Column(String(20), nullable=False)
     academic_year = Column(String(20), nullable=False)  # e.g., '2024-2025'
     max_students = Column(Integer, default=40)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=now_local)
     
     # Relationships
     course = relationship("Course", back_populates="class_sections")
@@ -131,7 +132,7 @@ class Enrollment(Base):
     id = Column(Integer, primary_key=True, index=True)
     student_id = Column(Integer, ForeignKey("students.id", ondelete="CASCADE"), nullable=False)
     class_section_id = Column(Integer, ForeignKey("class_sections.id", ondelete="CASCADE"), nullable=False)
-    enrollment_date = Column(DateTime, default=datetime.utcnow)
+    enrollment_date = Column(DateTime, default=now_local)
     status = Column(String(20), default='active')  # active, dropped, completed
     
     # Relationships
@@ -185,7 +186,7 @@ class Evaluation(Base):
     anomaly_reason = Column(Text, nullable=True)           # Why flagged as anomaly
     
     # Metadata
-    submission_date = Column(DateTime, default=datetime.utcnow)
+    submission_date = Column(DateTime, default=now_local)
     submission_ip = Column(String(45), nullable=True)
     processing_status = Column(String(20), default='pending')  # pending, processed, flagged
     processed_at = Column(DateTime, nullable=True)

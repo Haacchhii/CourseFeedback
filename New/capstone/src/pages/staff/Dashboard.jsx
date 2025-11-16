@@ -154,7 +154,7 @@ export default function Dashboard() {
       totalCourses: dashboardData.total_courses || dashboardData.total_sections || 0,
       totalEvaluations: dashboardData.total_evaluations || 0,
       totalEnrolledStudents: dashboardData.total_enrolled_students || 0,
-      participationRate: 0, // Not provided by API
+      participationRate: dashboardData.participation_rate || 0,
       avgRating: (dashboardData.avg_rating || dashboardData.average_rating || 0).toFixed(1),
       sentimentData: [
         { name: 'Positive', value: sentiment.positive || 0, color: '#10b981' },

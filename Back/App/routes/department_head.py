@@ -132,12 +132,24 @@ async def get_department_head_dashboard(
             Evaluation.is_anomaly == True
         ).scalar() or 0
         
+        # Calculate participation rate (students who submitted / total enrolled)
+        from models.enhanced_models import Enrollment
+        total_enrolled_students = db.query(func.count(Enrollment.id.distinct())).filter(
+            Enrollment.status == 'active'
+        ).scalar() or 0
+        
+        students_who_evaluated = db.query(func.count(Evaluation.student_id.distinct())).scalar() or 0
+        
+        participation_rate = round((students_who_evaluated / total_enrolled_students * 100), 1) if total_enrolled_students > 0 else 0
+        
         return {
             "success": True,
             "data": {
                 "department": dept_head.department,
                 "total_courses": total_courses,
                 "total_evaluations": total_evaluations,
+                "total_enrolled_students": total_enrolled_students,
+                "participation_rate": participation_rate,
                 "average_rating": round(avg_rating, 2),
                 "sentiment": sentiment_data,
                 "anomalies": anomaly_count
@@ -201,25 +213,49 @@ async def get_department_evaluations(
                 }
             }
         
+        from models.enhanced_models import Student
+        
         eval_data = []
         for e in evaluations:
             class_section = db.query(ClassSection).filter(ClassSection.id == e.class_section_id).first()
             course = db.query(Course).filter(Course.id == class_section.course_id).first() if class_section else None
             
+            # Get student info via user relationship
+            student = db.query(Student).filter(Student.id == e.student_id).first()
+            student_name = "Unknown Student"
+            if student and student.user:
+                student_name = f"{student.user.first_name} {student.user.last_name}" if student.user.first_name and student.user.last_name else (student.user.email or "Unknown Student")
+            elif student:
+                student_name = student.student_number or "Unknown Student"
+            
             eval_data.append({
                 "id": e.id,
+                "courseId": course.id if course else None,
+                "sectionId": class_section.id if class_section else None,
                 "course_code": course.subject_code if (course and course.subject_code) else "N/A",
                 "course_name": course.subject_name if (course and course.subject_name) else "N/A",
                 "instructor": class_section.instructor_id if class_section else "N/A",
+                "student": student_name,
+                "student_id": e.student_id,
                 "rating_overall": e.rating_overall if e.rating_overall else 0,
                 "rating_teaching": e.rating_teaching if e.rating_teaching else 0,
                 "rating_content": e.rating_content if e.rating_content else 0,
                 "rating_engagement": e.rating_engagement if e.rating_engagement else 0,
+                "ratings": {
+                    "overall": e.rating_overall if e.rating_overall else 0,
+                    "teaching": e.rating_teaching if e.rating_teaching else 0,
+                    "content": e.rating_content if e.rating_content else 0,
+                    "engagement": e.rating_engagement if e.rating_engagement else 0
+                },
                 "sentiment": e.sentiment or "neutral",
                 "sentiment_score": e.sentiment_score if e.sentiment_score else 0,
                 "is_anomaly": e.is_anomaly if e.is_anomaly else False,
+                "anomaly": e.is_anomaly if e.is_anomaly else False,
                 "text_feedback": e.text_feedback or "",
-                "submission_date": e.submission_date.isoformat() if e.submission_date else None
+                "comment": e.text_feedback or "",
+                "submission_date": e.submission_date.isoformat() if e.submission_date else None,
+                "semester": class_section.semester if class_section else "N/A",
+                "academic_year": class_section.academic_year if class_section else "N/A"
             })
         
         return {
@@ -265,16 +301,18 @@ async def get_sentiment_analysis(
             start_date = now - timedelta(days=365)
         
         # Get sentiment distribution over time (all programs - full access)
+        from sqlalchemy import cast, Date
+        date_col = cast(func.date_trunc('day', Evaluation.submission_date), Date)
         sentiments = db.query(
-            func.date_trunc('day', Evaluation.submission_date).label('date'),
+            date_col.label('date'),
             Evaluation.sentiment,
             func.count(Evaluation.id).label('count')
         ).filter(
             Evaluation.submission_date >= start_date
         ).group_by(
-            func.date_trunc('day', Evaluation.submission_date),
+            date_col,
             Evaluation.sentiment
-        ).order_by('date').all()
+        ).order_by(date_col).all()
         
         # Format data for charts
         sentiment_trends = {}
@@ -339,6 +377,8 @@ async def get_department_courses(
                 "data": []
             }
         
+        from models.enhanced_models import Enrollment
+        
         courses_data = []
         for section, course, program in results:
             # Get evaluation count for this section
@@ -350,6 +390,12 @@ async def get_department_courses(
             avg_rating = db.query(func.avg(Evaluation.rating_overall)).filter(
                 Evaluation.class_section_id == section.id
             ).scalar() or 0.0
+            
+            # Get actual enrolled students count
+            enrolled_count = db.query(func.count(Enrollment.id)).filter(
+                Enrollment.class_section_id == section.id,
+                Enrollment.status == 'active'
+            ).scalar() or 0
             
             # Construct instructor full name
             instructor_full_name = "N/A"
@@ -373,7 +419,7 @@ async def get_department_courses(
                 "semester": section.semester or "Unknown",
                 "academic_year": section.academic_year or "Unknown",
                 "evaluations_count": eval_count,
-                "enrolled_students": section.max_students or 0,
+                "enrolled_students": enrolled_count,
                 "status": "Active",  # Default status
                 "overallRating": float(avg_rating) if avg_rating else 0.0
             })
@@ -429,11 +475,16 @@ async def get_course_report(
                 if sentiment:
                     sentiment_data[sentiment.lower()] = count
             
+            # Get instructor name from user relationship
+            instructor_name = "Unknown"
+            if section.instructor:
+                instructor_name = f"{section.instructor.first_name} {section.instructor.last_name}"
+            
             sections_data.append({
                 "class_code": section.class_code,
-                "instructor": section.instructor_name,
-                "schedule": section.schedule,
-                "room": section.room,
+                "instructor": instructor_name,
+                "schedule": getattr(section, 'schedule', 'TBD'),
+                "room": getattr(section, 'room', 'TBD'),
                 "evaluations_count": eval_stats.total if eval_stats else 0,
                 "avg_ratings": {
                     "overall": round(eval_stats.avg_overall, 2) if eval_stats and eval_stats.avg_overall else 0.0,
@@ -466,79 +517,6 @@ async def get_course_report(
         raise HTTPException(status_code=500, detail=str(e))
 
 # ===========================
-# INSTRUCTOR PERFORMANCE
-# ===========================
-
-@router.get("/instructors")
-async def get_instructor_performance(
-    user_id: int = Query(...),
-    db: Session = Depends(get_db)
-):
-    """Get performance metrics for all instructors in department"""
-    try:
-        # Department-wide access (no program filtering)
-        # Get all class sections with their instructors - department-wide
-        sections = db.query(ClassSection).join(
-            Course, ClassSection.course_id == Course.id
-        ).all()
-        
-        # Group by instructor
-        instructor_data = {}
-        for section in sections:
-            instructor = section.instructor_name or "Unknown"
-            
-            if instructor not in instructor_data:
-                instructor_data[instructor] = {
-                    "name": instructor,
-                    "courses": set(),
-                    "total_evaluations": 0,
-                    "ratings": [],
-                    "sentiment_counts": {"positive": 0, "neutral": 0, "negative": 0}
-                }
-            
-            # Get course name
-            course = db.query(Course).filter(Course.id == section.course_id).first()
-            if course:
-                instructor_data[instructor]["courses"].add(course.course_name)
-            
-            # Get evaluation stats
-            evals = db.query(Evaluation).filter(Evaluation.class_section_id == section.id).all()
-            
-            for e in evals:
-                instructor_data[instructor]["total_evaluations"] += 1
-                instructor_data[instructor]["ratings"].append(e.rating_overall)
-                if e.sentiment:
-                    instructor_data[instructor]["sentiment_counts"][e.sentiment.lower()] += 1
-        
-        # Format output
-        instructors_list = []
-        for instructor, data in instructor_data.items():
-            avg_rating = sum(data["ratings"]) / len(data["ratings"]) if data["ratings"] else 0.0
-            
-            instructors_list.append({
-                "name": instructor,
-                "courses_count": len(data["courses"]),
-                "courses": list(data["courses"]),
-                "total_evaluations": data["total_evaluations"],
-                "avg_rating": round(avg_rating, 2),
-                "sentiment": data["sentiment_counts"]
-            })
-        
-        # Sort by average rating
-        instructors_list.sort(key=lambda x: x["avg_rating"], reverse=True)
-        
-        return {
-            "success": True,
-            "data": instructors_list
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error fetching instructor performance: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-# ===========================
 # ANOMALY DETECTION
 # ===========================
 
@@ -566,11 +544,16 @@ async def get_anomalies(
             class_section = db.query(ClassSection).filter(ClassSection.id == e.class_section_id).first()
             course = db.query(Course).filter(Course.id == class_section.course_id).first() if class_section else None
             
+            # Get instructor name from user relationship
+            instructor_name = "N/A"
+            if class_section and class_section.instructor:
+                instructor_name = f"{class_section.instructor.first_name} {class_section.instructor.last_name}"
+            
             anomaly_data.append({
                 "id": e.id,
-                "course_code": course.course_code if course else "N/A",
-                "course_name": course.course_name if course else "N/A",
-                "instructor": class_section.instructor_name if class_section else "N/A",
+                "course_code": course.subject_code if course else "N/A",
+                "course_name": course.subject_name if course else "N/A",
+                "instructor": instructor_name,
                 "rating_overall": e.rating_overall,
                 "anomaly_score": e.anomaly_score,
                 "comments": e.comments,
@@ -617,7 +600,7 @@ async def get_trend_analysis(
                 func.avg(Evaluation.rating_overall).label('avg_rating')
             ).filter(
                 Evaluation.submission_date >= six_months_ago
-            ).group_by(func.date_trunc('month', Evaluation.submission_date)).order_by('month').all()
+            ).group_by('month').order_by('month').all()
             
             trend_data = [{
                 "month": t.month.strftime('%Y-%m') if t.month else "unknown",
@@ -632,7 +615,7 @@ async def get_trend_analysis(
             ).filter(
                 Evaluation.submission_date >= six_months_ago
             ).group_by(
-                func.date_trunc('month', Evaluation.submission_date),
+                'month',
                 Evaluation.sentiment
             ).order_by('month').all()
             
@@ -653,7 +636,7 @@ async def get_trend_analysis(
                 func.avg(Evaluation.rating_engagement).label('avg_engagement')
             ).filter(
                 Evaluation.submission_date >= six_months_ago
-            ).group_by(func.date_trunc('month', Evaluation.submission_date)).order_by('month').all()
+            ).group_by('month').order_by('month').all()
             
             trend_data = [{
                 "month": t.month.strftime('%Y-%m') if t.month else "unknown",
@@ -972,12 +955,12 @@ async def get_completion_rates(
         sections_query = text("""
             SELECT 
                 cs.id as section_id,
-                cs.section_code as class_code,
+                cs.class_code,
                 c.id as course_id,
                 c.subject_code,
                 c.subject_name,
                 c.year_level,
-                COALESCE(u.full_name, 'No Instructor') as instructor_name,
+                COALESCE(CONCAT(u.first_name, ' ', u.last_name), 'No Instructor') as instructor_name,
                 cs.semester,
                 cs.academic_year,
                 COUNT(DISTINCT en.student_id) as enrolled_students,
@@ -992,8 +975,8 @@ async def get_completion_rates(
             LEFT JOIN users u ON cs.instructor_id = u.id
             LEFT JOIN enrollments en ON cs.id = en.class_section_id AND en.status = 'active'
             LEFT JOIN evaluations e ON cs.id = e.class_section_id AND en.student_id = e.student_id
-            GROUP BY cs.id, cs.section_code, c.id, c.subject_code, c.subject_name, 
-                     c.year_level, u.full_name, cs.semester, cs.academic_year
+            GROUP BY cs.id, cs.class_code, c.id, c.subject_code, c.subject_name, 
+                     c.year_level, u.first_name, u.last_name, cs.semester, cs.academic_year
             ORDER BY completion_rate ASC, c.subject_name
         """)
         
@@ -1078,11 +1061,12 @@ async def submit_support_request(
             raise HTTPException(status_code=404, detail="User not found")
         
         # Log the support request (in a real system, you would store this in a database)
+        full_name = f"{user.first_name} {user.last_name}"
         logger.info(f"""
         ========================================
         NEW SUPPORT REQUEST
         ========================================
-        From: {user.full_name} ({user.email})
+        From: {full_name} ({user.email})
         Role: {user.role}
         Issue Type: {request.issueType}
         Subject: {request.subject}

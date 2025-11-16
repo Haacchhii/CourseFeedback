@@ -6,6 +6,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
+from config import now_local
 
 Base = declarative_base()
 
@@ -21,8 +22,9 @@ class User(Base):
     department = Column(String(100), nullable=True)  # Enhanced field
     is_active = Column(Boolean, default=True)        # Enhanced field
     last_login = Column(DateTime, nullable=True)     # Enhanced field
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    must_change_password = Column(Boolean, default=False)  # Force password change on first login
+    created_at = Column(DateTime, default=now_local)
+    updated_at = Column(DateTime, default=now_local, onupdate=now_local)
     
     # Relationships
     students = relationship("Student", back_populates="user")
@@ -37,7 +39,7 @@ class Program(Base):
     program_name = Column(String(255), nullable=False)
     department = Column(String(100), nullable=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=now_local)
     
     # Relationships
     students = relationship("Student", back_populates="program")
@@ -52,7 +54,7 @@ class Student(Base):
     program_id = Column(Integer, ForeignKey("programs.id"), nullable=True)
     year_level = Column(Integer, nullable=False)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=now_local)
     
     # Relationships
     user = relationship("User", back_populates="students")
@@ -71,7 +73,7 @@ class Course(Base):
     semester = Column(Integer, nullable=True)  # FIXED: INTEGER to match upgraded database schema
     units = Column(Float, nullable=True)  # ADDED: units column from schema upgrade
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=now_local)
     # Note: updated_at column does not exist in database schema
     
     # Relationships
@@ -88,7 +90,7 @@ class ClassSection(Base):
     semester = Column(Integer, nullable=False)  # Fixed: INTEGER to match database schema
     academic_year = Column(String(20), nullable=False)  # "2024-2025"
     max_students = Column(Integer, default=40)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=now_local)
     
     # Relationships
     course = relationship("Course", back_populates="class_sections")
@@ -103,7 +105,7 @@ class Enrollment(Base):
     id = Column(Integer, primary_key=True, index=True)
     student_id = Column(Integer, ForeignKey("students.id"), nullable=False)
     class_section_id = Column(Integer, ForeignKey("class_sections.id"), nullable=False)
-    enrollment_date = Column(DateTime, default=datetime.utcnow)
+    enrolled_at = Column(DateTime, default=now_local)
     status = Column(String(20), default='active')  # active, dropped, completed
     
     # Relationships
@@ -148,7 +150,7 @@ class Evaluation(Base):
     processed_at = Column(DateTime, nullable=True)
     
     # Timestamp fields
-    submission_date = Column(DateTime, default=datetime.utcnow)
+    submission_date = Column(DateTime, default=now_local)
     submission_ip = Column(String(50), nullable=True)
     
     # Relationships
@@ -172,7 +174,7 @@ class DepartmentHead(Base):
     last_name = Column(String(100), nullable=False)
     department = Column(String(255), nullable=True)
     programs = Column(ARRAY(Integer), nullable=True)  # Array of program IDs they oversee
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=now_local)
     
     # Relationships
     user = relationship("User", back_populates="department_heads")
@@ -185,7 +187,7 @@ class Secretary(Base):
     name = Column(String(255), nullable=False)
     department = Column(String(255), nullable=True)
     programs = Column(ARRAY(Integer), nullable=True)  # Array of program IDs they manage
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=now_local)
     
     # Relationships
     user = relationship("User")
@@ -198,8 +200,8 @@ class Instructor(Base):
     name = Column(String(255), nullable=False)
     department = Column(String(255), nullable=True)
     specialization = Column(String(255), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=now_local)
+    updated_at = Column(DateTime, default=now_local, onupdate=now_local)
     
     # Relationships
     user = relationship("User")
@@ -217,8 +219,8 @@ class EvaluationPeriod(Base):
     total_students = Column(Integer, default=0)
     completed_evaluations = Column(Integer, default=0)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=now_local)
+    updated_at = Column(DateTime, default=now_local, onupdate=now_local)
     
     # Relationships
     creator = relationship("User")
@@ -240,7 +242,7 @@ class AuditLog(Base):
     status = Column(String(20), default='Success')  # Success, Failed, Blocked
     ip_address = Column(String(45), nullable=True)
     details = Column(JSONB, nullable=True)  # Additional context in JSON
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=now_local, index=True)
     
     # Relationships
     user = relationship("User")
@@ -252,6 +254,28 @@ class AuditLog(Base):
         Index('idx_audit_logs_severity', 'severity', 'status'),
     )
 
+class ExportHistory(Base):
+    __tablename__ = "export_history"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    export_type = Column(String(50), nullable=False)  # users, evaluations, courses, analytics
+    format = Column(String(10), nullable=False)  # csv, json, pdf
+    filters = Column(JSONB, nullable=True)  # Applied filters as JSON
+    file_size = Column(Integer, nullable=True)  # File size in bytes
+    record_count = Column(Integer, nullable=False)  # Number of records exported
+    status = Column(String(20), default='completed')  # completed, failed
+    created_at = Column(DateTime, default=now_local, index=True)
+    
+    # Relationships
+    user = relationship("User")
+    
+    # Indexes
+    __table_args__ = (
+        Index('idx_export_history_user', 'user_id', 'created_at'),
+        Index('idx_export_history_type', 'export_type', 'created_at'),
+    )
+
 class SystemSettings(Base):
     __tablename__ = "system_settings"
     
@@ -259,7 +283,7 @@ class SystemSettings(Base):
     category = Column(String(50), nullable=False, unique=True)  # general, email, security, backup
     settings = Column(JSONB, nullable=False)  # All settings for that category in JSON
     updated_by = Column(Integer, ForeignKey("users.id"), nullable=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=now_local, onupdate=now_local)
     
     # Relationships
     updater = relationship("User")
@@ -288,7 +312,7 @@ class AnalysisResult(Base):
     detailed_results = Column(JSONB, nullable=True)
     
     # Metadata
-    analysis_date = Column(DateTime, default=datetime.utcnow)
+    analysis_date = Column(DateTime, default=now_local)
     model_version = Column(String(20), nullable=True)
     processing_time_ms = Column(Integer, nullable=True)
     
@@ -301,6 +325,48 @@ class AnalysisResult(Base):
         Index('idx_analysis_results_date', 'analysis_date'),
     )
 
+class ProgramSection(Base):
+    __tablename__ = "program_sections"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    section_name = Column(String(100), nullable=False)
+    program_id = Column(Integer, ForeignKey("programs.id", ondelete="CASCADE"), nullable=False)
+    year_level = Column(Integer, nullable=False)  # 1-4
+    semester = Column(Integer, nullable=False)  # 1-3
+    school_year = Column(String(20), nullable=False)  # "2024-2025"
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=now_local)
+    updated_at = Column(DateTime, default=now_local, onupdate=now_local)
+    
+    # Relationships
+    program = relationship("Program")
+    section_students = relationship("SectionStudent", back_populates="section")
+    
+    # Indexes
+    __table_args__ = (
+        Index('idx_program_sections_program_id', 'program_id'),
+        Index('idx_program_sections_year_level', 'year_level'),
+        Index('idx_program_sections_is_active', 'is_active'),
+    )
+
+class SectionStudent(Base):
+    __tablename__ = "section_students"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    section_id = Column(Integer, ForeignKey("program_sections.id", ondelete="CASCADE"), nullable=False)
+    student_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime, default=now_local)
+    
+    # Relationships
+    section = relationship("ProgramSection", back_populates="section_students")
+    student = relationship("User")
+    
+    # Indexes
+    __table_args__ = (
+        Index('idx_section_students_section_id', 'section_id'),
+        Index('idx_section_students_student_id', 'student_id'),
+    )
+
 class NotificationQueue(Base):
     __tablename__ = "notification_queue"
     
@@ -311,9 +377,9 @@ class NotificationQueue(Base):
     message = Column(Text, nullable=False)
     data = Column(JSONB, nullable=True)  # Additional notification data
     status = Column(String(20), default='pending')  # pending, sent, failed
-    scheduled_for = Column(DateTime, default=datetime.utcnow)
+    scheduled_for = Column(DateTime, default=now_local)
     sent_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=now_local)
     
     # Relationships
     user = relationship("User")
