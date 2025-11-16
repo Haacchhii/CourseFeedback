@@ -738,3 +738,218 @@ async def get_year_levels(
     except Exception as e:
         logger.error(f"Error fetching year levels: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ===========================
+# CATEGORY AVERAGES & ANALYSIS
+# ===========================
+
+@router.get("/courses/{course_id}/category-averages")
+async def get_course_category_averages(
+    course_id: int,
+    user_id: int = Query(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Calculate 6 category averages from evaluation ratings for a specific course.
+    Categories based on LPU evaluation form:
+    1. Relevance of Course (questions 1-6)
+    2. Course Organization and ILOs (questions 7-11)
+    3. Teaching-Learning (questions 12-18)
+    4. Assessment (questions 19-24)
+    5. Learning Environment (questions 25-30)
+    6. Counseling (question 31)
+    """
+    try:
+        # Verify course exists
+        course = db.query(Course).filter(Course.id == course_id).first()
+        if not course:
+            raise HTTPException(status_code=404, detail="Course not found")
+        
+        # Get all evaluations for this course
+        evaluations = db.query(Evaluation).join(
+            ClassSection, Evaluation.class_section_id == ClassSection.id
+        ).filter(
+            ClassSection.course_id == course_id
+        ).all()
+        
+        if not evaluations:
+            return {
+                "success": True,
+                "data": {
+                    "course_id": course_id,
+                    "course_name": course.subject_name,
+                    "total_evaluations": 0,
+                    "categories": []
+                }
+            }
+        
+        # Define category question mappings
+        categories = {
+            "relevance_of_course": {
+                "name": "Relevance of Course",
+                "questions": ["1", "2", "3", "4", "5", "6"],
+                "description": "Development of skills and knowledge"
+            },
+            "course_organization": {
+                "name": "Course Organization and ILOs",
+                "questions": ["7", "8", "9", "10", "11"],
+                "description": "Course structure and learning outcomes"
+            },
+            "teaching_learning": {
+                "name": "Teaching - Learning",
+                "questions": ["12", "13", "14", "15", "16", "17", "18"],
+                "description": "Teaching methods and activities"
+            },
+            "assessment": {
+                "name": "Assessment",
+                "questions": ["19", "20", "21", "22", "23", "24"],
+                "description": "Assessment methods and feedback"
+            },
+            "learning_environment": {
+                "name": "Learning Environment",
+                "questions": ["25", "26", "27", "28", "29", "30"],
+                "description": "Facilities and learning resources"
+            },
+            "counseling": {
+                "name": "Counseling",
+                "questions": ["31"],
+                "description": "Consultation and support"
+            }
+        }
+        
+        # Calculate averages for each category
+        category_results = []
+        for cat_id, cat_info in categories.items():
+            all_ratings = []
+            
+            for evaluation in evaluations:
+                if evaluation.ratings and isinstance(evaluation.ratings, dict):
+                    # Extract ratings for this category's questions
+                    for q_num in cat_info["questions"]:
+                        rating = evaluation.ratings.get(q_num)
+                        if rating is not None and isinstance(rating, (int, float)):
+                            all_ratings.append(float(rating))
+            
+            if all_ratings:
+                average = sum(all_ratings) / len(all_ratings)
+                category_results.append({
+                    "category_id": cat_id,
+                    "category_name": cat_info["name"],
+                    "description": cat_info["description"],
+                    "average": round(average, 2),
+                    "total_responses": len(all_ratings),
+                    "question_count": len(cat_info["questions"])
+                })
+        
+        return {
+            "success": True,
+            "data": {
+                "course_id": course_id,
+                "course_name": course.subject_name,
+                "course_code": course.subject_code,
+                "total_evaluations": len(evaluations),
+                "categories": category_results
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error calculating category averages: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/courses/{course_id}/question-distribution")
+async def get_question_distribution(
+    course_id: int,
+    user_id: int = Query(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Get response distribution for all 31 questions in a course.
+    Returns count and percentage for each rating (1-4) per question.
+    """
+    try:
+        # Verify course exists
+        course = db.query(Course).filter(Course.id == course_id).first()
+        if not course:
+            raise HTTPException(status_code=404, detail="Course not found")
+        
+        # Get all evaluations for this course
+        evaluations = db.query(Evaluation).join(
+            ClassSection, Evaluation.class_section_id == ClassSection.id
+        ).filter(
+            ClassSection.course_id == course_id
+        ).all()
+        
+        if not evaluations:
+            return {
+                "success": True,
+                "data": {
+                    "course_id": course_id,
+                    "course_name": course.subject_name,
+                    "total_evaluations": 0,
+                    "questions": []
+                }
+            }
+        
+        # Initialize distribution for all 31 questions
+        question_distribution = {}
+        for q_num in range(1, 32):
+            question_distribution[str(q_num)] = {
+                "question_number": q_num,
+                "distribution": {
+                    "1": {"count": 0, "percentage": 0.0},
+                    "2": {"count": 0, "percentage": 0.0},
+                    "3": {"count": 0, "percentage": 0.0},
+                    "4": {"count": 0, "percentage": 0.0}
+                },
+                "total_responses": 0,
+                "average": 0.0
+            }
+        
+        # Count responses for each question
+        for evaluation in evaluations:
+            if evaluation.ratings and isinstance(evaluation.ratings, dict):
+                for q_num, rating in evaluation.ratings.items():
+                    if q_num in question_distribution and rating in [1, 2, 3, 4]:
+                        question_distribution[q_num]["distribution"][str(rating)]["count"] += 1
+                        question_distribution[q_num]["total_responses"] += 1
+        
+        # Calculate percentages and averages
+        for q_num, data in question_distribution.items():
+            total = data["total_responses"]
+            if total > 0:
+                # Calculate percentages
+                for rating in ["1", "2", "3", "4"]:
+                    count = data["distribution"][rating]["count"]
+                    data["distribution"][rating]["percentage"] = round((count / total) * 100, 1)
+                
+                # Calculate average
+                weighted_sum = sum(
+                    int(rating) * data["distribution"][rating]["count"]
+                    for rating in ["1", "2", "3", "4"]
+                )
+                data["average"] = round(weighted_sum / total, 2)
+        
+        # Convert to list format
+        questions_list = list(question_distribution.values())
+        
+        return {
+            "success": True,
+            "data": {
+                "course_id": course_id,
+                "course_name": course.subject_name,
+                "course_code": course.subject_code,
+                "total_evaluations": len(evaluations),
+                "questions": questions_list
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error calculating question distribution: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
