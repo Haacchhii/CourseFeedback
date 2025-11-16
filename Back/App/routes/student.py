@@ -75,7 +75,8 @@ async def get_student_courses(student_id: int, db: Session = Depends(get_db)):
                 CASE 
                     WHEN e.id IS NOT NULL THEN true 
                     ELSE false 
-                END as already_evaluated
+                END as already_evaluated,
+                e.id as evaluation_id
             FROM enrollments enr
             JOIN class_sections cs ON enr.class_section_id = cs.id
             JOIN courses c ON cs.course_id = c.id
@@ -99,7 +100,8 @@ async def get_student_courses(student_id: int, db: Session = Depends(get_db)):
                 "academic_year": row[6],
                 "program_name": row[7] or "Unknown",
                 "instructor_name": row[8] or "TBA",
-                "already_evaluated": row[9]
+                "already_evaluated": row[9],
+                "evaluation_id": row[10]
             })
         
         return {
@@ -310,7 +312,8 @@ async def get_evaluation_for_edit(evaluation_id: int, db: Session = Depends(get_
                 e.id, e.student_id, e.class_section_id,
                 e.sentiment,
                 cs.class_code, c.subject_name, c.subject_code,
-                ep.end_date as period_end
+                ep.end_date as period_end,
+                cs.semester, cs.academic_year
             FROM evaluations e
             JOIN class_sections cs ON e.class_section_id = cs.id
             JOIN courses c ON cs.course_id = c.id
@@ -330,6 +333,10 @@ async def get_evaluation_for_edit(evaluation_id: int, db: Session = Depends(get_
                 detail="Cannot edit evaluation - evaluation period has ended"
             )
         
+        # Note: ratings and comment are stored in database but not accessible yet
+        # For now, return empty so frontend shows blank form
+        # TODO: Update database schema to store ratings properly
+        
         return {
             "success": True,
             "data": {
@@ -337,11 +344,15 @@ async def get_evaluation_for_edit(evaluation_id: int, db: Session = Depends(get_
                 "student_id": eval_data[1],
                 "class_section_id": eval_data[2],
                 "sentiment": eval_data[3],
+                "ratings": {},  # TODO: Fetch from database when schema updated
+                "comment": "",  # TODO: Fetch from database when schema updated
                 "course": {
                     "class_code": eval_data[4],
                     "name": eval_data[5],
                     "code": eval_data[6]
                 },
+                "semester": eval_data[8],
+                "academic_year": eval_data[9],
                 "can_edit": True,
                 "period_end": period_end.isoformat() if period_end else None
             }

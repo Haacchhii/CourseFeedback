@@ -10,6 +10,8 @@ export default function EvaluateCourse(){
   const [course, setCourse] = useState(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [evaluationId, setEvaluationId] = useState(null)
   
   // Initialize ratings state from questionnaire config
   const [ratings, setRatings] = useState(() => {
@@ -27,22 +29,58 @@ export default function EvaluateCourse(){
   const [currentCategory, setCurrentCategory] = useState(0)
   const nav = useNavigate()
 
-  // Fetch course details
+  // Fetch course details and check if editing existing evaluation
   useEffect(() => {
-    const fetchCourse = async () => {
+    const fetchCourseAndEvaluation = async () => {
       try {
         setLoading(true)
-        const data = await studentAPI.getCourseDetails(courseId)
-        setCourse(data || { name: courseId })
+        const currentUser = user || JSON.parse(localStorage.getItem('currentUser'))
+        
+        // First, check if student has already evaluated this course
+        const coursesData = await studentAPI.getCourses(currentUser.id)
+        const courses = coursesData?.data || coursesData || []
+        const thisCourse = courses.find(c => 
+          c.class_section_id === parseInt(courseId) || c.id === parseInt(courseId)
+        )
+        
+        if (thisCourse) {
+          setCourse(thisCourse)
+          
+          // If already evaluated, fetch the existing evaluation
+          if (thisCourse.already_evaluated && thisCourse.evaluation_id) {
+            setIsEditMode(true)
+            setEvaluationId(thisCourse.evaluation_id)
+            
+            try {
+              const evalData = await studentAPI.getEvaluationForEdit(thisCourse.evaluation_id)
+              if (evalData?.data) {
+                // Pre-fill ratings if available
+                if (evalData.data.ratings && Object.keys(evalData.data.ratings).length > 0) {
+                  setRatings(prev => ({...prev, ...evalData.data.ratings}))
+                }
+                // Pre-fill comment if available
+                if (evalData.data.comment) {
+                  setComment(evalData.data.comment)
+                }
+              }
+            } catch (err) {
+              console.warn('Could not fetch existing evaluation:', err)
+            }
+          }
+        } else {
+          // Fallback: try to get course details directly
+          const data = await studentAPI.getCourseDetails(courseId)
+          setCourse(data || { name: courseId, class_section_id: courseId })
+        }
       } catch (err) {
         console.error('Error fetching course:', err)
-        setCourse({ name: courseId }) // Fallback
+        setCourse({ name: courseId, class_section_id: courseId })
       } finally {
         setLoading(false)
       }
     }
-    fetchCourse()
-  }, [courseId])
+    fetchCourseAndEvaluation()
+  }, [courseId, user])
 
   function setRating(questionId, value) {
     setRatings(prev => ({...prev, [questionId]: Number(value)}))
@@ -72,22 +110,36 @@ export default function EvaluateCourse(){
       setSubmitting(true)
       const currentUser = user || JSON.parse(localStorage.getItem('currentUser'))
       
-      console.log('Submitting evaluation:', {
-        courseId,
-        studentId: currentUser.id,
-        ratingsCount: Object.keys(ratings).length,
-        hasComment: !!comment
-      })
-      
-      // Backend accepts either user.id or student.id and converts automatically
-      await studentAPI.submitEvaluation({
+      const evaluationData = {
         class_section_id: parseInt(courseId),
-        student_id: currentUser.id, // Can be either users.id or students.id
+        student_id: currentUser.id,
         ratings,
         comment
-      })
+      }
       
-      alert('Evaluation submitted successfully!')
+      if (isEditMode && evaluationId) {
+        // Update existing evaluation
+        console.log('Updating evaluation:', {
+          evaluationId,
+          ratingsCount: Object.keys(ratings).length,
+          hasComment: !!comment
+        })
+        
+        await studentAPI.updateEvaluation(evaluationId, evaluationData)
+        alert('Evaluation updated successfully!')
+      } else {
+        // Create new evaluation
+        console.log('Submitting new evaluation:', {
+          courseId,
+          studentId: currentUser.id,
+          ratingsCount: Object.keys(ratings).length,
+          hasComment: !!comment
+        })
+        
+        await studentAPI.submitEvaluation(evaluationData)
+        alert('Evaluation submitted successfully!')
+      }
+      
       nav('/student/courses')
     } catch (err) {
       console.error('Error submitting evaluation:', err)
@@ -126,6 +178,18 @@ export default function EvaluateCourse(){
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto">
       <div className="bg-white rounded-lg shadow-lg">
+        {/* Edit Mode Banner */}
+        {isEditMode && (
+          <div className="bg-blue-50 border-b-2 border-blue-200 px-6 py-3">
+            <div className="flex items-center gap-2 text-blue-800">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+              </svg>
+              <span className="font-medium">Edit Mode: You can modify your previous responses</span>
+            </div>
+          </div>
+        )}
+        
         {/* Header */}
         <div className="p-6 border-b bg-gradient-to-r from-[#7a0000] to-[#8f0000]">
           <button 
@@ -137,7 +201,7 @@ export default function EvaluateCourse(){
             </svg>
             Back to Courses
           </button>
-          <h1 className="text-2xl font-bold text-white">Evaluating: {course.name || 'Course'}</h1>
+          <h1 className="text-2xl font-bold text-white">{isEditMode ? 'Editing Evaluation: ' : 'Evaluating: '}{course.name || 'Course'}</h1>
           <p className="text-sm text-gray-200 mt-1">
             {course.class_code || course.code || ''}
           </p>
@@ -326,10 +390,10 @@ export default function EvaluateCourse(){
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  <span>Submitting...</span>
+                  <span>{isEditMode ? 'Updating...' : 'Submitting...'}</span>
                 </>
               ) : (
-                <span>Submit Evaluation</span>
+                <span>{isEditMode ? 'Update Evaluation' : 'Submit Evaluation'}</span>
               )}
             </button>
           </div>
