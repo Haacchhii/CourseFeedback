@@ -52,11 +52,18 @@ export default function EvaluateCourse(){
             setEvaluationId(thisCourse.evaluation_id)
             
             try {
+              console.log('Fetching evaluation for edit, ID:', thisCourse.evaluation_id)
               const evalData = await studentAPI.getEvaluationForEdit(thisCourse.evaluation_id)
+              console.log('Evaluation data received:', evalData)
+              
               if (evalData?.data) {
+                console.log('Ratings from backend:', evalData.data.ratings)
+                console.log('Comment from backend:', evalData.data.comment)
+                
                 // Pre-fill ratings if available
                 if (evalData.data.ratings && Object.keys(evalData.data.ratings).length > 0) {
-                  setRatings(prev => ({...prev, ...evalData.data.ratings}))
+                  console.log('Setting ratings:', evalData.data.ratings)
+                  setRatings(evalData.data.ratings)  // Replace entirely instead of merging
                 }
                 // Pre-fill comment if available
                 if (evalData.data.comment) {
@@ -64,7 +71,8 @@ export default function EvaluateCourse(){
                 }
               }
             } catch (err) {
-              console.warn('Could not fetch existing evaluation:', err)
+              console.error('Could not fetch existing evaluation:', err)
+              console.error('Error details:', err.response?.data)
             }
           }
         } else {
