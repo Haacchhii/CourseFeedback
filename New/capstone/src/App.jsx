@@ -19,13 +19,11 @@ import AuditLogViewer from './pages/admin/AuditLogViewer'
 import DataExportCenter from './pages/admin/DataExportCenter'
 import EmailNotifications from './pages/admin/EmailNotifications'
 
-// Staff Pages (Secretary/Dept Head/Instructor)
+// Staff Pages (Secretary/Dept Head)
 import StaffDashboard from './pages/staff/Dashboard'
 import StaffSentimentAnalysis from './pages/staff/SentimentAnalysis'
-import StaffAnomalyDetection from './pages/staff/AnomalyDetection'
 import StaffCourses from './pages/staff/Courses'
 import StaffEvaluations from './pages/staff/Evaluations'
-import StaffEvaluationQuestions from './pages/staff/EvaluationQuestions'
 
 // Student Pages
 import StudentCourses from './pages/student/StudentCourses'
@@ -84,35 +82,25 @@ export default function App(){
           </ProtectedRoute>
         } />
 
-        {/* Staff Dashboard (Secretary/Dept Head/Instructor - Same Features) - Protected */}
+        {/* Staff Dashboard (Secretary/Dept Head - Same Features) - Protected */}
         <Route path="/dashboard" element={
-          <ProtectedRoute allowedRoles={['secretary', 'instructor', 'department_head']}>
+          <ProtectedRoute allowedRoles={['secretary', 'department_head']}>
             <StaffDashboard/>
           </ProtectedRoute>
         } />
         <Route path="/sentiment" element={
-          <ProtectedRoute allowedRoles={['secretary', 'instructor', 'department_head']}>
+          <ProtectedRoute allowedRoles={['secretary', 'department_head']}>
             <StaffSentimentAnalysis/>
           </ProtectedRoute>
         } />
-        <Route path="/anomalies" element={
-          <ProtectedRoute allowedRoles={['secretary', 'instructor', 'department_head']}>
-            <StaffAnomalyDetection/>
-          </ProtectedRoute>
-        } />
         <Route path="/courses" element={
-          <ProtectedRoute allowedRoles={['secretary', 'instructor', 'department_head']}>
+          <ProtectedRoute allowedRoles={['secretary', 'department_head']}>
             <StaffCourses/>
           </ProtectedRoute>
         } />
         <Route path="/evaluations" element={
-          <ProtectedRoute allowedRoles={['secretary', 'instructor', 'department_head']}>
+          <ProtectedRoute allowedRoles={['secretary', 'department_head']}>
             <StaffEvaluations/>
-          </ProtectedRoute>
-        } />
-        <Route path="/evaluation-questions" element={
-          <ProtectedRoute allowedRoles={['secretary', 'instructor', 'department_head']}>
-            <StaffEvaluationQuestions/>
           </ProtectedRoute>
         } />
 

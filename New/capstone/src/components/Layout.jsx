@@ -36,14 +36,12 @@ export default function Layout({ children }) {
     { path: '/admin/audit-logs', label: 'Audit Logs', icon: '📋' }
   ]
 
-  // Staff navigation items (Secretary/Instructor/Dept Head)
+  // Staff navigation items (Secretary/Dept Head)
   const staffNavigationItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: '�📊' },
-    { path: '/sentiment', label: 'Sentiment Analysis', icon: '💭' },
-    { path: '/anomalies', label: 'Anomaly Detection', icon: '🔍' },
+    { path: '/dashboard', label: 'Dashboard', icon: '📊' },
+    { path: '/sentiment', label: 'Sentiment & Anomalies', icon: '💭' },
     { path: '/courses', label: 'Courses', icon: '📚' },
-    { path: '/evaluations', label: 'Evaluations', icon: '📝' },
-    { path: '/evaluation-questions', label: 'Questions', icon: '❓' }
+    { path: '/evaluations', label: 'Evaluations', icon: '📝' }
   ]
 
   // Student navigation items

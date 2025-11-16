@@ -67,6 +67,11 @@ async def login(request: LoginRequest, db = Depends(get_db)):
             logger.warning(f"Login attempt for inactive user: {request.email}")
             return LoginResponse(success=False, message="Account is inactive")
         
+        # Reject instructor role - instructors cannot log in
+        if user_data.role == 'instructor':
+            logger.warning(f"Login attempt blocked for instructor role: {request.email}")
+            return LoginResponse(success=False, message="Instructor access is not available. Please contact administration.")
+        
         # Verify password
         stored_hash = user_data.password_hash
         try:

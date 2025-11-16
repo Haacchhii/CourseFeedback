@@ -99,56 +99,24 @@ async def get_department_head_dashboard(
                 }
             }
         
-        # Get programs under this department head
-        # Use helper function to parse ARRAY(Integer) field
-        program_ids = parse_program_ids(dept_head.programs)
+        # Department-wide access (no program filtering) - merged with secretary role
+        # Department heads now have full department access like secretaries
+        logger.info(f"Department head accessing dashboard (department-wide access)")
         
-        # Debug log to verify parsing
-        logger.info(f"Department head programs: {dept_head.programs} (type: {type(dept_head.programs)})")
-        logger.info(f"Parsed program_ids: {program_ids} (type: {type(program_ids)})")
+        # Total courses - department-wide
+        total_courses = db.query(func.count(Course.id)).scalar() or 0
         
-        # Total courses - use empty list check to avoid SQL errors
-        if not program_ids:
-            total_courses = 0
-        else:
-            total_courses = db.query(func.count(Course.id)).filter(
-                Course.program_id.in_(program_ids)
-            ).scalar() or 0
+        # Total evaluations - department-wide
+        total_evaluations = db.query(func.count(Evaluation.id)).scalar() or 0
         
-        # Total evaluations
-        total_evaluations = 0
-        avg_rating = 0.0
-        if program_ids:
-            total_evaluations = db.query(func.count(Evaluation.id)).join(
-                ClassSection, Evaluation.class_section_id == ClassSection.id
-            ).join(
-                Course, ClassSection.course_id == Course.id
-            ).filter(
-                Course.program_id.in_(program_ids)
-            ).scalar() or 0
-            
-            # Average rating
-            avg_rating = db.query(func.avg(Evaluation.rating_overall)).join(
-                ClassSection, Evaluation.class_section_id == ClassSection.id
-            ).join(
-                Course, ClassSection.course_id == Course.id
-            ).filter(
-                Course.program_id.in_(program_ids)
-            ).scalar() or 0.0
+        # Average rating - department-wide
+        avg_rating = db.query(func.avg(Evaluation.rating_overall)).scalar() or 0.0
         
-        # Sentiment distribution
-        sentiment_dist = []
-        if program_ids:
-            sentiment_dist = db.query(
-                Evaluation.sentiment,
-                func.count(Evaluation.id).label('count')
-            ).join(
-                ClassSection, Evaluation.class_section_id == ClassSection.id
-            ).join(
-                Course, ClassSection.course_id == Course.id
-            ).filter(
-                Course.program_id.in_(program_ids)
-            ).group_by(Evaluation.sentiment).all()
+        # Sentiment distribution - department-wide
+        sentiment_dist = db.query(
+            Evaluation.sentiment,
+            func.count(Evaluation.id).label('count')
+        ).group_by(Evaluation.sentiment).all()
         
         sentiment_data = {
             "positive": 0,
@@ -159,13 +127,8 @@ async def get_department_head_dashboard(
             if sentiment:
                 sentiment_data[sentiment.lower()] = count
         
-        # Anomaly count
-        anomaly_count = db.query(func.count(Evaluation.id)).join(
-            ClassSection, Evaluation.class_section_id == ClassSection.id
-        ).join(
-            Course, ClassSection.course_id == Course.id
-        ).filter(
-            Course.program_id.in_(program_ids),
+        # Anomaly count - department-wide
+        anomaly_count = db.query(func.count(Evaluation.id)).filter(
             Evaluation.is_anomaly == True
         ).scalar() or 0
         
@@ -434,18 +397,10 @@ async def get_course_report(
 ):
     """Get detailed report for a specific course"""
     try:
-        # Verify access
-        dept_head = db.query(DepartmentHead).filter(DepartmentHead.user_id == user_id).first()
-        if not dept_head:
-            raise HTTPException(status_code=404, detail="Department head not found")
-        
+        # Department-wide access (no program filtering)
         course = db.query(Course).filter(Course.id == course_id).first()
         if not course:
             raise HTTPException(status_code=404, detail="Course not found")
-        
-        program_ids = parse_program_ids(dept_head.programs)
-        if course.program_id not in program_ids:
-            raise HTTPException(status_code=403, detail="Access denied to this course")
         
         # Get all class sections
         sections = db.query(ClassSection).filter(ClassSection.course_id == course_id).all()
@@ -521,18 +476,10 @@ async def get_instructor_performance(
 ):
     """Get performance metrics for all instructors in department"""
     try:
-        # Get department head info
-        dept_head = db.query(DepartmentHead).filter(DepartmentHead.user_id == user_id).first()
-        if not dept_head:
-            raise HTTPException(status_code=404, detail="Department head not found")
-        
-        program_ids = parse_program_ids(dept_head.programs)
-        
-        # Get all class sections with their instructors
+        # Department-wide access (no program filtering)
+        # Get all class sections with their instructors - department-wide
         sections = db.query(ClassSection).join(
             Course, ClassSection.course_id == Course.id
-        ).filter(
-            Course.program_id.in_(program_ids)
         ).all()
         
         # Group by instructor
@@ -660,13 +607,7 @@ async def get_trend_analysis(
 ):
     """Get trend analysis over time"""
     try:
-        # Get department head info
-        dept_head = db.query(DepartmentHead).filter(DepartmentHead.user_id == user_id).first()
-        if not dept_head:
-            raise HTTPException(status_code=404, detail="Department head not found")
-        
-        program_ids = parse_program_ids(dept_head.programs)
-        
+        # Department-wide access (no program filtering)
         # Get trends by month for the last 6 months
         six_months_ago = datetime.now() - timedelta(days=180)
         
@@ -674,12 +615,7 @@ async def get_trend_analysis(
             trends = db.query(
                 func.date_trunc('month', Evaluation.submission_date).label('month'),
                 func.avg(Evaluation.rating_overall).label('avg_rating')
-            ).join(
-                ClassSection, Evaluation.class_section_id == ClassSection.id
-            ).join(
-                Course, ClassSection.course_id == Course.id
             ).filter(
-                Course.program_id.in_(program_ids),
                 Evaluation.submission_date >= six_months_ago
             ).group_by(func.date_trunc('month', Evaluation.submission_date)).order_by('month').all()
             
@@ -693,12 +629,7 @@ async def get_trend_analysis(
                 func.date_trunc('month', Evaluation.submission_date).label('month'),
                 Evaluation.sentiment,
                 func.count(Evaluation.id).label('count')
-            ).join(
-                ClassSection, Evaluation.class_section_id == ClassSection.id
-            ).join(
-                Course, ClassSection.course_id == Course.id
             ).filter(
-                Course.program_id.in_(program_ids),
                 Evaluation.submission_date >= six_months_ago
             ).group_by(
                 func.date_trunc('month', Evaluation.submission_date),
@@ -720,12 +651,7 @@ async def get_trend_analysis(
             trends = db.query(
                 func.date_trunc('month', Evaluation.submission_date).label('month'),
                 func.avg(Evaluation.rating_engagement).label('avg_engagement')
-            ).join(
-                ClassSection, Evaluation.class_section_id == ClassSection.id
-            ).join(
-                Course, ClassSection.course_id == Course.id
             ).filter(
-                Course.program_id.in_(program_ids),
                 Evaluation.submission_date >= six_months_ago
             ).group_by(func.date_trunc('month', Evaluation.submission_date)).order_by('month').all()
             

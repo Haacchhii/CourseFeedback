@@ -22,7 +22,6 @@ try:
     from routes.system_admin import router as system_admin_router
     from routes.department_head import router as department_head_router
     from routes.secretary import router as secretary_router
-    from routes.instructor import router as instructor_router
     ROUTES_AVAILABLE = True
     print("🛣️ All routes loaded successfully")
 except ImportError as e:
@@ -46,8 +45,7 @@ if ROUTES_AVAILABLE:
     app.include_router(admin_router, prefix="/api/admin", tags=["admin-dashboard"])
     app.include_router(department_head_router, prefix="/api/dept-head", tags=["department-head"])
     app.include_router(secretary_router, prefix="/api/secretary", tags=["secretary"])
-    app.include_router(instructor_router, prefix="/api/instructor", tags=["instructor"])
-    print("✅ API routes registered: auth, student, admin (users + dashboard), dept-head, secretary, instructor")
+    print("✅ API routes registered: auth, student, admin (users + dashboard), dept-head, secretary")
     
     # Debug: Print all registered routes
     print("\n🔍 Registered API Routes:")
