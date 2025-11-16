@@ -39,6 +39,8 @@ apiClient.interceptors.response.use(
       // Server responded with error status
       const { status, data } = error.response
       
+      console.error('API Error Response:', { status, data }) // Debug log
+      
       // Handle specific error codes
       if (status === 401) {
         // Unauthorized - clear token and redirect to login
@@ -48,13 +50,17 @@ apiClient.interceptors.response.use(
       }
       
       // Return error message from backend or default message
-      const errorMessage = data?.detail || data?.message || 'An error occurred'
-      return Promise.reject(new Error(errorMessage))
+      const errorMessage = data?.detail || data?.message || `Server error (${status})`
+      const errorObj = new Error(errorMessage)
+      errorObj.response = error.response // Preserve response for debugging
+      return Promise.reject(errorObj)
     } else if (error.request) {
       // Request was made but no response received
+      console.error('No response from server:', error.request)
       return Promise.reject(new Error('No response from server. Please check your connection.'))
     } else {
       // Something else happened
+      console.error('Request error:', error.message)
       return Promise.reject(error)
     }
   }

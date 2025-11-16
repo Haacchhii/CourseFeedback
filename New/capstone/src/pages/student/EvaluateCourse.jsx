@@ -57,21 +57,27 @@ export default function EvaluateCourse(){
   function canSubmit() {
     // Check all ratings are provided
     const allRatingsProvided = Object.values(ratings).every(r => r !== null)
-    // Comment is required
-    const hasComment = comment.trim().length > 0
-    return allRatingsProvided && hasComment
+    // Comment is optional - can be blank
+    return allRatingsProvided
   }
 
   async function submit(){
     setError('')
     
     if (!canSubmit()) {
-      return setError('Please complete all ratings and provide a comment before submitting')
+      return setError('Please complete all ratings before submitting')
     }
     
     try {
       setSubmitting(true)
       const currentUser = user || JSON.parse(localStorage.getItem('currentUser'))
+      
+      console.log('Submitting evaluation:', {
+        courseId,
+        studentId: currentUser.id,
+        ratingsCount: Object.keys(ratings).length,
+        hasComment: !!comment
+      })
       
       // Backend accepts either user.id or student.id and converts automatically
       await studentAPI.submitEvaluation({
@@ -85,7 +91,9 @@ export default function EvaluateCourse(){
       nav('/student/courses')
     } catch (err) {
       console.error('Error submitting evaluation:', err)
-      setError(err.message || 'Failed to submit evaluation. Please try again.')
+      console.error('Error response:', err.response?.data)
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to submit evaluation. Please try again.'
+      setError(errorMsg)
     } finally {
       setSubmitting(false)
     }
@@ -263,7 +271,7 @@ export default function EvaluateCourse(){
         {/* Comments Section */}
         <div className="px-6 py-4 bg-gray-50 border-t">
           <div className="font-medium mb-2">Additional Comments and Suggestions</div>
-          <div className="text-xs text-gray-500 mb-3">Please provide any additional feedback or suggestions for improvement (required)</div>
+          <div className="text-xs text-gray-500 mb-3">Please provide any additional feedback or suggestions for improvement (optional)</div>
           <textarea
             rows={4}
             className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
@@ -273,7 +281,7 @@ export default function EvaluateCourse(){
           />
           {comment.length > 0 && (
             <div className="text-xs text-gray-500 mt-1">
-              {comment.length} characters {comment.length < 50 && '(minimum 50 characters recommended)'}
+              {comment.length} characters
             </div>
           )}
         </div>
@@ -296,7 +304,7 @@ export default function EvaluateCourse(){
                   Ready to submit!
                 </span>
               ) : (
-                <span>Complete all questions and add a comment to submit</span>
+                <span>Complete all questions to submit</span>
               )}
             </div>
             

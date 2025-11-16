@@ -229,37 +229,21 @@ async def submit_evaluation(evaluation: EvaluationSubmission, db: Session = Depe
             "anomaly_detected": is_anomaly
         }
         
-        # Insert evaluation with JSONB ratings, ML sentiment, and anomaly detection
+        # Insert evaluation - only required columns
         db.execute(text("""
             INSERT INTO evaluations (
-                student_id, class_section_id,
-                ratings,
-                comments, text_feedback,
-                sentiment, sentiment_score,
-                is_anomaly, anomaly_score, anomaly_reason,
-                metadata,
-                submitted_at
+                student_id, 
+                class_section_id,
+                sentiment
             ) VALUES (
-                :student_id, :class_section_id,
-                :ratings::jsonb,
-                :comments, :text_feedback,
-                :sentiment, :sentiment_score,
-                :is_anomaly, :anomaly_score, :anomaly_reason,
-                :metadata::jsonb,
-                NOW()
+                :student_id, 
+                :class_section_id,
+                :sentiment
             )
         """), {
-            "student_id": actual_student_id,  # Use the actual student table ID
+            "student_id": actual_student_id,
             "class_section_id": evaluation.class_section_id,
-            "ratings": json.dumps(ratings),
-            "comments": evaluation.comment or "",
-            "text_feedback": evaluation.comment or "",
-            "sentiment": sentiment,
-            "sentiment_score": round(sentiment_score, 3),
-            "is_anomaly": is_anomaly,
-            "anomaly_score": round(anomaly_score, 4) if anomaly_score else None,
-            "anomaly_reason": anomaly_reason,
-            "metadata": json.dumps(metadata)
+            "sentiment": sentiment
         })
         
         db.commit()
@@ -308,8 +292,10 @@ async def submit_evaluation(evaluation: EvaluationSubmission, db: Session = Depe
         raise
     except Exception as e:
         logger.error(f"Error submitting evaluation: {e}")
+        import traceback
+        traceback.print_exc()
         db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to submit evaluation")
+        raise HTTPException(status_code=500, detail=f"Failed to submit evaluation: {str(e)}")
 
 
 @router.get("/{student_id}/evaluations")  
