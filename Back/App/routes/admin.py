@@ -7,7 +7,10 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text, func
 from database.connection import get_db
+from models.enhanced_models import User
 from typing import Optional, List
+from pydantic import BaseModel
+from datetime import datetime
 import logging
 
 logger = logging.getLogger(__name__)
@@ -739,12 +742,12 @@ async def get_completion_rates(
         sections_query = text("""
             SELECT 
                 cs.id as section_id,
-                cs.class_code,
+                cs.section_code as class_code,
                 c.id as course_id,
                 c.subject_code,
                 c.subject_name,
                 c.year_level,
-                cs.instructor_name,
+                COALESCE(u.full_name, 'No Instructor') as instructor_name,
                 cs.semester,
                 cs.academic_year,
                 COUNT(DISTINCT en.student_id) as enrolled_students,
@@ -756,10 +759,11 @@ async def get_completion_rates(
                 END as completion_rate
             FROM class_sections cs
             INNER JOIN courses c ON cs.course_id = c.id
+            LEFT JOIN users u ON cs.instructor_id = u.id
             LEFT JOIN enrollments en ON cs.id = en.class_section_id AND en.status = 'active'
             LEFT JOIN evaluations e ON cs.id = e.class_section_id AND en.student_id = e.student_id
-            GROUP BY cs.id, cs.class_code, c.id, c.subject_code, c.subject_name, 
-                     c.year_level, cs.instructor_name, cs.semester, cs.academic_year
+            GROUP BY cs.id, cs.section_code, c.id, c.subject_code, c.subject_name, 
+                     c.year_level, u.full_name, cs.semester, cs.academic_year
             ORDER BY completion_rate ASC, c.subject_name
         """)
         
@@ -839,7 +843,6 @@ async def submit_support_request(
     """
     try:
         # Get user details
-        from models.enhanced_models import User
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
@@ -868,7 +871,6 @@ async def submit_support_request(
         # 3. Create notification for admin dashboard
         
         # For now, we'll just acknowledge receipt
-        from datetime import datetime
         return {
             "success": True,
             "message": "Support request submitted successfully. An administrator will review your message shortly.",
