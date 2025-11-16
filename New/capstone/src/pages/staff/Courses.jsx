@@ -17,7 +17,6 @@ export default function Courses() {
   const [activeTab, setActiveTab] = useState('overview')
   const [selectedCourse, setSelectedCourse] = useState(null)
   const [courseDetails, setCourseDetails] = useState(null)
-  const [showAddModal, setShowAddModal] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   
   // Pagination state
@@ -105,28 +104,8 @@ export default function Courses() {
     }
   }, [courses, programs])
 
-  // Fetch available courses and instructors for section creation
-  useEffect(() => {
-    const fetchSectionData = async () => {
-      if (!currentUser || !showAddModal) return
-      
-      try {
-        // Fetch all courses (course definitions)
-        const coursesResponse = await adminAPI.getCourses({})
-        const coursesData = coursesResponse?.data || coursesResponse || []
-        setAvailableCourses(Array.isArray(coursesData) ? coursesData : [])
-        
-        // Fetch all instructors
-        const instructorsResponse = await adminAPI.getInstructors({})
-        const instructorsData = instructorsResponse?.data || instructorsResponse || []
-        setInstructors(Array.isArray(instructorsData) ? instructorsData : [])
-      } catch (err) {
-        console.error('[COURSES] Error fetching section data:', err)
-      }
-    }
-    
-    fetchSectionData()
-  }, [showAddModal, currentUser])
+  // Add Course functionality removed - monitoring role only
+  // Secretary/Dept Head can view and analyze courses but cannot create new ones
 
   // Fetch courses from API
   useEffect(() => {
@@ -617,16 +596,6 @@ export default function Courses() {
                   </div>
                 </div>
               </div>
-              
-              <button 
-                onClick={() => setShowAddModal(true)}
-                className="lpu-btn-secondary inline-flex items-center"
-              >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
-                </svg>
-                Add Course
-              </button>
             </div>
           </div>
         </div>
@@ -1133,8 +1102,8 @@ export default function Courses() {
         </div>
       )}
       
-      {/* Add Course Modal - Complete Form */}
-      {showAddModal && (
+      {/* Add Course functionality removed - monitoring role only */}
+      {false && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full my-8">
             {/* Modal Header */}
