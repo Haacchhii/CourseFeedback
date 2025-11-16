@@ -614,6 +614,26 @@ export const adminAPI = {
       dateRange: options.dateRange
     })
   },
+
+  /**
+   * Get category averages for a course (6 categories from 31 questions)
+   * @param {number} courseId - Course ID
+   * @param {number} userId - User ID
+   * @returns {Promise} Category averages data
+   */
+  getCategoriesAverages: async (courseId, userId) => {
+    return apiClient.get(`/admin/courses/${courseId}/category-averages?user_id=${userId}`)
+  },
+
+  /**
+   * Get question distribution for a course (all 31 questions)
+   * @param {number} courseId - Course ID
+   * @param {number} userId - User ID
+   * @returns {Promise} Question distribution data
+   */
+  getQuestionDistribution: async (courseId, userId) => {
+    return apiClient.get(`/admin/courses/${courseId}/question-distribution?user_id=${userId}`)
+  },
 }
 
 // ============================================
@@ -824,6 +844,26 @@ export const deptHeadAPI = {
   getYearLevels: async () => {
     const currentUser = authAPI.getCurrentUser()
     return apiClient.get(`/dept-head/year-levels?user_id=${currentUser?.id}`)
+  },
+
+  /**
+   * Get category averages for a course (6 categories from 31 questions)
+   * @param {number} courseId - Course ID
+   * @param {number} userId - User ID
+   * @returns {Promise} Category averages data
+   */
+  getCategoryAverages: async (courseId, userId) => {
+    return apiClient.get(`/dept-head/courses/${courseId}/category-averages?user_id=${userId}`)
+  },
+
+  /**
+   * Get question distribution for a course (all 31 questions)
+   * @param {number} courseId - Course ID
+   * @param {number} userId - User ID
+   * @returns {Promise} Question distribution data
+   */
+  getQuestionDistribution: async (courseId, userId) => {
+    return apiClient.get(`/dept-head/courses/${courseId}/question-distribution?user_id=${userId}`)
   },
 }
 
@@ -1088,6 +1128,26 @@ export const secretaryAPI = {
   getYearLevels: async () => {
     const currentUser = authAPI.getCurrentUser()
     return apiClient.get(`/secretary/year-levels?user_id=${currentUser?.id}`)
+  },
+
+  /**
+   * Get category averages for a course (6 categories from 31 questions)
+   * @param {number} courseId - Course ID
+   * @param {number} userId - User ID
+   * @returns {Promise} Category averages data
+   */
+  getCategoryAverages: async (courseId, userId) => {
+    return apiClient.get(`/secretary/courses/${courseId}/category-averages?user_id=${userId}`)
+  },
+
+  /**
+   * Get question distribution for a course (all 31 questions)
+   * @param {number} courseId - Course ID
+   * @param {number} userId - User ID
+   * @returns {Promise} Question distribution data
+   */
+  getQuestionDistribution: async (courseId, userId) => {
+    return apiClient.get(`/secretary/courses/${courseId}/question-distribution?user_id=${userId}`)
   },
 }
 

@@ -17,6 +17,9 @@ export default function Courses() {
   const [activeTab, setActiveTab] = useState('overview')
   const [selectedCourse, setSelectedCourse] = useState(null)
   const [courseDetails, setCourseDetails] = useState(null)
+  const [categoryAverages, setCategoryAverages] = useState([])
+  const [questionDistribution, setQuestionDistribution] = useState([])
+  const [loadingDetails, setLoadingDetails] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   
   // Pagination state
@@ -276,12 +279,10 @@ export default function Courses() {
 
   const handleCourseClick = async (courseId) => {
     setSubmitting(true)
+    setLoadingDetails(true)
     setSelectedCourse(courseId)
     
     try {
-      // Simulate API call with Promise
-      await new Promise((resolve) => setTimeout(resolve, 500))
-      
       // Get actual course data
       const course = courses.find(c => c.id === courseId)
       if (!course) {
@@ -289,6 +290,43 @@ export default function Courses() {
       }
       
       const courseEvals = evaluations.filter(e => e.courseId === courseId)
+      
+      // Fetch category averages and question distribution from backend
+      let categoryData = []
+      let questionData = []
+      
+      try {
+        if (isAdmin(currentUser)) {
+          const [catResp, qResp] = await Promise.all([
+            adminAPI.getCategoriesAverages(courseId, currentUser.id),
+            adminAPI.getQuestionDistribution(courseId, currentUser.id)
+          ])
+          categoryData = catResp?.data?.categories || []
+          questionData = qResp?.data?.questions || []
+        } else if (currentUser.role === 'secretary') {
+          const [catResp, qResp] = await Promise.all([
+            secretaryAPI.getCategoryAverages(courseId, currentUser.id),
+            secretaryAPI.getQuestionDistribution(courseId, currentUser.id)
+          ])
+          categoryData = catResp?.data?.categories || []
+          questionData = qResp?.data?.questions || []
+        } else if (currentUser.role === 'department_head') {
+          const [catResp, qResp] = await Promise.all([
+            deptHeadAPI.getCategoryAverages(courseId, currentUser.id),
+            deptHeadAPI.getQuestionDistribution(courseId, currentUser.id)
+          ])
+          categoryData = catResp?.data?.categories || []
+          questionData = qResp?.data?.questions || []
+        }
+        
+        setCategoryAverages(categoryData)
+        setQuestionDistribution(questionData)
+      } catch (apiError) {
+        console.error('Error fetching detailed analysis data:', apiError)
+        // Continue with existing data even if new endpoints fail
+        setCategoryAverages([])
+        setQuestionDistribution([])
+      }
       
       // Calculate criteria ratings from categoryRatings
       const criteriaRatings = {}
@@ -360,9 +398,11 @@ export default function Courses() {
       })
       
       setSubmitting(false)
+      setLoadingDetails(false)
     } catch (error) {
       console.error('Error loading course details:', error)
       setSubmitting(false)
+      setLoadingDetails(false)
       // Could add error state here to show user-friendly error message
     }
   }
@@ -1061,28 +1101,192 @@ export default function Courses() {
                     </div>
                   </div>
 
-                  {/* Criteria Comparison */}
+                  {/* Category Averages (31 Questions - 6 Categories) */}
                   <div className="bg-white p-6 rounded-lg border">
-                    <h3 className="text-lg font-semibold mb-2 text-gray-700">Criteria Comparison</h3>
-                    <p className="text-sm text-gray-500 mb-6">Breakdown of evaluation criteria</p>
+                    <h3 className="text-lg font-semibold mb-2 text-gray-700">Category Performance Analysis</h3>
+                    <p className="text-sm text-gray-500 mb-6">Average ratings across 6 evaluation categories (31 questions)</p>
                     
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                      {Object.entries(courseDetails.criteriaRatings).map(([criterion, rating], index) => {
-                        const colors = ['text-green-600', 'text-orange-500', 'text-blue-600', 'text-purple-600'];
-                        const bgColors = ['bg-green-100', 'bg-orange-100', 'bg-blue-100', 'bg-purple-100'];
+                    {loadingDetails ? (
+                      <div className="flex justify-center py-8">
+                        <svg className="animate-spin h-8 w-8 text-[#7a0000]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      </div>
+                    ) : categoryAverages.length > 0 ? (
+                      <div className="space-y-4">
+                        {categoryAverages.map((category, index) => {
+                          const colors = ['text-blue-600', 'text-green-600', 'text-purple-600', 'text-orange-600', 'text-teal-600', 'text-pink-600'];
+                          const bgColors = ['bg-blue-50', 'bg-green-50', 'bg-purple-50', 'bg-orange-50', 'bg-teal-50', 'bg-pink-50'];
+                          const percentage = (category.average / 4) * 100;
+                          
+                          return (
+                            <div key={category.category_id} className={`${bgColors[index % bgColors.length]} p-4 rounded-lg`}>
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex-1">
+                                  <h4 className="font-semibold text-gray-800">{category.category_name}</h4>
+                                  <p className="text-xs text-gray-600 mt-1">{category.description}</p>
+                                </div>
+                                <div className={`text-2xl font-bold ${colors[index % colors.length]} ml-4`}>
+                                  {category.average}/4.0
+                                </div>
+                              </div>
+                              <div className="mt-2">
+                                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                  <div 
+                                    className={`h-2.5 rounded-full ${colors[index % colors.length].replace('text-', 'bg-')}`}
+                                    style={{ width: `${percentage}%` }}
+                                  ></div>
+                                </div>
+                                <div className="flex justify-between items-center mt-1">
+                                  <span className="text-xs text-gray-600">
+                                    {category.question_count} questions • {category.total_responses} responses
+                                  </span>
+                                  <span className="text-xs font-medium text-gray-700">
+                                    {percentage.toFixed(1)}%
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                        <p>No category data available</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Detailed Analysis Tab (31 Questions) */}
+              {activeTab === 'sentiment' && (
+                <div className="space-y-6">
+                  <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg border border-blue-200">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center">
+                      <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                      </svg>
+                      Question-Level Response Distribution
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      Detailed breakdown of how students rated each of the 31 evaluation questions (1 = Strongly Disagree, 4 = Strongly Agree)
+                    </p>
+                  </div>
+
+                  {loadingDetails ? (
+                    <div className="flex justify-center py-12">
+                      <svg className="animate-spin h-10 w-10 text-[#7a0000]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    </div>
+                  ) : questionDistribution.length > 0 ? (
+                    <div className="space-y-6">
+                      {/* Group questions by category */}
+                      {categoryAverages.map((category, catIndex) => {
+                        // Get question numbers for this category
+                        const categoryQuestionMaps = {
+                          'relevance_of_course': [1, 2, 3, 4, 5, 6],
+                          'course_organization': [7, 8, 9, 10, 11],
+                          'teaching_learning': [12, 13, 14, 15, 16, 17, 18],
+                          'assessment': [19, 20, 21, 22, 23, 24],
+                          'learning_environment': [25, 26, 27, 28, 29, 30],
+                          'counseling': [31]
+                        };
+                        
+                        const questionNumbers = categoryQuestionMaps[category.category_id] || [];
+                        const categoryQuestions = questionDistribution.filter(q => 
+                          questionNumbers.includes(q.question_number)
+                        );
+                        
+                        if (categoryQuestions.length === 0) return null;
+                        
+                        const colors = ['blue', 'green', 'purple', 'orange', 'teal', 'pink'];
+                        const color = colors[catIndex % colors.length];
+                        
                         return (
-                          <div key={criterion} className={`${bgColors[index % bgColors.length]} p-3 rounded-lg`}>
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium text-gray-700">{criterion}</span>
-                              <span className={`text-lg font-bold ${colors[index % colors.length]}`}>
-                                {rating}/4.0
-                              </span>
+                          <div key={category.category_id} className={`bg-${color}-50 border border-${color}-200 rounded-lg p-6`}>
+                            <h4 className={`text-lg font-bold text-${color}-900 mb-4`}>
+                              {category.category_name}
+                            </h4>
+                            
+                            <div className="space-y-4">
+                              {categoryQuestions.map(question => (
+                                <div key={question.question_number} className="bg-white rounded-lg p-4 shadow-sm">
+                                  <div className="flex items-center justify-between mb-3">
+                                    <span className="font-semibold text-gray-700">
+                                      Question {question.question_number}
+                                    </span>
+                                    <div className="flex items-center space-x-2">
+                                      <span className={`text-lg font-bold text-${color}-600`}>
+                                        {question.average.toFixed(2)}
+                                      </span>
+                                      <span className="text-sm text-gray-500">/ 4.0</span>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Response distribution bars */}
+                                  <div className="space-y-2">
+                                    {['4', '3', '2', '1'].map(rating => {
+                                      const ratingData = question.distribution[rating];
+                                      const barColors = {
+                                        '4': 'bg-green-500',
+                                        '3': 'bg-blue-500',
+                                        '2': 'bg-orange-500',
+                                        '1': 'bg-red-500'
+                                      };
+                                      
+                                      return (
+                                        <div key={rating} className="flex items-center space-x-3">
+                                          <span className="text-xs font-medium text-gray-600 w-24">
+                                            Rating {rating}
+                                          </span>
+                                          <div className="flex-1 bg-gray-200 rounded-full h-6 relative">
+                                            <div 
+                                              className={`${barColors[rating]} h-6 rounded-full transition-all duration-500 flex items-center justify-end pr-2`}
+                                              style={{ width: `${ratingData.percentage}%` }}
+                                            >
+                                              {ratingData.percentage > 10 && (
+                                                <span className="text-xs font-medium text-white">
+                                                  {ratingData.percentage.toFixed(1)}%
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
+                                          <span className="text-xs text-gray-600 w-16 text-right">
+                                            {ratingData.count} ({ratingData.percentage.toFixed(1)}%)
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                  
+                                  <div className="mt-3 pt-3 border-t border-gray-200">
+                                    <span className="text-xs text-gray-500">
+                                      Total responses: {question.total_responses}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                           </div>
                         );
                       })}
                     </div>
-                  </div>
+                  ) : (
+                    <div className="text-center py-12 text-gray-500">
+                      <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                      </svg>
+                      <p className="text-lg font-medium">No question distribution data available</p>
+                      <p className="text-sm">Evaluation responses will appear here once submitted</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
