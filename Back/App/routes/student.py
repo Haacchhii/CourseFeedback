@@ -231,21 +231,25 @@ async def submit_evaluation(evaluation: EvaluationSubmission, db: Session = Depe
             "anomaly_detected": is_anomaly
         }
         
-        # Insert evaluation - only required columns
+        # Insert evaluation with ratings stored as JSON
+        ratings_json = json.dumps(ratings)
         db.execute(text("""
             INSERT INTO evaluations (
                 student_id, 
                 class_section_id,
-                sentiment
+                sentiment,
+                comments
             ) VALUES (
                 :student_id, 
                 :class_section_id,
-                :sentiment
+                :sentiment,
+                :comments
             )
         """), {
             "student_id": actual_student_id,
             "class_section_id": evaluation.class_section_id,
-            "sentiment": sentiment
+            "sentiment": sentiment,
+            "comments": f"RATINGS:{ratings_json}|COMMENT:{evaluation.comment or ''}"
         })
         
         db.commit()
@@ -310,7 +314,7 @@ async def get_evaluation_for_edit(evaluation_id: int, db: Session = Depends(get_
         result = db.execute(text("""
             SELECT 
                 e.id, e.student_id, e.class_section_id,
-                e.sentiment,
+                e.sentiment, e.comments,
                 cs.class_code, c.subject_name, c.subject_code,
                 ep.end_date as period_end,
                 cs.semester, cs.academic_year
@@ -326,16 +330,26 @@ async def get_evaluation_for_edit(evaluation_id: int, db: Session = Depends(get_
             raise HTTPException(status_code=404, detail="Evaluation not found")
         
         # Check if evaluation period has ended
-        period_end = eval_data[7]
+        period_end = eval_data[8]
         if period_end and datetime.now().date() > period_end:
             raise HTTPException(
                 status_code=403, 
                 detail="Cannot edit evaluation - evaluation period has ended"
             )
         
-        # Note: ratings and comment are stored in database but not accessible yet
-        # For now, return empty so frontend shows blank form
-        # TODO: Update database schema to store ratings properly
+        # Parse ratings and comment from stored data
+        ratings = {}
+        comment = ""
+        stored_data = eval_data[4] or ""
+        
+        try:
+            if "RATINGS:" in stored_data and "|COMMENT:" in stored_data:
+                parts = stored_data.split("|COMMENT:")
+                ratings_str = parts[0].replace("RATINGS:", "")
+                comment = parts[1] if len(parts) > 1 else ""
+                ratings = json.loads(ratings_str)
+        except Exception as e:
+            logger.warning(f"Could not parse stored evaluation data: {e}")
         
         return {
             "success": True,
@@ -344,15 +358,15 @@ async def get_evaluation_for_edit(evaluation_id: int, db: Session = Depends(get_
                 "student_id": eval_data[1],
                 "class_section_id": eval_data[2],
                 "sentiment": eval_data[3],
-                "ratings": {},  # TODO: Fetch from database when schema updated
-                "comment": "",  # TODO: Fetch from database when schema updated
+                "ratings": ratings,
+                "comment": comment,
                 "course": {
-                    "class_code": eval_data[4],
-                    "name": eval_data[5],
-                    "code": eval_data[6]
+                    "class_code": eval_data[5],
+                    "name": eval_data[6],
+                    "code": eval_data[7]
                 },
-                "semester": eval_data[8],
-                "academic_year": eval_data[9],
+                "semester": eval_data[9],
+                "academic_year": eval_data[10],
                 "can_edit": True,
                 "period_end": period_end.isoformat() if period_end else None
             }
@@ -460,16 +474,19 @@ async def update_evaluation(
         except:
             pass
         
-        # Update evaluation in database
+        # Update evaluation in database with new ratings
+        ratings_json = json.dumps(ratings)
         db.execute(text("""
             UPDATE evaluations
             SET 
                 sentiment = :sentiment,
-                updated_at = NOW()
+                comments = :comments,
+                submitted_at = NOW()
             WHERE id = :evaluation_id
         """), {
             "evaluation_id": evaluation_id,
-            "sentiment": sentiment
+            "sentiment": sentiment,
+            "comments": f"RATINGS:{ratings_json}|COMMENT:{evaluation.comment or ''}"
         })
         
         db.commit()
