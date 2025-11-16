@@ -17,6 +17,11 @@ export default function SentimentAnalysis() {
   const [selectedYearLevel, setSelectedYearLevel] = useState('all')
   const [selectedProgram, setSelectedProgram] = useState('all')
   const [showFilters, setShowFilters] = useState(false)
+  
+  // Anomaly detection state (merged from AnomalyDetection.jsx)
+  const [anomalies, setAnomalies] = useState([])
+  const [anomaliesLoading, setAnomaliesLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
 
   // Filter options states
   const [programOptions, setProgramOptions] = useState([])
@@ -119,6 +124,47 @@ export default function SentimentAnalysis() {
     
     fetchSentiment()
   }, [currentUser, selectedSemester, selectedYearLevel, selectedProgram])
+
+  // Fetch anomalies (merged from AnomalyDetection.jsx)
+  useEffect(() => {
+    const fetchAnomalies = async () => {
+      if (!currentUser) return
+      
+      try {
+        setAnomaliesLoading(true)
+        let data
+        
+        // Use appropriate API based on user role
+        if (isAdmin(currentUser)) {
+          data = await adminAPI.getAnomalies()
+        } else if (currentUser.role === 'secretary') {
+          data = await secretaryAPI.getAnomalies()
+        } else if (currentUser.role === 'department_head') {
+          data = await deptHeadAPI.getAnomalies()
+        }
+        
+        // Extract data from response
+        const anomaliesData = Array.isArray(data) ? data : (data?.data || [])
+        setAnomalies(anomaliesData)
+      } catch (err) {
+        console.error('Error fetching anomalies:', err)
+      } finally {
+        setAnomaliesLoading(false)
+      }
+    }
+    
+    fetchAnomalies()
+  }, [currentUser])
+
+  // Filter anomalies by search term
+  const filteredAnomalies = useMemo(() => {
+    return anomalies.filter(anomaly => {
+      if (searchTerm === '') return true
+      return anomaly.courseName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+             anomaly.comment?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+             anomaly.instructorName?.toLowerCase().includes(searchTerm.toLowerCase())
+    })
+  }, [anomalies, searchTerm])
 
   // Since API doesn't return courses/evaluations arrays, use the trend and overall data
   const sentimentOverview = useMemo(() => {
@@ -519,6 +565,155 @@ export default function SentimentAnalysis() {
                 Hover over chart elements to see detailed information. Click on legend items to hide/show data series.
                 Use the academic period and year level filters to view specific segment analysis.
               </p>
+            </div>
+          </div>
+        </div>
+
+        {/* ===== ANOMALY DETECTION SECTION (Merged from AnomalyDetection.jsx) ===== */}
+        <div className="mt-12">
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold text-gray-900 mb-2 flex items-center">
+              <svg className="w-8 h-8 mr-3 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+              </svg>
+              Anomaly Detection
+            </h2>
+            <p className="text-gray-600">
+              Identifies suspicious evaluation patterns including straight-lining, outliers, and contradictory responses
+            </p>
+          </div>
+
+          {/* Anomaly Summary Cards */}
+          <div className="grid md:grid-cols-3 gap-6 mb-8">
+            <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-2xl shadow-lg p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-white/90 mb-2">Total Anomalies</h3>
+                  <p className="text-4xl font-bold text-white">{anomalies.length}</p>
+                  <p className="text-xs text-white/70 mt-1">Detected issues</p>
+                </div>
+                <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
+                  <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl shadow-lg p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-white/90 mb-2">Filtered Results</h3>
+                  <p className="text-4xl font-bold text-white">{filteredAnomalies.length}</p>
+                  <p className="text-xs text-white/70 mt-1">Matching search</p>
+                </div>
+                <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
+                  <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl shadow-lg p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-white/90 mb-2">Flagged Rate</h3>
+                  <p className="text-4xl font-bold text-white">
+                    {sentimentData?.overall ? 
+                      Math.round((anomalies.length / (sentimentData.overall.positive + sentimentData.overall.neutral + sentimentData.overall.negative)) * 100) 
+                      : 0}%
+                  </p>
+                  <p className="text-xs text-white/70 mt-1">Of total evaluations</p>
+                </div>
+                <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
+                  <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Search Bar */}
+          <div className="mb-6">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search anomalies by course, instructor, or comment..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="lpu-input pl-12"
+              />
+              <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              </svg>
+            </div>
+          </div>
+
+          {/* Anomalies Table */}
+          <div className="lpu-card overflow-hidden">
+            <div className="overflow-x-auto">
+              {anomaliesLoading ? (
+                <div className="flex justify-center items-center py-12">
+                  <svg className="animate-spin h-8 w-8 text-[#7a0000]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                </div>
+              ) : filteredAnomalies.length > 0 ? (
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Course</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Instructor</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Anomaly Type</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Rating</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredAnomalies.map((anomaly, index) => (
+                      <tr key={index} className="hover:bg-gray-50 transition-colors duration-150">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">{anomaly.courseName || 'N/A'}</div>
+                          <div className="text-xs text-gray-500">{anomaly.courseCode || ''}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                          {anomaly.instructorName || 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                            anomaly.anomalyReason?.includes('straight') ? 'bg-red-100 text-red-800' :
+                            anomaly.anomalyReason?.includes('outlier') ? 'bg-orange-100 text-orange-800' :
+                            'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {anomaly.anomalyReason || 'Detected'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                          <div className="flex items-center">
+                            <span className="font-medium">{anomaly.ratingOverall || 'N/A'}</span>
+                            <span className="text-gray-400 mx-1">/</span>
+                            <span className="text-gray-500">4.0</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {anomaly.submissionDate ? new Date(anomaly.submissionDate).toLocaleDateString() : 'N/A'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                  <svg className="w-16 h-16 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  <p className="text-lg font-medium">No anomalies detected</p>
+                  <p className="text-sm">All evaluations appear to be legitimate</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
