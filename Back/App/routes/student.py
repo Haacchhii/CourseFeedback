@@ -231,25 +231,56 @@ async def submit_evaluation(evaluation: EvaluationSubmission, db: Session = Depe
             "anomaly_detected": is_anomaly
         }
         
-        # Insert evaluation with ratings stored as JSON
+        # Insert evaluation with ratings stored in JSONB column
         ratings_json = json.dumps(ratings)
+        
+        # Calculate summary ratings for legacy columns
+        rating_teaching = avg_rating  # Overall average for teaching
+        rating_content = avg_rating   # Overall average for content
+        rating_engagement = avg_rating # Overall average for engagement
+        rating_overall = avg_rating    # Overall average
+        
         db.execute(text("""
             INSERT INTO evaluations (
                 student_id, 
                 class_section_id,
+                ratings,
+                text_feedback,
                 sentiment,
-                comments
+                sentiment_score,
+                is_anomaly,
+                anomaly_score,
+                rating_teaching,
+                rating_content,
+                rating_engagement,
+                rating_overall
             ) VALUES (
                 :student_id, 
                 :class_section_id,
+                :ratings::jsonb,
+                :text_feedback,
                 :sentiment,
-                :comments
+                :sentiment_score,
+                :is_anomaly,
+                :anomaly_score,
+                :rating_teaching,
+                :rating_content,
+                :rating_engagement,
+                :rating_overall
             )
         """), {
             "student_id": actual_student_id,
             "class_section_id": evaluation.class_section_id,
+            "ratings": ratings_json,
+            "text_feedback": evaluation.comment or '',
             "sentiment": sentiment,
-            "comments": f"RATINGS:{ratings_json}|COMMENT:{evaluation.comment or ''}"
+            "sentiment_score": sentiment_score,
+            "is_anomaly": is_anomaly,
+            "anomaly_score": anomaly_score,
+            "rating_teaching": int(round(rating_teaching)),
+            "rating_content": int(round(rating_content)),
+            "rating_engagement": int(round(rating_engagement)),
+            "rating_overall": int(round(rating_overall))
         })
         
         db.commit()
@@ -314,7 +345,7 @@ async def get_evaluation_for_edit(evaluation_id: int, db: Session = Depends(get_
         result = db.execute(text("""
             SELECT 
                 e.id, e.student_id, e.class_section_id,
-                e.sentiment, e.comments,
+                e.sentiment, e.ratings, e.text_feedback,
                 cs.class_code, c.subject_name, c.subject_code,
                 ep.end_date as period_end,
                 cs.semester, cs.academic_year
@@ -330,26 +361,22 @@ async def get_evaluation_for_edit(evaluation_id: int, db: Session = Depends(get_
             raise HTTPException(status_code=404, detail="Evaluation not found")
         
         # Check if evaluation period has ended
-        period_end = eval_data[8]
+        period_end = eval_data[9]
         if period_end and datetime.now().date() > period_end:
             raise HTTPException(
                 status_code=403, 
                 detail="Cannot edit evaluation - evaluation period has ended"
             )
         
-        # Parse ratings and comment from stored data
+        # Parse ratings from JSONB column
         ratings = {}
-        comment = ""
-        stored_data = eval_data[4] or ""
+        comment = eval_data[5] or ""
         
         try:
-            if "RATINGS:" in stored_data and "|COMMENT:" in stored_data:
-                parts = stored_data.split("|COMMENT:")
-                ratings_str = parts[0].replace("RATINGS:", "")
-                comment = parts[1] if len(parts) > 1 else ""
-                ratings = json.loads(ratings_str)
+            if eval_data[4]:  # ratings JSONB column
+                ratings = eval_data[4] if isinstance(eval_data[4], dict) else json.loads(eval_data[4])
         except Exception as e:
-            logger.warning(f"Could not parse stored evaluation data: {e}")
+            logger.warning(f"Could not parse stored ratings: {e}")
         
         return {
             "success": True,
@@ -361,12 +388,12 @@ async def get_evaluation_for_edit(evaluation_id: int, db: Session = Depends(get_
                 "ratings": ratings,
                 "comment": comment,
                 "course": {
-                    "class_code": eval_data[5],
-                    "name": eval_data[6],
-                    "code": eval_data[7]
+                    "class_code": eval_data[6],
+                    "name": eval_data[7],
+                    "code": eval_data[8]
                 },
-                "semester": eval_data[9],
-                "academic_year": eval_data[10],
+                "semester": eval_data[10],
+                "academic_year": eval_data[11],
                 "can_edit": True,
                 "period_end": period_end.isoformat() if period_end else None
             }
@@ -476,17 +503,40 @@ async def update_evaluation(
         
         # Update evaluation in database with new ratings
         ratings_json = json.dumps(ratings)
+        
+        # Calculate summary ratings
+        rating_teaching = avg_rating
+        rating_content = avg_rating
+        rating_engagement = avg_rating
+        rating_overall = avg_rating
+        
         db.execute(text("""
             UPDATE evaluations
             SET 
+                ratings = :ratings::jsonb,
+                text_feedback = :text_feedback,
                 sentiment = :sentiment,
-                comments = :comments,
-                submitted_at = NOW()
+                sentiment_score = :sentiment_score,
+                is_anomaly = :is_anomaly,
+                anomaly_score = :anomaly_score,
+                rating_teaching = :rating_teaching,
+                rating_content = :rating_content,
+                rating_engagement = :rating_engagement,
+                rating_overall = :rating_overall,
+                submission_date = NOW()
             WHERE id = :evaluation_id
         """), {
             "evaluation_id": evaluation_id,
+            "ratings": ratings_json,
+            "text_feedback": evaluation.comment or '',
             "sentiment": sentiment,
-            "comments": f"RATINGS:{ratings_json}|COMMENT:{evaluation.comment or ''}"
+            "sentiment_score": sentiment_score,
+            "is_anomaly": is_anomaly,
+            "anomaly_score": anomaly_score,
+            "rating_teaching": int(round(rating_teaching)),
+            "rating_content": int(round(rating_content)),
+            "rating_engagement": int(round(rating_engagement)),
+            "rating_overall": int(round(rating_overall))
         })
         
         db.commit()
