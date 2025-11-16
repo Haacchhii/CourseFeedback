@@ -131,9 +131,9 @@ export default function StudentCourses(){
               <div className="flex justify-between items-start mb-2">
                 <div>
                   <div className="font-semibold text-sm text-blue-600">{c.id}</div>
-                  <div className="text-xs text-gray-500 font-mono mt-1">{c.classCode}</div>
+                  <div className="text-xs text-gray-500 font-mono mt-1">{c.class_code}</div>
                 </div>
-                {c.status === 'Done' ? (
+                {c.already_evaluated ? (
                   <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-medium">✓ Evaluated</span>
                 ) : (
                   <span className="inline-block bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full font-medium">Evaluate</span>
@@ -141,10 +141,10 @@ export default function StudentCourses(){
               </div>
               <div className="font-medium text-sm mb-2">{c.name}</div>
               <div className="text-xs text-gray-600 mb-2">
-                <div>{c.instructor}</div>
+                <div>{c.instructor_name}</div>
                 <div className="mt-1">{c.semester}</div>
               </div>
-              {c.status === 'Done' ? (
+              {c.already_evaluated ? (
                 <Link 
                   to={`/student/evaluate/${c.class_section_id || c.id}`}
                   className="block w-full text-center px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
@@ -187,19 +187,19 @@ export default function StudentCourses(){
                   key={c.id} 
                   onClick={() => nav(`/student/evaluate/${c.class_section_id || c.id}`)}
                   className={`align-top cursor-pointer transition-all ${
-                    c.status === 'Done' 
+                    c.already_evaluated 
                       ? 'hover:bg-green-50 border-l-4 border-l-green-500' 
                       : 'hover:bg-orange-50 border-l-4 border-l-orange-500'
                   }`}
                 >
-                  <td className="py-3 lg:py-4 px-2 lg:px-4 border-b font-semibold text-xs lg:text-sm text-blue-600 whitespace-nowrap">{c.id}</td>
-                  <td className="py-3 lg:py-4 px-2 lg:px-4 border-b text-xs lg:text-sm font-mono text-gray-700 whitespace-nowrap">{c.classCode}</td>
+                  <td className="py-3 lg:py-4 px-2 lg:px-4 border-b font-semibold text-xs lg:text-sm text-blue-600 whitespace-nowrap">{c.code}</td>
+                  <td className="py-3 lg:py-4 px-2 lg:px-4 border-b text-xs lg:text-sm font-mono text-gray-700 whitespace-nowrap">{c.class_code}</td>
                   <td className="py-3 lg:py-4 px-2 lg:px-4 border-b text-xs lg:text-sm font-medium">{c.name}</td>
-                  <td className="py-3 lg:py-4 px-2 lg:px-4 border-b text-xs lg:text-sm text-gray-600">{c.instructor}</td>
+                  <td className="py-3 lg:py-4 px-2 lg:px-4 border-b text-xs lg:text-sm text-gray-600">{c.instructor_name}</td>
                   <td className="py-3 lg:py-4 px-2 lg:px-4 border-b text-xs lg:text-sm text-gray-600 whitespace-nowrap">{c.semester}</td>
                   <td className="py-3 lg:py-4 px-2 lg:px-4 border-b text-xs lg:text-sm">
                     <div className="flex items-center gap-2">
-                      {c.status === 'Done' ? (
+                      {c.already_evaluated ? (
                         <>
                           <span className="inline-block bg-green-100 text-green-800 text-xs px-2.5 py-1 rounded-full whitespace-nowrap font-medium">✓ Evaluated</span>
                           <button

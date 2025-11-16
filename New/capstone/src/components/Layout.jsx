@@ -48,7 +48,6 @@ export default function Layout({ children }) {
 
   // Student navigation items
   const studentNavigationItems = [
-    { path: '/student-evaluation', label: 'My Evaluations', icon: '📝' },
     { path: '/student/courses', label: 'My Courses', icon: '📚' }
   ]
 

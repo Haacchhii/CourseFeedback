@@ -137,9 +137,9 @@ export default function EvaluateCourse(){
             </svg>
             Back to Courses
           </button>
-          <h1 className="text-2xl font-bold text-white">{course.name}</h1>
+          <h1 className="text-2xl font-bold text-white">Evaluating: {course.name || 'Course'}</h1>
           <p className="text-sm text-gray-200 mt-1">
-            {course.class_code || courseId}
+            {course.class_code || course.code || ''}
           </p>
           <p className="text-xs text-gray-300 mt-1">
             {course.semester || 'Current Semester'} • {course.academic_year || 'Academic Year 2024-2025'}
@@ -223,9 +223,9 @@ export default function EvaluateCourse(){
                   <div className="text-xs text-gray-500 mt-1">{question.shortLabel}</div>
                 </div>
                 {/* Left-aligned ratings */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   {[1, 2, 3, 4].map(value => (
-                    <label key={value} className="flex flex-col items-center cursor-pointer">
+                    <label key={value} className="cursor-pointer">
                       <input
                         type="radio"
                         name={question.id}
@@ -234,10 +234,10 @@ export default function EvaluateCourse(){
                         onChange={(e) => setRating(question.id, e.target.value)}
                         className="sr-only"
                       />
-                      <span className={`w-12 h-12 flex items-center justify-center rounded-full border-2 font-bold text-sm transition-all ${
+                      <span className={`w-14 h-14 flex items-center justify-center rounded-full border-3 font-bold text-lg transition-all shadow-sm ${
                         ratings[question.id] === value
-                          ? 'bg-[#7a0000] text-white border-[#7a0000] scale-110'
-                          : 'bg-white text-gray-700 border-gray-300 hover:border-[#7a0000] hover:scale-105'
+                          ? 'bg-[#7a0000] text-white border-[#7a0000] scale-110 shadow-lg'
+                          : 'bg-white text-gray-700 border-gray-400 hover:border-[#7a0000] hover:bg-gray-50 hover:scale-105'
                       }`}>
                         {value}
                       </span>
