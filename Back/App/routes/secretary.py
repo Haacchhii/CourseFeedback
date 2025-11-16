@@ -1086,3 +1086,162 @@ async def get_question_distribution(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ===========================
+# COMPLETION TRACKING
+# ===========================
+
+@router.get("/completion-rates")
+async def get_completion_rates(
+    user_id: int = Query(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Get evaluation completion rates for all courses.
+    Returns overall statistics and per-course breakdown.
+    """
+    try:
+        # Get all class sections with enrollment and evaluation counts
+        sections_query = text("""
+            SELECT 
+                cs.id as section_id,
+                cs.class_code,
+                c.id as course_id,
+                c.subject_code,
+                c.subject_name,
+                c.year_level,
+                cs.instructor_name,
+                cs.semester,
+                cs.academic_year,
+                COUNT(DISTINCT en.student_id) as enrolled_students,
+                COUNT(DISTINCT e.id) as submitted_evaluations,
+                CASE 
+                    WHEN COUNT(DISTINCT en.student_id) > 0 
+                    THEN ROUND((COUNT(DISTINCT e.id)::NUMERIC / COUNT(DISTINCT en.student_id) * 100), 1)
+                    ELSE 0
+                END as completion_rate
+            FROM class_sections cs
+            INNER JOIN courses c ON cs.course_id = c.id
+            LEFT JOIN enrollments en ON cs.id = en.class_section_id AND en.status = 'active'
+            LEFT JOIN evaluations e ON cs.id = e.class_section_id AND en.student_id = e.student_id
+            GROUP BY cs.id, cs.class_code, c.id, c.subject_code, c.subject_name, 
+                     c.year_level, cs.instructor_name, cs.semester, cs.academic_year
+            ORDER BY completion_rate ASC, c.subject_name
+        """)
+        
+        sections_result = db.execute(sections_query).fetchall()
+        
+        # Calculate overall statistics
+        total_enrolled = sum(row[9] for row in sections_result)
+        total_evaluations = sum(row[10] for row in sections_result)
+        overall_completion = round((total_evaluations / total_enrolled * 100), 1) if total_enrolled > 0 else 0
+        
+        # Format course data
+        courses = []
+        low_completion_count = 0
+        for row in sections_result:
+            completion_rate = float(row[11])
+            if completion_rate < 70:
+                low_completion_count += 1
+            
+            courses.append({
+                "section_id": row[0],
+                "class_code": row[1],
+                "course_id": row[2],
+                "course_code": row[3],
+                "course_name": row[4],
+                "year_level": row[5],
+                "instructor": row[6],
+                "semester": row[7],
+                "academic_year": row[8],
+                "enrolled_students": row[9],
+                "submitted_evaluations": row[10],
+                "completion_rate": completion_rate,
+                "pending_evaluations": row[9] - row[10],
+                "is_below_threshold": completion_rate < 70
+            })
+        
+        return {
+            "success": True,
+            "data": {
+                "overall": {
+                    "total_students": total_enrolled,
+                    "total_evaluations": total_evaluations,
+                    "completion_rate": overall_completion,
+                    "pending_evaluations": total_enrolled - total_evaluations,
+                    "total_courses": len(sections_result),
+                    "low_completion_courses": low_completion_count
+                },
+                "courses": courses
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error calculating completion rates: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ===========================
+# SUPPORT REQUEST
+# ===========================
+
+class SupportRequest(BaseModel):
+    issueType: str
+    courseId: Optional[str] = None
+    courseName: Optional[str] = None
+    studentId: Optional[str] = None
+    studentName: Optional[str] = None
+    subject: str
+    message: str
+
+@router.post("/support-request")
+async def submit_support_request(
+    user_id: int,
+    request: SupportRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Submit a support request to system administrator
+    Secretary can report issues regarding courses, students, or general inquiries
+    """
+    try:
+        # Get user details
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Log the support request (in a real system, you would store this in a database)
+        logger.info(f"""
+        ========================================
+        NEW SUPPORT REQUEST
+        ========================================
+        From: {user.full_name} ({user.email})
+        Role: {user.role}
+        Issue Type: {request.issueType}
+        Subject: {request.subject}
+        
+        Course Info: {request.courseName or 'N/A'} (ID: {request.courseId or 'N/A'})
+        Student Info: {request.studentName or 'N/A'} (ID: {request.studentId or 'N/A'})
+        
+        Message:
+        {request.message}
+        ========================================
+        """)
+        
+        # In production, you would:
+        # 1. Insert into support_tickets table
+        # 2. Send email to system admin
+        # 3. Create notification for admin dashboard
+        
+        # For now, we'll just acknowledge receipt
+        return {
+            "success": True,
+            "message": "Support request submitted successfully. An administrator will review your message shortly.",
+            "ticket_id": f"TICKET-{user_id}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error submitting support request: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+

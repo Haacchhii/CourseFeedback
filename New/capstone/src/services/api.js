@@ -634,6 +634,25 @@ export const adminAPI = {
   getQuestionDistribution: async (courseId, userId) => {
     return apiClient.get(`/admin/courses/${courseId}/question-distribution?user_id=${userId}`)
   },
+
+  /**
+   * Get completion rates for all courses
+   * @returns {Promise} Completion rates data with overall statistics and per-course breakdown
+   */
+  getCompletionRates: async () => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.get(`/admin/completion-rates?user_id=${currentUser?.id}`)
+  },
+
+  /**
+   * Submit a support request to the system administrator
+   * @param {Object} requestData - Support request data (issueType, subject, message, optional course/student info)
+   * @returns {Promise} Success response with ticket ID
+   */
+  submitSupportRequest: async (requestData) => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.post(`/admin/support-request?user_id=${currentUser?.id}`, requestData)
+  },
 }
 
 // ============================================
@@ -864,6 +883,25 @@ export const deptHeadAPI = {
    */
   getQuestionDistribution: async (courseId, userId) => {
     return apiClient.get(`/dept-head/courses/${courseId}/question-distribution?user_id=${userId}`)
+  },
+
+  /**
+   * Get completion rates for all courses
+   * @returns {Promise} Completion rates data with overall statistics and per-course breakdown
+   */
+  getCompletionRates: async () => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.get(`/dept-head/completion-rates?user_id=${currentUser?.id}`)
+  },
+
+  /**
+   * Submit a support request to the system administrator
+   * @param {Object} requestData - Support request data (issueType, subject, message, optional course/student info)
+   * @returns {Promise} Success response with ticket ID
+   */
+  submitSupportRequest: async (requestData) => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.post(`/dept-head/support-request?user_id=${currentUser?.id}`, requestData)
   },
 }
 
@@ -1148,6 +1186,25 @@ export const secretaryAPI = {
    */
   getQuestionDistribution: async (courseId, userId) => {
     return apiClient.get(`/secretary/courses/${courseId}/question-distribution?user_id=${userId}`)
+  },
+
+  /**
+   * Get completion rates for all courses
+   * @returns {Promise} Completion rates data with overall statistics and per-course breakdown
+   */
+  getCompletionRates: async () => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.get(`/secretary/completion-rates?user_id=${currentUser?.id}`)
+  },
+
+  /**
+   * Submit a support request to the system administrator
+   * @param {Object} requestData - Support request data (issueType, subject, message, optional course/student info)
+   * @returns {Promise} Success response with ticket ID
+   */
+  submitSupportRequest: async (requestData) => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.post(`/secretary/support-request?user_id=${currentUser?.id}`, requestData)
   },
 }
 
