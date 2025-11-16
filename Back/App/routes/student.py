@@ -347,12 +347,10 @@ async def get_evaluation_for_edit(evaluation_id: int, db: Session = Depends(get_
                 e.id, e.student_id, e.class_section_id,
                 e.sentiment, e.ratings, e.text_feedback,
                 cs.class_code, c.subject_name, c.subject_code,
-                ep.end_date as period_end,
                 cs.semester, cs.academic_year
             FROM evaluations e
             JOIN class_sections cs ON e.class_section_id = cs.id
             JOIN courses c ON cs.course_id = c.id
-            LEFT JOIN evaluation_periods ep ON cs.evaluation_period_id = ep.id
             WHERE e.id = :evaluation_id
         """), {"evaluation_id": evaluation_id})
         
@@ -360,23 +358,21 @@ async def get_evaluation_for_edit(evaluation_id: int, db: Session = Depends(get_
         if not eval_data:
             raise HTTPException(status_code=404, detail="Evaluation not found")
         
-        # Check if evaluation period has ended
-        period_end = eval_data[9]
-        if period_end and datetime.now().date() > period_end:
-            raise HTTPException(
-                status_code=403, 
-                detail="Cannot edit evaluation - evaluation period has ended"
-            )
+        logger.info(f"Fetched evaluation data: {eval_data}")
         
         # Parse ratings from JSONB column
         ratings = {}
-        comment = eval_data[5] or ""
+        comment = eval_data[5] or ""  # text_feedback
         
         try:
             if eval_data[4]:  # ratings JSONB column
+                logger.info(f"Raw ratings data: {eval_data[4]}, type: {type(eval_data[4])}")
                 ratings = eval_data[4] if isinstance(eval_data[4], dict) else json.loads(eval_data[4])
+                logger.info(f"Parsed ratings: {ratings}")
         except Exception as e:
-            logger.warning(f"Could not parse stored ratings: {e}")
+            logger.error(f"Could not parse stored ratings: {e}")
+            import traceback
+            traceback.print_exc()
         
         return {
             "success": True,
@@ -392,10 +388,9 @@ async def get_evaluation_for_edit(evaluation_id: int, db: Session = Depends(get_
                     "name": eval_data[7],
                     "code": eval_data[8]
                 },
-                "semester": eval_data[10],
-                "academic_year": eval_data[11],
-                "can_edit": True,
-                "period_end": period_end.isoformat() if period_end else None
+                "semester": eval_data[9],
+                "academic_year": eval_data[10],
+                "can_edit": True
             }
         }
         
@@ -403,7 +398,9 @@ async def get_evaluation_for_edit(evaluation_id: int, db: Session = Depends(get_
         raise
     except Exception as e:
         logger.error(f"Error fetching evaluation: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch evaluation")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to fetch evaluation: {str(e)}")
 
 
 @router.put("/evaluations/{evaluation_id}")
@@ -417,16 +414,14 @@ async def update_evaluation(
     Only allowed if evaluation period hasn't ended
     """
     try:
-        # Get existing evaluation and check period
+        # Get existing evaluation
         existing_result = db.execute(text("""
             SELECT 
                 e.id, e.student_id, e.class_section_id,
-                cs.class_code, c.subject_name,
-                ep.end_date as period_end
+                cs.class_code, c.subject_name
             FROM evaluations e
             JOIN class_sections cs ON e.class_section_id = cs.id
             JOIN courses c ON cs.course_id = c.id
-            LEFT JOIN evaluation_periods ep ON cs.evaluation_period_id = ep.id
             WHERE e.id = :evaluation_id
         """), {"evaluation_id": evaluation_id})
         
@@ -445,14 +440,6 @@ async def update_evaluation(
             
             if not student_check or student_check[0] != actual_student_id:
                 raise HTTPException(status_code=403, detail="Unauthorized to edit this evaluation")
-        
-        # Check if evaluation period has ended
-        period_end = existing_data[5]
-        if period_end and datetime.now().date() > period_end:
-            raise HTTPException(
-                status_code=403, 
-                detail="Cannot edit evaluation - evaluation period has ended"
-            )
         
         # Validate ratings
         ratings = evaluation.ratings

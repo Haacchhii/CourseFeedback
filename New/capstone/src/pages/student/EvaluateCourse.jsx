@@ -184,7 +184,7 @@ export default function EvaluateCourse(){
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-5xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto pb-2" style={{scrollBehavior: 'auto'}}>
       <div className="bg-white rounded-lg shadow-lg">
         {/* Edit Mode Banner */}
         {isEditMode && (
@@ -288,8 +288,8 @@ export default function EvaluateCourse(){
           </div>
 
           <div className="space-y-6">
-            {questionnaireCategories[currentCategory].questions.map((question) => (
-              <div key={question.id} className="border-b pb-5 last:border-b-0">
+            {questionnaireCategories[currentCategory].questions.map((question, index) => (
+              <div key={question.id} className={index !== questionnaireCategories[currentCategory].questions.length - 1 ? "border-b pb-5" : "pb-2"}>
                 <div className="mb-3">
                   <div className="font-medium text-gray-800">{question.text}</div>
                   <div className="text-xs text-gray-500 mt-1">{question.shortLabel}</div>
@@ -297,20 +297,28 @@ export default function EvaluateCourse(){
                 {/* Left-aligned ratings */}
                 <div className="flex items-center gap-3">
                   {[1, 2, 3, 4].map(value => (
-                    <label key={value} className="cursor-pointer">
+                    <label key={value} className="cursor-pointer" onClick={(e) => e.preventDefault()}>
                       <input
                         type="radio"
                         name={question.id}
                         value={value}
                         checked={ratings[question.id] === value}
-                        onChange={(e) => setRating(question.id, e.target.value)}
+                        onChange={(e) => {
+                          e.preventDefault()
+                          setRating(question.id, e.target.value)
+                        }}
                         className="sr-only"
                       />
-                      <span className={`w-14 h-14 flex items-center justify-center rounded-full border-3 font-bold text-lg transition-all shadow-sm ${
-                        ratings[question.id] === value
-                          ? 'bg-[#7a0000] text-white border-[#7a0000] scale-110 shadow-lg'
-                          : 'bg-white text-gray-700 border-gray-400 hover:border-[#7a0000] hover:bg-gray-50 hover:scale-105'
-                      }`}>
+                      <span 
+                        onClick={(e) => {
+                          e.preventDefault()
+                          setRating(question.id, value)
+                        }}
+                        className={`w-14 h-14 flex items-center justify-center rounded-full border-3 font-bold text-lg transition-all shadow-sm ${
+                          ratings[question.id] === value
+                            ? 'bg-[#7a0000] text-white border-[#7a0000] scale-110 shadow-lg'
+                            : 'bg-white text-gray-700 border-gray-400 hover:border-[#7a0000] hover:bg-gray-50 hover:scale-105'
+                        }`}>
                         {value}
                       </span>
                     </label>
@@ -349,7 +357,7 @@ export default function EvaluateCourse(){
         </div>
 
         {/* Comments Section */}
-        <div className="px-6 py-4 bg-gray-50 border-t">
+        <div className="px-6 py-3 bg-gray-50 border-t">
           <div className="font-medium mb-2">Additional Comments (optional)</div>
           <textarea
             rows={4}
@@ -366,9 +374,9 @@ export default function EvaluateCourse(){
         </div>
 
         {/* Submit Section */}
-        <div className="px-6 py-4 bg-white border-t">
+        <div className="px-6 py-3 bg-white border-t">
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
               {error}
             </div>
           )}
