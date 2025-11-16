@@ -257,7 +257,7 @@ async def submit_evaluation(evaluation: EvaluationSubmission, db: Session = Depe
             ) VALUES (
                 :student_id, 
                 :class_section_id,
-                :ratings::jsonb,
+                CAST(:ratings AS jsonb),
                 :text_feedback,
                 :sentiment,
                 :sentiment_score,
@@ -513,7 +513,7 @@ async def update_evaluation(
         db.execute(text("""
             UPDATE evaluations
             SET 
-                ratings = :ratings::jsonb,
+                ratings = CAST(:ratings AS jsonb),
                 text_feedback = :text_feedback,
                 sentiment = :sentiment,
                 sentiment_score = :sentiment_score,
