@@ -28,7 +28,6 @@ import StaffEvaluations from './pages/staff/Evaluations'
 import StaffEvaluationQuestions from './pages/staff/EvaluationQuestions'
 
 // Student Pages
-import StudentEvaluation from './pages/student/StudentEvaluation'
 import StudentCourses from './pages/student/StudentCourses'
 import EvaluateCourse from './pages/student/EvaluateCourse'
 
@@ -118,11 +117,6 @@ export default function App(){
         } />
 
         {/* Student Pages - Protected */}
-        <Route path="/student-evaluation" element={
-          <ProtectedRoute allowedRoles={['student']}>
-            <StudentEvaluation/>
-          </ProtectedRoute>
-        } />
         <Route path="/student/courses" element={
           <ProtectedRoute allowedRoles={['student']}>
             <StudentCourses/>

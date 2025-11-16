@@ -139,7 +139,10 @@ export default function EvaluateCourse(){
           </button>
           <h1 className="text-2xl font-bold text-white">{course.name}</h1>
           <p className="text-sm text-gray-200 mt-1">
-            {course.class_code || courseId} • {course.instructor_name || 'Instructor'}
+            {course.class_code || courseId}
+          </p>
+          <p className="text-xs text-gray-300 mt-1">
+            {course.semester || 'Current Semester'} • {course.academic_year || 'Academic Year 2024-2025'}
           </p>
         </div>
 
@@ -199,42 +202,47 @@ export default function EvaluateCourse(){
           <div className="mb-6">
             <h2 className="text-lg font-semibold text-gray-800">{questionnaireCategories[currentCategory].name}</h2>
             <p className="text-sm text-gray-600 mt-1">{questionnaireCategories[currentCategory].description}</p>
+            
+            {/* Rating Scale Legend - shown once per category */}
+            <div className="mt-4 flex items-center gap-3 bg-gray-50 p-3 rounded-lg">
+              <span className="text-xs font-medium text-gray-600">Rating Scale:</span>
+              <div className="flex items-center gap-4">
+                <span className="text-xs text-gray-600">1 = Strongly Disagree</span>
+                <span className="text-xs text-gray-600">2 = Disagree</span>
+                <span className="text-xs text-gray-600">3 = Agree</span>
+                <span className="text-xs text-gray-600">4 = Strongly Agree</span>
+              </div>
+            </div>
           </div>
 
-          <div className="space-y-8">
+          <div className="space-y-6">
             {questionnaireCategories[currentCategory].questions.map((question) => (
-              <div key={question.id} className="border-b pb-6 last:border-b-0">
+              <div key={question.id} className="border-b pb-5 last:border-b-0">
                 <div className="mb-3">
                   <div className="font-medium text-gray-800">{question.text}</div>
                   <div className="text-xs text-gray-500 mt-1">{question.shortLabel}</div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-500 w-28">Strongly Disagree</span>
-                  <div className="flex items-center gap-2 flex-1 justify-center">
-                    {[1, 2, 3, 4].map(value => (
-                      <label key={value} className="flex flex-col items-center cursor-pointer">
-                        <input
-                          type="radio"
-                          name={question.id}
-                          value={value}
-                          checked={ratings[question.id] === value}
-                          onChange={(e) => setRating(question.id, e.target.value)}
-                          className="sr-only"
-                        />
-                        <span className={`w-12 h-12 flex items-center justify-center rounded-full border-2 font-bold text-sm transition-all ${
-                          ratings[question.id] === value
-                            ? 'bg-[#7a0000] text-white border-[#7a0000] scale-110'
-                            : 'bg-white text-gray-700 border-gray-300 hover:border-[#7a0000] hover:scale-105'
-                        }`}>
-                          {value}
-                        </span>
-                        <span className="mt-2 text-[10px] text-gray-500 text-center">
-                          {value === 1 ? 'Strongly\nDisagree' : value === 2 ? 'Disagree' : value === 3 ? 'Agree' : 'Strongly\nAgree'}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                  <span className="text-xs text-gray-500 w-28 text-right">Strongly Agree</span>
+                {/* Left-aligned ratings */}
+                <div className="flex items-center gap-2">
+                  {[1, 2, 3, 4].map(value => (
+                    <label key={value} className="flex flex-col items-center cursor-pointer">
+                      <input
+                        type="radio"
+                        name={question.id}
+                        value={value}
+                        checked={ratings[question.id] === value}
+                        onChange={(e) => setRating(question.id, e.target.value)}
+                        className="sr-only"
+                      />
+                      <span className={`w-12 h-12 flex items-center justify-center rounded-full border-2 font-bold text-sm transition-all ${
+                        ratings[question.id] === value
+                          ? 'bg-[#7a0000] text-white border-[#7a0000] scale-110'
+                          : 'bg-white text-gray-700 border-gray-300 hover:border-[#7a0000] hover:scale-105'
+                      }`}>
+                        {value}
+                      </span>
+                    </label>
+                  ))}
                 </div>
               </div>
             ))}
@@ -270,12 +278,11 @@ export default function EvaluateCourse(){
 
         {/* Comments Section */}
         <div className="px-6 py-4 bg-gray-50 border-t">
-          <div className="font-medium mb-2">Additional Comments and Suggestions</div>
-          <div className="text-xs text-gray-500 mb-3">Please provide any additional feedback or suggestions for improvement (optional)</div>
+          <div className="font-medium mb-2">Additional Comments (optional)</div>
           <textarea
             rows={4}
             className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-            placeholder="Enter your comments here... For example: The course materials were very informative but could use more practical examples."
+            placeholder="Enter your additional comments here... (optional)"
             value={comment}
             onChange={e => setComment(e.target.value)}
           />

@@ -134,9 +134,9 @@ export default function StudentCourses(){
                   <div className="text-xs text-gray-500 font-mono mt-1">{c.classCode}</div>
                 </div>
                 {c.status === 'Done' ? (
-                  <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Evaluated</span>
+                  <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-medium">✓ Evaluated</span>
                 ) : (
-                  <span className="inline-block bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full">Pending</span>
+                  <span className="inline-block bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full font-medium">Evaluate</span>
                 )}
               </div>
               <div className="font-medium text-sm mb-2">{c.name}</div>
@@ -145,13 +145,18 @@ export default function StudentCourses(){
                 <div className="mt-1">{c.semester}</div>
               </div>
               {c.status === 'Done' ? (
-                <div className="text-sm font-medium text-gray-500 text-center py-2">Completed</div>
+                <Link 
+                  to={`/student/evaluate/${c.class_section_id || c.id}`}
+                  className="block w-full text-center px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
+                >
+                  Edit Evaluation
+                </Link>
               ) : (
                 <Link 
                   to={`/student/evaluate/${c.class_section_id || c.id}`}
                   className="block w-full text-center px-3 py-2 bg-[#7a0000] text-white rounded text-sm hover:bg-[#8f0000] transition-colors"
                 >
-                  Evaluate
+                  Evaluate Now
                 </Link>
               )}
             </div>
@@ -169,40 +174,48 @@ export default function StudentCourses(){
                 <th className="py-2 lg:py-3 px-2 lg:px-4 border-b">Instructor</th>
                 <th className="py-2 lg:py-3 px-2 lg:px-4 border-b whitespace-nowrap">Semester</th>
                 <th className="py-2 lg:py-3 px-2 lg:px-4 border-b">Status</th>
-                <th className="py-2 lg:py-3 px-2 lg:px-4 border-b">Action</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-6 px-4 text-center text-sm text-gray-500">No courses found for your program and year level.</td>
+                  <td colSpan={6} className="py-6 px-4 text-center text-sm text-gray-500">No courses found for your program and year level.</td>
                 </tr>
               )}
               {filtered.map(c => (
-                <tr key={c.id} className="align-top hover:bg-gray-50">
+                <tr 
+                  key={c.id} 
+                  onClick={() => nav(`/student/evaluate/${c.class_section_id || c.id}`)}
+                  className={`align-top cursor-pointer transition-all ${
+                    c.status === 'Done' 
+                      ? 'hover:bg-green-50 border-l-4 border-l-green-500' 
+                      : 'hover:bg-orange-50 border-l-4 border-l-orange-500'
+                  }`}
+                >
                   <td className="py-3 lg:py-4 px-2 lg:px-4 border-b font-semibold text-xs lg:text-sm text-blue-600 whitespace-nowrap">{c.id}</td>
                   <td className="py-3 lg:py-4 px-2 lg:px-4 border-b text-xs lg:text-sm font-mono text-gray-700 whitespace-nowrap">{c.classCode}</td>
                   <td className="py-3 lg:py-4 px-2 lg:px-4 border-b text-xs lg:text-sm font-medium">{c.name}</td>
                   <td className="py-3 lg:py-4 px-2 lg:px-4 border-b text-xs lg:text-sm text-gray-600">{c.instructor}</td>
                   <td className="py-3 lg:py-4 px-2 lg:px-4 border-b text-xs lg:text-sm text-gray-600 whitespace-nowrap">{c.semester}</td>
                   <td className="py-3 lg:py-4 px-2 lg:px-4 border-b text-xs lg:text-sm">
-                    {c.status === 'Done' ? (
-                      <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full whitespace-nowrap">Evaluated</span>
-                    ) : (
-                      <span className="inline-block bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full whitespace-nowrap">Pending</span>
-                    )}
-                  </td>
-                  <td className="py-3 lg:py-4 px-2 lg:px-4 border-b text-xs lg:text-sm">
-                    {c.status === 'Done' ? (
-                      <span className="text-xs lg:text-sm font-medium text-gray-500 whitespace-nowrap">Completed</span>
-                    ) : (
-                      <Link 
-                        to={`/student/evaluate/${c.class_section_id || c.id}`}
-                        className="inline-flex items-center justify-center px-2 lg:px-3 py-1 bg-[#7a0000] text-white rounded text-xs lg:text-sm hover:bg-[#8f0000] transition-colors whitespace-nowrap"
-                      >
-                        Evaluate
-                      </Link>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {c.status === 'Done' ? (
+                        <>
+                          <span className="inline-block bg-green-100 text-green-800 text-xs px-2.5 py-1 rounded-full whitespace-nowrap font-medium">✓ Evaluated</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              nav(`/student/evaluate/${c.class_section_id || c.id}`)
+                            }}
+                            className="text-xs text-blue-600 hover:text-blue-800 font-medium underline whitespace-nowrap"
+                          >
+                            Edit
+                          </button>
+                        </>
+                      ) : (
+                        <span className="inline-block bg-orange-100 text-orange-800 text-xs px-2.5 py-1 rounded-full whitespace-nowrap font-medium">Evaluate</span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

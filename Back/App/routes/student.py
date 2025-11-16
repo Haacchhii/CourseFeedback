@@ -298,6 +298,195 @@ async def submit_evaluation(evaluation: EvaluationSubmission, db: Session = Depe
         raise HTTPException(status_code=500, detail=f"Failed to submit evaluation: {str(e)}")
 
 
+@router.get("/evaluations/{evaluation_id}")
+async def get_evaluation_for_edit(evaluation_id: int, db: Session = Depends(get_db)):
+    """
+    Get a specific evaluation for editing
+    Returns the evaluation data to pre-fill the form
+    """
+    try:
+        result = db.execute(text("""
+            SELECT 
+                e.id, e.student_id, e.class_section_id,
+                e.sentiment,
+                cs.class_code, c.subject_name, c.subject_code,
+                ep.end_date as period_end
+            FROM evaluations e
+            JOIN class_sections cs ON e.class_section_id = cs.id
+            JOIN courses c ON cs.course_id = c.id
+            LEFT JOIN evaluation_periods ep ON cs.evaluation_period_id = ep.id
+            WHERE e.id = :evaluation_id
+        """), {"evaluation_id": evaluation_id})
+        
+        eval_data = result.fetchone()
+        if not eval_data:
+            raise HTTPException(status_code=404, detail="Evaluation not found")
+        
+        # Check if evaluation period has ended
+        period_end = eval_data[7]
+        if period_end and datetime.now().date() > period_end:
+            raise HTTPException(
+                status_code=403, 
+                detail="Cannot edit evaluation - evaluation period has ended"
+            )
+        
+        return {
+            "success": True,
+            "data": {
+                "id": eval_data[0],
+                "student_id": eval_data[1],
+                "class_section_id": eval_data[2],
+                "sentiment": eval_data[3],
+                "course": {
+                    "class_code": eval_data[4],
+                    "name": eval_data[5],
+                    "code": eval_data[6]
+                },
+                "can_edit": True,
+                "period_end": period_end.isoformat() if period_end else None
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching evaluation: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch evaluation")
+
+
+@router.put("/evaluations/{evaluation_id}")
+async def update_evaluation(
+    evaluation_id: int, 
+    evaluation: EvaluationSubmission, 
+    db: Session = Depends(get_db)
+):
+    """
+    Update an existing evaluation
+    Only allowed if evaluation period hasn't ended
+    """
+    try:
+        # Get existing evaluation and check period
+        existing_result = db.execute(text("""
+            SELECT 
+                e.id, e.student_id, e.class_section_id,
+                cs.class_code, c.subject_name,
+                ep.end_date as period_end
+            FROM evaluations e
+            JOIN class_sections cs ON e.class_section_id = cs.id
+            JOIN courses c ON cs.course_id = c.id
+            LEFT JOIN evaluation_periods ep ON cs.evaluation_period_id = ep.id
+            WHERE e.id = :evaluation_id
+        """), {"evaluation_id": evaluation_id})
+        
+        existing_data = existing_result.fetchone()
+        if not existing_data:
+            raise HTTPException(status_code=404, detail="Evaluation not found")
+        
+        # Verify student owns this evaluation
+        actual_student_id = existing_data[1]
+        if actual_student_id != evaluation.student_id:
+            # Try checking if student_id is actually user_id
+            student_check = db.execute(text("""
+                SELECT s.id FROM students s
+                WHERE s.id = :student_id OR s.user_id = :student_id
+            """), {"student_id": evaluation.student_id}).fetchone()
+            
+            if not student_check or student_check[0] != actual_student_id:
+                raise HTTPException(status_code=403, detail="Unauthorized to edit this evaluation")
+        
+        # Check if evaluation period has ended
+        period_end = existing_data[5]
+        if period_end and datetime.now().date() > period_end:
+            raise HTTPException(
+                status_code=403, 
+                detail="Cannot edit evaluation - evaluation period has ended"
+            )
+        
+        # Validate ratings
+        ratings = evaluation.ratings
+        if not ratings or len(ratings) == 0:
+            raise HTTPException(status_code=400, detail="No ratings provided")
+        
+        rating_values = list(ratings.values())
+        for rating_val in rating_values:
+            if not isinstance(rating_val, (int, float)) or not (1 <= rating_val <= 4):
+                raise HTTPException(status_code=400, detail="All ratings must be between 1 and 4")
+        
+        # Calculate average rating and sentiment
+        avg_rating = sum(rating_values) / len(rating_values)
+        
+        # Try ML sentiment analysis
+        sentiment = "neutral"
+        sentiment_score = 0.5
+        ml_used = False
+        
+        try:
+            sentiment_analyzer = SentimentAnalyzer()
+            comment_text = evaluation.comment or ""
+            if comment_text:
+                ml_result = sentiment_analyzer.analyze(comment_text)
+                sentiment = ml_result["sentiment"]
+                sentiment_score = ml_result["confidence"]
+                ml_used = True
+        except:
+            sentiment, sentiment_score = _rating_based_sentiment(avg_rating)
+        
+        # Try anomaly detection
+        is_anomaly = False
+        anomaly_score = 0.0
+        anomaly_reason = None
+        
+        try:
+            anomaly_detector = AnomalyDetector()
+            anomaly_result = anomaly_detector.detect({
+                "ratings": rating_values,
+                "avg_rating": avg_rating,
+                "sentiment": sentiment
+            })
+            is_anomaly = anomaly_result["is_anomaly"]
+            anomaly_score = anomaly_result["anomaly_score"]
+            anomaly_reason = anomaly_result.get("reason")
+        except:
+            pass
+        
+        # Update evaluation in database
+        db.execute(text("""
+            UPDATE evaluations
+            SET 
+                sentiment = :sentiment,
+                updated_at = NOW()
+            WHERE id = :evaluation_id
+        """), {
+            "evaluation_id": evaluation_id,
+            "sentiment": sentiment
+        })
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": f"Evaluation updated successfully for {existing_data[4]}",
+            "data": {
+                "evaluation_id": evaluation_id,
+                "ratings": ratings,
+                "average_rating": round(avg_rating, 2),
+                "sentiment": sentiment,
+                "sentiment_score": round(sentiment_score, 3),
+                "anomaly_detected": is_anomaly,
+                "ml_powered": ml_used
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating evaluation: {e}")
+        import traceback
+        traceback.print_exc()
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update evaluation: {str(e)}")
+
+
 @router.get("/{student_id}/evaluations")  
 async def get_student_evaluations(student_id: int, db: Session = Depends(get_db)):
     """Get all evaluations submitted by a student"""

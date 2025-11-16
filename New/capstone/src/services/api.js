@@ -656,6 +656,25 @@ export const studentAPI = {
   getCourseDetails: async (courseId) => {
     return apiClient.get(`/student/courses/${courseId}`)
   },
+
+  /**
+   * Get evaluation for editing
+   * @param {number} evaluationId - Evaluation ID
+   * @returns {Promise} Evaluation data
+   */
+  getEvaluationForEdit: async (evaluationId) => {
+    return apiClient.get(`/student/evaluations/${evaluationId}`)
+  },
+
+  /**
+   * Update existing evaluation
+   * @param {number} evaluationId - Evaluation ID
+   * @param {Object} evaluationData - Updated evaluation data
+   * @returns {Promise} Updated evaluation
+   */
+  updateEvaluation: async (evaluationId, evaluationData) => {
+    return apiClient.put(`/student/evaluations/${evaluationId}`, evaluationData)
+  },
 }
 
 // ============================================
