@@ -1,14 +1,11 @@
-services:
-  # PostgreSQL Database
-  - type: pserv
-    name: coursefeedback-db
-    env: python
+databases:
+  - name: coursefeedback-db
+    databaseName: coursefeedback
+    user: coursefeedback
     plan: free
     region: singapore
-    databases:
-      - name: coursefeedback
-        databaseName: coursefeedback
-        user: coursefeedback
+
+services:
 
   # Backend API (FastAPI)
   - type: web
