@@ -26,7 +26,7 @@ services:
         generateValue: true
       - key: CORS_ORIGINS
         value: "*"
-    healthCheckPath: /api/auth/login
+    healthCheckPath: /health
 
   # Frontend (React + Vite) - Served with Node.js
   - type: web
