@@ -5,16 +5,16 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     # Database Configuration
-    DATABASE_URL: str = "postgresql://postgres:password@localhost/course_feedback_db"
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres:password@localhost/course_feedback_db")
     
     # Debug Configuration
-    DEBUG: bool = False
+    DEBUG: bool = os.getenv("DEBUG", "False").lower() == "true"
     
     # CORS Configuration (from .env)
-    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
+    CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173")
     
     # JWT Configuration
-    SECRET_KEY: str = "your-secret-key-here-change-in-production"
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-here-change-in-production")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
