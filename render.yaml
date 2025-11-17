@@ -37,12 +37,14 @@ services:
     env: static
     region: singapore
     plan: free
-    buildCommand: "cd New/capstone && npm install && npm run build"
+    buildCommand: "cd New/capstone && npm ci && npx vite build"
     staticPublishPath: ./New/capstone/dist
     routes:
       - type: rewrite
         source: /*
         destination: /index.html
     envVars:
+      - key: NODE_VERSION
+        value: 22.16.0
       - key: VITE_API_URL
         value: https://coursefeedback-backend.onrender.com

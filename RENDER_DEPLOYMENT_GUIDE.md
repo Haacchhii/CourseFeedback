@@ -39,7 +39,7 @@ git push origin feature/secretary-depthead-overhaul
    - **Start Command:** `uvicorn main:app --host 0.0.0.0 --port $PORT`
 4. **Environment Variables** (click "Add Environment Variable"):
    ```
-   DATABASE_URL = [paste your Internal Database URL from step 3]
+   DATABASE_URL = [postgresql://coursefeedback:MGgvOljlqDJMQPm8cyon832dHMkXdTZu@dpg-d4dk4rripnbc73a49ocg-a/coursefeedback]
    SECRET_KEY = [generate a random string, e.g., use: openssl rand -hex 32]
    CORS_ORIGINS = *
    DEBUG = False
@@ -55,7 +55,7 @@ git push origin feature/secretary-depthead-overhaul
    - **Region:** Singapore
    - **Branch:** `feature/secretary-depthead-overhaul`
    - **Root Directory:** `New/capstone`
-   - **Build Command:** `npm install && npm run build`
+   - **Build Command:** `npm ci && npx vite build`
    - **Publish Directory:** `dist`
 4. **Environment Variables**:
    ```
