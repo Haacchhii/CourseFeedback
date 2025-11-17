@@ -48,6 +48,15 @@ git push origin feature/secretary-depthead-overhaul
 6. **Copy your backend URL** (e.g., `https://coursefeedback-backend.onrender.com`)
 
 ### 5. Deploy Frontend (React + Vite)
+
+#### Option A: Using Blueprint (RECOMMENDED - Easier)
+1. Go to Render Dashboard → Click **"New +"** → **"Blueprint"**
+2. Connect your repository: `Haacchhii/CourseFeedback`
+3. Select branch: `feature/secretary-depthead-overhaul`
+4. Render will detect `render.yaml` and show all 3 services
+5. Click **"Apply"** - it will create all services automatically with correct settings!
+
+#### Option B: Manual Setup
 1. Click **"New +"** → **"Web Service"**
 2. Connect your GitHub repository
 3. Configure:
@@ -56,15 +65,17 @@ git push origin feature/secretary-depthead-overhaul
    - **Branch:** `feature/secretary-depthead-overhaul`
    - **Root Directory:** `New/capstone`
    - **Runtime:** Node
-   - **Build Command:** `npm install && npm run build`
+   - **Build Command:** ⚠️ **IMPORTANT:** Clear the auto-detected command and type: `npm install && npm run build`
    - **Start Command:** `npx serve -s dist -l $PORT`
-4. **Environment Variables**:
+4. **Environment Variables** (Add these manually):
    ```
    NODE_VERSION = 22.16.0
    VITE_API_URL = https://coursefeedback-backend.onrender.com/api
    ```
    (Use the backend URL from step 4, add `/api` at the end)
 5. Click **"Create Web Service"**
+
+⚠️ **Common Issue:** If Render auto-fills "npm run dev", you MUST change it to "npm run build" manually!
 
 ### 6. Access Your Application
 - Frontend URL: `https://coursefeedback-frontend.onrender.com`
