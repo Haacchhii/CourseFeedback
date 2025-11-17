@@ -31,20 +31,16 @@ services:
         value: "*"
     healthCheckPath: /api/auth/login
 
-  # Frontend (React + Vite)
+  # Frontend (React + Vite) - Served with Node.js
   - type: web
     name: coursefeedback-frontend
-    env: static
+    env: node
     region: singapore
     plan: free
-    buildCommand: "cd New/capstone && npm ci && npx vite build"
-    staticPublishPath: ./New/capstone/dist
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
+    buildCommand: "cd New/capstone && npm install && npm run build"
+    startCommand: "cd New/capstone && npx serve -s dist -l $PORT"
     envVars:
       - key: NODE_VERSION
         value: 22.16.0
       - key: VITE_API_URL
-        value: https://coursefeedback-backend.onrender.com
+        value: https://coursefeedback-backend.onrender.com/api

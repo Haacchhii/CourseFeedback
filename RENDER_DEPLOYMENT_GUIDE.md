@@ -48,21 +48,23 @@ git push origin feature/secretary-depthead-overhaul
 6. **Copy your backend URL** (e.g., `https://coursefeedback-backend.onrender.com`)
 
 ### 5. Deploy Frontend (React + Vite)
-1. Click **"New +"** → **"Static Site"**
+1. Click **"New +"** → **"Web Service"**
 2. Connect your GitHub repository
 3. Configure:
    - **Name:** `coursefeedback-frontend`
    - **Region:** Singapore
    - **Branch:** `feature/secretary-depthead-overhaul`
    - **Root Directory:** `New/capstone`
-   - **Build Command:** `npm ci && npx vite build`
-   - **Publish Directory:** `dist`
+   - **Runtime:** Node
+   - **Build Command:** `npm install && npm run build`
+   - **Start Command:** `npx serve -s dist -l $PORT`
 4. **Environment Variables**:
    ```
+   NODE_VERSION = 22.16.0
    VITE_API_URL = https://coursefeedback-backend.onrender.com/api
    ```
    (Use the backend URL from step 4, add `/api` at the end)
-5. Click **"Create Static Site"**
+5. Click **"Create Web Service"**
 
 ### 6. Access Your Application
 - Frontend URL: `https://coursefeedback-frontend.onrender.com`
