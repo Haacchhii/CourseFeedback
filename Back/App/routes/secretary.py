@@ -668,29 +668,14 @@ async def get_secretary_evaluations(
     sentiment: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    """Get evaluations for secretary's programs"""
+    """Get evaluations (full system access - single department system)"""
     try:
-        # Get secretary info
-        secretary = db.query(Secretary).filter(Secretary.user_id == user_id).first()
-        if not secretary:
-            raise HTTPException(status_code=404, detail="Secretary not found")
-        
-        program_ids = secretary.programs or []
-        if not program_ids:
-            # No programs assigned, return empty result
-            return {
-                "success": True,
-                "data": [],
-                "pagination": {"page": page, "page_size": page_size, "total": 0, "pages": 0}
-            }
-        
-        # Build query for evaluations
+        # Secretary has full system access (single department system)
+        # Build query for all evaluations
         query = db.query(Evaluation).join(
             ClassSection, Evaluation.class_section_id == ClassSection.id
         ).join(
             Course, ClassSection.course_id == Course.id
-        ).filter(
-            Course.program_id.in_(program_ids)
         )
         
         # Apply filters
