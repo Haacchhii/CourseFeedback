@@ -175,6 +175,29 @@ export default function EvaluationPeriodManagement() {
       return
     }
     
+    // Validate date overlap with active periods
+    const newStartDate = new Date(formData.startDate)
+    const newEndDate = new Date(formData.endDate)
+    
+    // Check against all existing periods (both open and closed)
+    const allPeriods = [...(currentPeriod ? [currentPeriod] : []), ...pastPeriods]
+    const hasOverlap = allPeriods.some(period => {
+      const existingStart = new Date(period.startDate)
+      const existingEnd = new Date(period.endDate)
+      
+      // Check if new period overlaps with existing period
+      return (
+        (newStartDate >= existingStart && newStartDate <= existingEnd) || // New start is within existing period
+        (newEndDate >= existingStart && newEndDate <= existingEnd) ||     // New end is within existing period
+        (newStartDate <= existingStart && newEndDate >= existingEnd)      // New period completely encompasses existing period
+      )
+    })
+    
+    if (hasOverlap) {
+      alert('⚠️ Date Overlap Detected\n\nThe selected dates overlap with an existing evaluation period. Please choose different dates that do not conflict with any active or past periods.')
+      return
+    }
+    
     // Auto-generate period name from semester + academic year
     const periodName = `${formData.semester} ${formData.academicYear}`
     

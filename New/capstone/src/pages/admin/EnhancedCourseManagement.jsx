@@ -2579,24 +2579,6 @@ student2@example.com,IT-PROG1-2024,email,
                 )}
               </div>
 
-              {/* Instructor Selection */}
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Instructor *</label>
-                <select
-                  required
-                  value={sectionFormData.instructor_id}
-                  onChange={(e) => setSectionFormData({ ...sectionFormData, instructor_id: parseInt(e.target.value) })}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                >
-                  <option value="">Select an instructor</option>
-                  {instructors.map(instructor => (
-                    <option key={instructor.id} value={instructor.id}>
-                      {instructor.first_name} {instructor.last_name} ({instructor.email})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
               {/* Section Code */}
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Section Code *</label>
@@ -2983,8 +2965,8 @@ student2@example.com,IT-PROG1-2024,email,
 
       {/* Quick Bulk Enrollment Modal */}
       {showQuickBulkEnrollModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full my-8">
             <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white p-6 rounded-t-2xl">
               <div className="flex justify-between items-center">
                 <div>

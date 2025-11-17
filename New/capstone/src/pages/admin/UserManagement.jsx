@@ -789,7 +789,7 @@ export default function UserManagement() {
                         user.role === 'admin' ? 'bg-red-100 text-red-800' :
                         'bg-gray-100 text-gray-800'
                       }`}>
-                        {user.userType}
+                        {getRoleDisplayName(user.role)}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">

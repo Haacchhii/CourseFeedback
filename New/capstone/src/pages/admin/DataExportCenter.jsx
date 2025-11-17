@@ -775,26 +775,6 @@ export default function DataExportCenter() {
                 </button>
               </div>
 
-              <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl shadow-lg p-6 hover:shadow-xl transition-all text-white">
-                <div className="flex items-center mb-4">
-                  <div className="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center mr-4">
-                    <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold">Full System Export</h3>
-                    <p className="text-sm text-indigo-100">Complete backup</p>
-                  </div>
-                </div>
-                <p className="text-sm text-indigo-100 mb-4">Export all system data including users, courses, evaluations, and settings.</p>
-                <button
-                  onClick={() => handleQuickExport('Full System')}
-                  className="w-full bg-white hover:bg-indigo-50 text-indigo-600 font-semibold py-3 px-4 rounded-lg transition-all"
-                >
-                  Export Everything →
-                </button>
-              </div>
             </div>
           </>
         )}
