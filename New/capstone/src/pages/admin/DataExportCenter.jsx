@@ -55,7 +55,8 @@ export default function DataExportCenter() {
     auditDateRange: 'all',
     auditAction: 'all',
     auditUser: 'all',
-    auditCategory: 'all'
+    auditCategory: 'all',
+    auditSeverity: 'all'
   })
   
   // API State
@@ -133,7 +134,8 @@ export default function DataExportCenter() {
       auditDateRange: 'all',
       auditAction: 'all',
       auditUser: 'all',
-      auditCategory: 'all'
+      auditCategory: 'all',
+      auditSeverity: 'all'
     })
     setShowExportModal(true)
   }
@@ -171,16 +173,12 @@ export default function DataExportCenter() {
         if (exportFilters.courseYearLevel !== 'all') options.yearLevel = exportFilters.courseYearLevel
         data = await adminAPI.exportCourses(options)
         downloadData(data, `courses_export_${timestamp}.${modalFormat}`, modalFormat)
-      } else if (selectedExportType === 'Analytics Report') {
-        options.reportType = exportFilters.analyticsReportType
-        options.dateRange = exportFilters.analyticsDateRange
-        data = await adminAPI.exportAnalytics(options)
-        downloadData(data, `analytics_export_${timestamp}.${modalFormat}`, modalFormat)
       } else if (selectedExportType === 'Audit Logs') {
         if (exportFilters.auditDateRange !== 'all') options.dateRange = exportFilters.auditDateRange
         if (exportFilters.auditAction !== 'all') options.action = exportFilters.auditAction
         if (exportFilters.auditUser !== 'all') options.user = exportFilters.auditUser
         if (exportFilters.auditCategory !== 'all') options.category = exportFilters.auditCategory
+        if (exportFilters.auditSeverity !== 'all') options.severity = exportFilters.auditSeverity
         data = await adminAPI.exportAuditLogs(options)
         downloadData(data, `audit_logs_export_${timestamp}.${modalFormat}`, modalFormat)
       } else if (selectedExportType === 'Full System') {
@@ -230,6 +228,18 @@ export default function DataExportCenter() {
     
     console.log('downloadData called with format:', format)
     console.log('Data structure:', Array.isArray(data) ? `Array with ${data.length} items` : typeof data)
+    
+    // Check if data is empty
+    if (Array.isArray(data) && data.length === 0) {
+      alert('No data found matching the selected filters. Please adjust your filters and try again.')
+      return
+    }
+    
+    // Check for null/undefined data
+    if (!data) {
+      alert('Export failed: No data received from server.')
+      return
+    }
     
     // Handle different formats
     if (format === 'json') {
@@ -733,27 +743,6 @@ export default function DataExportCenter() {
                 </button>
               </div>
 
-              <div className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all border-2 border-transparent hover:border-orange-500">
-                <div className="flex items-center mb-4">
-                  <div className="w-16 h-16 bg-orange-100 rounded-xl flex items-center justify-center mr-4">
-                    <svg className="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900">Analytics Report</h3>
-                    <p className="text-sm text-gray-600">Comprehensive insights</p>
-                  </div>
-                </div>
-                <p className="text-sm text-gray-600 mb-4">Export complete analytics including sentiment, trends, and statistics.</p>
-                <button
-                  onClick={() => handleQuickExport('Analytics Report')}
-                  className="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-3 px-4 rounded-lg transition-all"
-                >
-                  Export Analytics →
-                </button>
-              </div>
-
               <div className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all border-2 border-transparent hover:border-red-500">
                 <div className="flex items-center mb-4">
                   <div className="w-16 h-16 bg-red-100 rounded-xl flex items-center justify-center mr-4">
@@ -1188,44 +1177,6 @@ export default function DataExportCenter() {
                 </div>
               )}
 
-              {selectedExportType === 'Analytics Report' && (
-                <div className="bg-gray-50 rounded-xl p-4 space-y-4">
-                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                    <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
-                    </svg>
-                    Analytics Options
-                  </h3>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Report Type</label>
-                      <select
-                        value={exportFilters.analyticsReportType}
-                        onChange={(e) => setExportFilters({...exportFilters, analyticsReportType: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="summary">Summary Report</option>
-                        <option value="detailed">Detailed Report</option>
-                        <option value="trends">Trend Analysis</option>
-                        <option value="sentiment">Sentiment Analysis</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
-                      <select
-                        value={exportFilters.analyticsDateRange}
-                        onChange={(e) => setExportFilters({...exportFilters, analyticsDateRange: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="semester">Current Semester</option>
-                        <option value="year">Current Year</option>
-                        <option value="all">All Time</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {selectedExportType === 'Audit Logs' && (
                 <div className="bg-gray-50 rounded-xl p-4 space-y-4">
                   <h3 className="font-semibold text-gray-900 flex items-center gap-2">
@@ -1296,6 +1247,20 @@ export default function DataExportCenter() {
                         <option value="Section Management">Section Management</option>
                         <option value="System Settings">System Settings</option>
                         <option value="Security">Security</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Severity</label>
+                      <select
+                        value={exportFilters.auditSeverity}
+                        onChange={(e) => setExportFilters({...exportFilters, auditSeverity: e.target.value})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="all">All Severities</option>
+                        <option value="Info">Info</option>
+                        <option value="Warning">Warning</option>
+                        <option value="Error">Error</option>
+                        <option value="Critical">Critical</option>
                       </select>
                     </div>
                   </div>

@@ -796,7 +796,7 @@ export default function EvaluationPeriodManagement() {
       {/* Enroll Program Section Modal */}
       {showEnrollModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
               <div className="bg-gradient-to-r from-purple-600 to-purple-700 p-6 border-b-4 border-purple-800">
               <div className="flex justify-between items-center">
                 <div>
@@ -821,20 +821,34 @@ export default function EvaluationPeriodManagement() {
                 <>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Program Section *</label>
-                    <select
-                      required
-                      value={enrollFormData.programSectionId}
-                      onChange={(e) => setEnrollFormData({...enrollFormData, programSectionId: e.target.value})}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    >
-                      <option value="">Select a program section...</option>
-                      {availableProgramSections.map((section) => (
-                        <option key={section.id} value={section.id}>
-                          {section.sectionName} - {section.programCode} (Year {section.yearLevel}, Sem {section.semester}) - {section.studentCount} students
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-gray-500 mt-1">Select the student group (e.g., BSCS-DS-3A) to enable for evaluation</p>
+                    {availableProgramSections.length === 0 ? (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <p className="text-sm font-semibold text-yellow-900 mb-2">⚠️ No Program Sections Found</p>
+                        <p className="text-sm text-yellow-800 mb-3">
+                          You need to create program sections before enrolling them in an evaluation period.
+                        </p>
+                        <p className="text-xs text-yellow-700">
+                          <strong>To create sections:</strong> Go to Course Management → Manage Sections → Create a section (e.g., "BSIT-3A") and assign students to it.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <select
+                          required
+                          value={enrollFormData.programSectionId}
+                          onChange={(e) => setEnrollFormData({...enrollFormData, programSectionId: e.target.value})}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        >
+                          <option value="">Select a program section...</option>
+                          {availableProgramSections.map((section) => (
+                            <option key={section.id} value={section.id}>
+                              {section.sectionName || section.section_name} - {section.programCode || section.program_code} (Year {section.yearLevel || section.year_level}, Sem {section.semester}) - {section.studentCount || section.student_count} students
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">Select the student group (e.g., BSCS-DS-3A) to enable for evaluation</p>
+                      </>
+                    )}
                   </div>
 
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -852,10 +866,10 @@ export default function EvaluationPeriodManagement() {
                   {enrollFormData.programSectionId && (
                     <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                       <p className="text-sm font-semibold text-purple-900">
-                        📋 Selected: {availableProgramSections.find(s => s.id === parseInt(enrollFormData.programSectionId))?.section_name}
+                        📋 Selected: {availableProgramSections.find(s => s.id === parseInt(enrollFormData.programSectionId))?.sectionName || availableProgramSections.find(s => s.id === parseInt(enrollFormData.programSectionId))?.section_name}
                       </p>
-                      <p className="text-xs text-purple-700 mt-1">
-                        {availableProgramSections.find(s => s.id === parseInt(enrollFormData.programSectionId))?.program_code} - Year {availableProgramSections.find(s => s.id === parseInt(enrollFormData.programSectionId))?.year_level}
+                      <p className="text-xs text-gray-600 mt-1">
+                        {availableProgramSections.find(s => s.id === parseInt(enrollFormData.programSectionId))?.programCode || availableProgramSections.find(s => s.id === parseInt(enrollFormData.programSectionId))?.program_code} - Year {availableProgramSections.find(s => s.id === parseInt(enrollFormData.programSectionId))?.yearLevel || availableProgramSections.find(s => s.id === parseInt(enrollFormData.programSectionId))?.year_level}
                       </p>
                     </div>
                   )}
@@ -873,10 +887,10 @@ export default function EvaluationPeriodManagement() {
                 </button>
                 <button
                   type="submit"
-                  disabled={submitting}
-                  className="flex-1 px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white rounded-lg font-semibold transition-all"
+                  disabled={submitting || availableProgramSections.length === 0}
+                  className="flex-1 px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white rounded-lg font-semibold transition-all disabled:cursor-not-allowed"
                 >
-                  {submitting ? 'Enrolling...' : 'Enroll Program Section'}
+                  {submitting ? 'Enrolling...' : availableProgramSections.length === 0 ? 'No Sections Available' : 'Enroll Program Section'}
                 </button>
               </div>
             </form>

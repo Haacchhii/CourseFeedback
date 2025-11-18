@@ -26,6 +26,9 @@ export default function Courses() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 15
   
+  // Detailed analysis category pagination
+  const [currentCategoryPage, setCurrentCategoryPage] = useState(0)
+  
   // Data for section creation
   const [availableCourses, setAvailableCourses] = useState([])
   const [instructors, setInstructors] = useState([])
@@ -44,9 +47,11 @@ export default function Courses() {
 
   // Fetch programs from database
   useEffect(() => {
+    if (!currentUser) return
+    
+    let isMounted = true
+    
     const fetchPrograms = async () => {
-      if (!currentUser) return
-      
       try {
         let programsData
         
@@ -66,6 +71,8 @@ export default function Courses() {
           programsData = await instructorAPI.getPrograms()
         }
         
+        if (!isMounted) return // Don't update state if unmounted
+        
         console.log('[COURSES] Programs API response:', programsData)
         
         if (programsData?.data && Array.isArray(programsData.data) && programsData.data.length > 0) {
@@ -76,12 +83,17 @@ export default function Courses() {
           setPrograms([])
         }
       } catch (err) {
+        if (!isMounted) return // Don't update state if unmounted
         console.error('[COURSES] Error fetching programs:', err)
         setPrograms([])
       }
     }
     
     fetchPrograms()
+    
+    return () => {
+      isMounted = false
+    }
   }, [currentUser])
   
   // Fallback: Extract unique programs from courses if programs array is empty
@@ -112,9 +124,16 @@ export default function Courses() {
 
   // Fetch courses from API
   useEffect(() => {
+    if (!currentUser) return
+    
+    // Create abort controller to cancel previous requests
+    const abortController = new AbortController()
+    let isMounted = true
+    
     const fetchData = async () => {
       try {
         setLoading(true)
+        setError(null)
         const filters = {}
         if (selectedProgram !== 'all') filters.program = selectedProgram
         
@@ -136,6 +155,9 @@ export default function Courses() {
         } else {
           throw new Error(`Unsupported role: ${currentUser.role}`)
         }
+        
+        // Only update state if component is still mounted and request wasn't aborted
+        if (!isMounted || abortController.signal.aborted) return
         
         // Extract data from response (handle both direct arrays and {success, data} format)
         const courses = Array.isArray(coursesData) ? coursesData : (coursesData?.data || [])
@@ -164,13 +186,25 @@ export default function Courses() {
         setCourses(normalizedCourses)
         setEvaluations(evaluations)
       } catch (err) {
+        if (abortController.signal.aborted) return // Ignore aborted requests
         console.error('Error fetching courses:', err)
-        setError(err.message || 'Failed to load courses')
+        if (isMounted) {
+          setError(err.message || 'Failed to load courses')
+        }
       } finally {
-        setLoading(false)
+        if (isMounted) {
+          setLoading(false)
+        }
       }
     }
+    
     fetchData()
+    
+    // Cleanup function to abort request and prevent state updates
+    return () => {
+      isMounted = false
+      abortController.abort()
+    }
   }, [currentUser, selectedProgram])
 
   // Enhance courses with evaluation data
@@ -181,7 +215,7 @@ export default function Courses() {
       
       // Use data from API response first, fallback to calculation
       const evaluationCount = course.evaluations_count || courseEvaluations.length
-      const enrollmentCount = course.enrolledStudents || 0
+      const enrollmentCount = course.enrolledStudents || course.enrolled_students || 0
       
       // Use overallRating from API (already calculated in backend)
       let overallRating = course.overallRating || 0
@@ -286,6 +320,7 @@ export default function Courses() {
     setSubmitting(true)
     setLoadingDetails(true)
     setSelectedCourse(courseId)
+    setCurrentCategoryPage(0) // Reset to first category
     
     try {
       // Get actual course data
@@ -294,13 +329,36 @@ export default function Courses() {
         throw new Error('Course not found')
       }
       
-      const courseEvals = evaluations.filter(e => e.courseId === courseId)
+      // Match evaluations by sectionId or class_section_id (courseId in frontend maps to section_id in backend)
+      const courseEvals = evaluations.filter(e => 
+        e.sectionId === courseId || 
+        e.class_section_id === courseId || 
+        e.courseId === courseId
+      )
+      
+      console.log(`[COURSE DETAILS] ==================`)
+      console.log(`[COURSE DETAILS] Looking for evaluations for course ID: ${courseId}`)
+      console.log(`[COURSE DETAILS] Course data:`, course)
+      console.log(`[COURSE DETAILS] Total evaluations in state: ${evaluations.length}`)
+      console.log(`[COURSE DETAILS] Sample evaluation structure:`, evaluations[0])
+      console.log(`[COURSE DETAILS] Evaluations IDs check:`, evaluations.slice(0, 5).map(e => ({
+        id: e.id,
+        sectionId: e.sectionId,
+        class_section_id: e.class_section_id,
+        courseId: e.courseId
+      })))
+      console.log(`[COURSE DETAILS] Found ${courseEvals.length} matching evaluations`)
+      if (courseEvals.length > 0) {
+        console.log(`[COURSE DETAILS] Sample matched evaluation:`, courseEvals[0])
+      }
+      console.log(`[COURSE DETAILS] ==================`)
       
       // Fetch category averages and question distribution from backend
       let categoryData = []
       let questionData = []
       
       try {
+        console.log(`[COURSE DETAILS API] Fetching category and question data for course ${courseId}, role: ${currentUser.role}`)
         if (isAdmin(currentUser)) {
           const [catResp, qResp] = await Promise.all([
             adminAPI.getCategoriesAverages(courseId, currentUser.id),
@@ -308,6 +366,7 @@ export default function Courses() {
           ])
           categoryData = catResp?.data?.categories || []
           questionData = qResp?.data?.questions || []
+          console.log(`[COURSE DETAILS API] Admin - Got ${categoryData.length} categories, ${questionData.length} questions`)
         } else if (currentUser.role === 'secretary') {
           const [catResp, qResp] = await Promise.all([
             secretaryAPI.getCategoryAverages(courseId, currentUser.id),
@@ -315,6 +374,9 @@ export default function Courses() {
           ])
           categoryData = catResp?.data?.categories || []
           questionData = qResp?.data?.questions || []
+          console.log(`[COURSE DETAILS API] Secretary - Got ${categoryData.length} categories, ${questionData.length} questions`)
+          console.log(`[COURSE DETAILS API] Category response:`, catResp)
+          console.log(`[COURSE DETAILS API] Question response:`, qResp)
         } else if (currentUser.role === 'department_head') {
           const [catResp, qResp] = await Promise.all([
             deptHeadAPI.getCategoryAverages(courseId, currentUser.id),
@@ -322,12 +384,14 @@ export default function Courses() {
           ])
           categoryData = catResp?.data?.categories || []
           questionData = qResp?.data?.questions || []
+          console.log(`[COURSE DETAILS API] Dept Head - Got ${categoryData.length} categories, ${questionData.length} questions`)
         }
         
         setCategoryAverages(categoryData)
         setQuestionDistribution(questionData)
       } catch (apiError) {
-        console.error('Error fetching detailed analysis data:', apiError)
+        console.error('[COURSE DETAILS API] Error fetching detailed analysis data:', apiError)
+        console.error('[COURSE DETAILS API] Error details:', apiError.response?.data)
         // Continue with existing data even if new endpoints fail
         setCategoryAverages([])
         setQuestionDistribution([])
@@ -389,9 +453,24 @@ export default function Courses() {
         negative: courseEvals.filter(e => e.sentiment === 'negative').length
       }
       
+      // Calculate overall rating from found evaluations
+      let calculatedOverallRating = course.overallRating || 0
+      if (courseEvals.length > 0) {
+        const totalRating = courseEvals.reduce((sum, e) => {
+          const ratings = Object.values(e.ratings || {})
+          const avgRating = ratings.length > 0 ? ratings.reduce((a, b) => a + b) / ratings.length : 0
+          return sum + avgRating
+        }, 0)
+        calculatedOverallRating = parseFloat((totalRating / courseEvals.length).toFixed(1))
+        console.log(`[COURSE DETAILS] Calculated overall rating: ${calculatedOverallRating} from ${courseEvals.length} evaluations`)
+      }
+      
       // Set the course details
       setCourseDetails({
         ...course,
+        overallRating: calculatedOverallRating,
+        evaluationCount: courseEvals.length,
+        enrollmentCount: course.enrolledStudents || course.enrolled_students || 0,
         criteriaRatings,
         sentimentBreakdown,
         evaluations: courseEvals.slice(0, 10), // Show recent 10
@@ -1002,7 +1081,7 @@ export default function Courses() {
                   <div>
                     <h2 className="text-2xl font-bold text-white">{courseDetails.name}</h2>
                     <p className="text-[#ffd700] text-sm mt-1">
-                      {courseDetails.classCode} • Instructor: {courseDetails.instructor}
+                      {courseDetails.classCode}
                     </p>
                     <div className="flex items-center space-x-4 mt-2">
                       <span className="text-white/80 text-sm">
@@ -1095,12 +1174,14 @@ export default function Courses() {
                         <div className="flex justify-between items-center p-3 bg-green-50 rounded">
                           <span className="font-medium text-green-700">Response Rate</span>
                           <span className="text-2xl font-bold text-green-600">
-                            {Math.round((courseDetails.evaluationCount / courseDetails.enrollmentCount) * 100)}%
+                            {courseDetails.enrollmentCount && courseDetails.enrollmentCount > 0
+                              ? Math.round((courseDetails.evaluationCount / courseDetails.enrollmentCount) * 100)
+                              : 0}%
                           </span>
                         </div>
                         <div className="flex justify-between items-center p-3 bg-purple-50 rounded">
                           <span className="font-medium text-purple-700">Enrolled Students</span>
-                          <span className="text-2xl font-bold text-purple-600">{courseDetails.enrollmentCount}</span>
+                          <span className="text-2xl font-bold text-purple-600">{courseDetails.enrollmentCount || 0}</span>
                         </div>
                       </div>
                     </div>
@@ -1118,9 +1199,15 @@ export default function Courses() {
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
                       </div>
-                    ) : categoryAverages.length > 0 ? (
+                    ) : categoryAverages.length > 0 || (courseDetails.criteriaRatings && Object.keys(courseDetails.criteriaRatings).length > 0) ? (
                       <div className="space-y-4">
-                        {categoryAverages.map((category, index) => {
+                        {(categoryAverages.length > 0 ? categoryAverages : Object.entries(courseDetails.criteriaRatings || {}).map(([name, avg]) => ({
+                          category_name: name,
+                          average: avg,
+                          question_count: 5,
+                          total_responses: courseDetails.evaluationCount,
+                          description: 'Average rating for this category'
+                        }))).map((category, index) => {
                           const colors = ['text-blue-600', 'text-green-600', 'text-purple-600', 'text-orange-600', 'text-teal-600', 'text-pink-600'];
                           const bgColors = ['bg-blue-50', 'bg-green-50', 'bg-purple-50', 'bg-orange-50', 'bg-teal-50', 'bg-pink-50'];
                           const percentage = (category.average / 4) * 100;
@@ -1190,10 +1277,22 @@ export default function Courses() {
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
                     </div>
-                  ) : questionDistribution.length > 0 ? (
+                  ) : questionDistribution.length > 0 || (courseDetails.evaluations && courseDetails.evaluations.length > 0) ? (
                     <div className="space-y-6">
-                      {/* Group questions by category */}
-                      {categoryAverages.map((category, catIndex) => {
+                      {/* Category Navigation */}
+                      {(() => {
+                        const allCategories = categoryAverages.length > 0 ? categoryAverages : courseDetails.criteriaRatings ? Object.entries(courseDetails.criteriaRatings).map(([name, avg], idx) => ({
+                          category_id: ['relevance_of_course', 'course_organization', 'teaching_learning', 'assessment', 'learning_environment', 'counseling'][idx] || 'other',
+                          category_name: name,
+                          average: avg
+                        })) : [];
+                        
+                        if (allCategories.length === 0) return null;
+                        
+                        const category = allCategories[currentCategoryPage];
+                        if (!category) return null;
+                        
+                        const catIndex = currentCategoryPage;
                         // Get question numbers for this category
                         const categoryQuestionMaps = {
                           'relevance_of_course': [1, 2, 3, 4, 5, 6],
@@ -1221,57 +1320,74 @@ export default function Courses() {
                             </h4>
                             
                             <div className="space-y-4">
-                              {categoryQuestions.map(question => (
-                                <div key={question.question_number} className="bg-white rounded-lg p-4 shadow-sm">
-                                  <div className="flex items-center justify-between mb-3">
-                                    <span className="font-semibold text-gray-700">
-                                      Question {question.question_number}
-                                    </span>
-                                    <div className="flex items-center space-x-2">
-                                      <span className={`text-lg font-bold text-${color}-600`}>
-                                        {question.average.toFixed(2)}
-                                      </span>
-                                      <span className="text-sm text-gray-500">/ 4.0</span>
-                                    </div>
-                                  </div>
-                                  
-                                  {/* Response distribution bars */}
-                                  <div className="space-y-2">
-                                    {['4', '3', '2', '1'].map(rating => {
-                                      const ratingData = question.distribution[rating];
-                                      const barColors = {
-                                        '4': 'bg-green-500',
-                                        '3': 'bg-blue-500',
-                                        '2': 'bg-orange-500',
-                                        '1': 'bg-red-500'
-                                      };
-                                      
-                                      return (
-                                        <div key={rating} className="flex items-center space-x-3">
-                                          <span className="text-xs font-medium text-gray-600 w-24">
-                                            Rating {rating}
+                              {categoryQuestions.map(question => {
+                                // Find highest count
+                                const counts = ['1', '2', '3', '4'].map(r => question.distribution[r].count);
+                                const maxCount = Math.max(...counts);
+                                
+                                return (
+                                  <div key={question.question_number} className="bg-white rounded-lg p-4 shadow-sm">
+                                    <div className="mb-3">
+                                      <div className="flex items-start justify-between">
+                                        <div className="flex-1 pr-4">
+                                          <span className="font-semibold text-gray-900 block">
+                                            Question {question.question_number}
                                           </span>
-                                          <div className="flex-1 bg-gray-200 rounded-full h-6 relative">
-                                            <div 
-                                              className={`${barColors[rating]} h-6 rounded-full transition-all duration-500 flex items-center justify-end pr-2`}
-                                              style={{ width: `${ratingData.percentage}%` }}
-                                            >
-                                              {ratingData.percentage > 10 && (
-                                                <span className="text-xs font-medium text-white">
-                                                  {ratingData.percentage.toFixed(1)}%
-                                                </span>
-                                              )}
-                                            </div>
-                                          </div>
-                                          <span className="text-xs text-gray-600 w-16 text-right">
-                                            {ratingData.count} ({ratingData.percentage.toFixed(1)}%)
-                                          </span>
+                                          {question.question_text && (
+                                            <p className="text-sm text-gray-600 mt-1">{question.question_text}</p>
+                                          )}
                                         </div>
-                                      );
-                                    })}
-                                  </div>
-                                  
-                                  <div className="mt-3 pt-3 border-t border-gray-200">
+                                        <div className="flex items-center space-x-2 flex-shrink-0">
+                                          <span className={`text-lg font-bold text-${color}-600`}>
+                                            {question.average.toFixed(2)}
+                                          </span>
+                                          <span className="text-sm text-gray-500">/ 4.0</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    
+                                    {/* Response distribution bars */}
+                                    <div className="space-y-2">
+                                      {['4', '3', '2', '1'].map(rating => {
+                                        const ratingData = question.distribution[rating];
+                                        const isHighest = ratingData.count === maxCount && maxCount > 0;
+                                        const barColors = {
+                                          '4': 'bg-green-500',
+                                          '3': 'bg-blue-500',
+                                          '2': 'bg-orange-500',
+                                          '1': 'bg-red-500'
+                                        };
+                                        
+                                        return (
+                                          <div key={rating} className="flex items-center space-x-3">
+                                            <span className="text-xs font-medium text-gray-600 w-24">
+                                              {rating === '4' && 'Strongly Agree'}
+                                              {rating === '3' && 'Agree'}
+                                              {rating === '2' && 'Disagree'}
+                                              {rating === '1' && 'Strongly Disagree'}
+                                            </span>
+                                            <div className="flex-1 bg-gray-200 rounded-full h-6 relative">
+                                              <div 
+                                                className={`${barColors[rating]} h-6 rounded-full transition-all duration-500 flex items-center justify-end pr-2 ${isHighest ? 'ring-2 ring-yellow-400' : ''}`}
+                                                style={{ width: `${ratingData.percentage}%` }}
+                                              >
+                                                {ratingData.percentage > 10 && (
+                                                  <span className="text-xs font-medium text-white">
+                                                    {ratingData.percentage.toFixed(1)}%
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </div>
+                                            <span className={`text-xs w-20 text-right ${isHighest ? 'font-bold text-yellow-600' : 'text-gray-600'}`}>
+                                              {ratingData.count} students
+                                              {isHighest && <span className="ml-1">👑</span>}
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                    
+                                    <div className="mt-3 pt-3 border-t border-gray-200">
                                     <span className="text-xs text-gray-500">
                                       Total responses: {question.total_responses}
                                     </span>
@@ -1281,7 +1397,48 @@ export default function Courses() {
                             </div>
                           </div>
                         );
-                      })}
+                      })()}
+                      
+                      {/* Pagination Controls */}
+                      {(() => {
+                        const allCategories = categoryAverages.length > 0 ? categoryAverages : courseDetails.criteriaRatings ? Object.entries(courseDetails.criteriaRatings).map(([name, avg], idx) => ({
+                          category_id: ['relevance_of_course', 'course_organization', 'teaching_learning', 'assessment', 'learning_environment', 'counseling'][idx] || 'other',
+                          category_name: name,
+                          average: avg
+                        })) : [];
+                        
+                        if (allCategories.length <= 1) return null;
+                        
+                        return (
+                          <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200">
+                            <button
+                              onClick={() => setCurrentCategoryPage(prev => Math.max(0, prev - 1))}
+                              disabled={currentCategoryPage === 0}
+                              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
+                              </svg>
+                              <span>Previous Category</span>
+                            </button>
+                            
+                            <span className="text-sm text-gray-600">
+                              Category {currentCategoryPage + 1} of {allCategories.length}
+                            </span>
+                            
+                            <button
+                              onClick={() => setCurrentCategoryPage(prev => Math.min(allCategories.length - 1, prev + 1))}
+                              disabled={currentCategoryPage >= allCategories.length - 1}
+                              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                            >
+                              <span>Next Category</span>
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
+                              </svg>
+                            </button>
+                          </div>
+                        );
+                      })()}
                     </div>
                   ) : (
                     <div className="text-center py-12 text-gray-500">

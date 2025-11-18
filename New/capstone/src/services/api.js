@@ -12,7 +12,7 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 10000, // 10 second timeout
+  timeout: 30000, // 30 second timeout for complex queries
 })
 
 // Request interceptor - Add auth token to all requests
@@ -197,6 +197,8 @@ export const adminAPI = {
     if (params.search) queryParams.append('search', params.search)
     if (params.role) queryParams.append('role', params.role)
     if (params.status) queryParams.append('status', params.status)
+    if (params.program) queryParams.append('program', params.program)
+    if (params.year_level) queryParams.append('year_level', params.year_level)
     
     return apiClient.get(`/admin/users?${queryParams.toString()}`)
   },
@@ -719,8 +721,14 @@ export const adminAPI = {
    * @returns {Promise} Export data
    */
   exportUsers: async (options = {}) => {
-    const format = options.format || 'json'
-    return apiClient.get(`/admin/export/users?format=${format}`)
+    const currentUser = authAPI.getCurrentUser()
+    const params = new URLSearchParams()
+    params.append('format', options.format || 'csv')
+    if (currentUser?.id) params.append('user_id', currentUser.id)
+    if (options.role) params.append('role', options.role)
+    if (options.program) params.append('program', options.program)
+    if (options.status) params.append('status', options.status)
+    return apiClient.get(`/admin/export/users?${params.toString()}`)
   },
 
   /**
@@ -729,12 +737,14 @@ export const adminAPI = {
    * @returns {Promise} Export data
    */
   exportEvaluations: async (options = {}) => {
-    const format = options.format || 'json'
-    const params = new URLSearchParams({ format })
-    if (options.dateRange) {
-      if (options.dateRange.start) params.append('start_date', options.dateRange.start)
-      if (options.dateRange.end) params.append('end_date', options.dateRange.end)
-    }
+    const currentUser = authAPI.getCurrentUser()
+    const params = new URLSearchParams()
+    params.append('format', options.format || 'csv')
+    if (currentUser?.id) params.append('user_id', currentUser.id)
+    if (options.dateRange) params.append('dateRange', options.dateRange)
+    if (options.program) params.append('program', options.program)
+    if (options.semester) params.append('semester', options.semester)
+    if (options.instructor) params.append('instructor', options.instructor)
     return apiClient.get(`/admin/export/evaluations?${params.toString()}`)
   },
 
@@ -744,8 +754,14 @@ export const adminAPI = {
    * @returns {Promise} Export data
    */
   exportCourses: async (options = {}) => {
-    const format = options.format || 'json'
-    return apiClient.get(`/admin/export/courses?format=${format}`)
+    const currentUser = authAPI.getCurrentUser()
+    const params = new URLSearchParams()
+    params.append('format', options.format || 'csv')
+    if (currentUser?.id) params.append('user_id', currentUser.id)
+    if (options.program) params.append('program', options.program)
+    if (options.status) params.append('status', options.status)
+    if (options.yearLevel) params.append('year_level', options.yearLevel)
+    return apiClient.get(`/admin/export/courses?${params.toString()}`)
   },
 
   /**
@@ -754,12 +770,10 @@ export const adminAPI = {
    * @returns {Promise} Export data
    */
   exportAnalytics: async (options = {}) => {
-    const format = options.format || 'json'
-    const params = new URLSearchParams({ format })
-    if (options.dateRange) {
-      if (options.dateRange.start) params.append('start_date', options.dateRange.start)
-      if (options.dateRange.end) params.append('end_date', options.dateRange.end)
-    }
+    const params = new URLSearchParams()
+    params.append('format', options.format || 'csv')
+    if (options.reportType) params.append('reportType', options.reportType)
+    if (options.dateRange) params.append('dateRange', options.dateRange)
     return apiClient.get(`/admin/export/analytics?${params.toString()}`)
   },
 
@@ -769,12 +783,46 @@ export const adminAPI = {
    * @returns {Promise} Export data
    */
   exportAuditLogs: async (options = {}) => {
-    const format = options.format || 'json'
-    const params = new URLSearchParams({ format })
-    if (options.dateRange) {
-      if (options.dateRange.start) params.append('start_date', options.dateRange.start)
-      if (options.dateRange.end) params.append('end_date', options.dateRange.end)
+    const params = new URLSearchParams()
+    params.append('format', options.format || 'csv')
+    if (options.action && options.action !== 'all') params.append('action', options.action)
+    if (options.category && options.category !== 'all') params.append('category', options.category)
+    if (options.user && options.user !== 'all') params.append('user', options.user)
+    if (options.severity && options.severity !== 'all') params.append('severity', options.severity)
+    
+    // Convert dateRange to start_date and end_date
+    if (options.dateRange && options.dateRange !== 'all') {
+      const now = new Date()
+      let startDate = null
+      
+      switch (options.dateRange) {
+        case 'today':
+          startDate = new Date(now.setHours(0, 0, 0, 0))
+          break
+        case 'last_7_days':
+          startDate = new Date(now.setDate(now.getDate() - 7))
+          break
+        case 'last_30_days':
+          startDate = new Date(now.setDate(now.getDate() - 30))
+          break
+        case 'current_month':
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+          break
+        case 'last_month':
+          startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+          const endDate = new Date(now.getFullYear(), now.getMonth(), 0)
+          params.append('end_date', endDate.toISOString())
+          break
+      }
+      
+      if (startDate) {
+        params.append('start_date', startDate.toISOString())
+      }
     }
+    
+    const currentUser = authAPI.getCurrentUser()
+    if (currentUser?.id) params.append('user_id', currentUser.id)
+    
     return apiClient.get(`/admin/export/audit-logs?${params.toString()}`)
   },
 

@@ -121,6 +121,8 @@ async def get_all_users(
     search: Optional[str] = None,
     role: Optional[str] = None,
     status: Optional[str] = None,
+    program: Optional[str] = None,
+    year_level: Optional[int] = None,
     db: Session = Depends(get_db)
 ):
     """Get paginated list of all users with filters"""
@@ -146,8 +148,37 @@ async def get_all_users(
             is_active = status == "active"
             query = query.filter(User.is_active == is_active)
         
+        # Filter by program and/or year level (for students)
+        # Build single subquery with both conditions to avoid conflicts
+        if program or year_level:
+            student_subquery = db.query(Student.user_id)
+            
+            if program:
+                student_subquery = student_subquery.join(Program).filter(
+                    Program.program_code == program
+                )
+                logger.info(f"Filtering by program: {program}")
+            
+            if year_level:
+                student_subquery = student_subquery.filter(
+                    Student.year_level == year_level
+                )
+                logger.info(f"Filtering by year_level: {year_level}")
+            
+            student_ids_result = student_subquery.all()
+            logger.info(f"Found {len(student_ids_result)} students matching filter. User IDs: {[sid[0] for sid in student_ids_result[:5]]}")
+            
+            student_ids = [sid[0] for sid in student_ids_result]
+            if student_ids:
+                query = query.filter(User.id.in_(student_ids))
+            else:
+                # No students match - return empty result
+                logger.warning(f"No students found matching program={program}, year_level={year_level}")
+                query = query.filter(User.id == -1)  # Force empty result
+        
         # Get total count
         total = query.count()
+        logger.info(f"Total users after filters: {total}")
         
         # Apply pagination
         offset = (page - 1) * page_size
@@ -163,6 +194,7 @@ async def get_all_users(
                 "last_name": user.last_name,
                 "role": user.role,
                 "department": user.department,
+                "school_id": user.school_id,
                 "is_active": user.is_active,
                 "last_login": user.last_login.isoformat() if user.last_login else None,
                 "created_at": user.created_at.isoformat() if user.created_at else None
@@ -1520,6 +1552,7 @@ async def get_programs(db: Session = Depends(get_db)):
 async def get_sections(
     search: Optional[str] = None,
     program_id: Optional[int] = None,
+    program_code: Optional[str] = None,
     year_level: Optional[int] = None,
     semester: Optional[int] = None,
     db: Session = Depends(get_db)
@@ -1535,6 +1568,7 @@ async def get_sections(
                 c.subject_name,
                 cs.class_code,
                 c.program_id,
+                p.program_code,
                 c.year_level,
                 cs.semester,
                 cs.academic_year,
@@ -1542,6 +1576,7 @@ async def get_sections(
                 COUNT(DISTINCT e.student_id) as enrolled_count
             FROM class_sections cs
             LEFT JOIN courses c ON cs.course_id = c.id
+            LEFT JOIN programs p ON c.program_id = p.id
             LEFT JOIN enrollments e ON cs.id = e.class_section_id
             WHERE 1=1
         """)
@@ -1557,6 +1592,10 @@ async def get_sections(
             query = text(str(query) + " AND c.program_id = :program_id")
             params['program_id'] = program_id
         
+        if program_code:
+            query = text(str(query) + " AND p.program_code = :program_code")
+            params['program_code'] = program_code
+        
         if year_level:
             query = text(str(query) + " AND c.year_level = :year_level")
             params['year_level'] = year_level
@@ -1567,7 +1606,7 @@ async def get_sections(
         
         query = text(str(query) + """
             GROUP BY cs.id, cs.course_id, c.subject_code, c.subject_name, 
-                     cs.class_code, c.program_id, c.year_level, cs.semester, 
+                     cs.class_code, c.program_id, p.program_code, c.year_level, cs.semester, 
                      cs.academic_year, cs.max_students
             ORDER BY c.subject_code, cs.class_code
         """)
@@ -2718,35 +2757,68 @@ async def delete_scheduled_export(
 @router.get("/export/users")
 async def export_users(
     format: str = Query("csv", regex="^(csv|json)$"),
+    role: Optional[str] = Query(None),
+    program: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
     user_id: Optional[int] = Query(None),
     db: Session = Depends(get_db)
 ):
-    """Export all users data"""
+    """Export users data with filters"""
     try:
-        users = db.query(User).all()
+        query = db.query(User)
         
-        if format == "json":
-            users_data = [{
+        # Apply filters
+        if role and role != 'all':
+            query = query.filter(User.role == role)
+        
+        if status and status != 'all':
+            is_active = status.lower() == 'active'
+            query = query.filter(User.is_active == is_active)
+        
+        # Filter by program for students
+        if program and program != 'all':
+            student_ids = db.query(Student.user_id).join(Program).filter(
+                Program.program_code == program
+            ).subquery()
+            query = query.filter(User.id.in_(student_ids))
+        
+        users = query.all()
+        
+        users_data = []
+        for u in users:
+            user_dict = {
                 "id": u.id,
                 "email": u.email,
                 "first_name": u.first_name,
                 "last_name": u.last_name,
+                "school_id": u.school_id,
                 "role": u.role,
                 "department": u.department,
                 "is_active": u.is_active,
                 "created_at": u.created_at.isoformat() if u.created_at else None
-            } for u in users]
+            }
             
-            # Log export
-            log_export(db, user_id, 'users', format, len(users_data), {})
+            # Add student-specific data
+            if u.role == "student":
+                student = db.query(Student).filter(Student.user_id == u.id).first()
+                if student and student.program_id:
+                    program_obj = db.query(Program).filter(Program.id == student.program_id).first()
+                    if program_obj:
+                        user_dict["program"] = program_obj.program_code
+                        user_dict["program_name"] = program_obj.program_name
+                        user_dict["year_level"] = student.year_level
+                        user_dict["student_number"] = student.student_number
             
-            return {"success": True, "data": users_data}
+            users_data.append(user_dict)
         
-        # CSV format would be handled by frontend
         # Log export
-        log_export(db, user_id, 'users', format, len(users), {})
+        filters = {}
+        if role: filters['role'] = role
+        if program: filters['program'] = program
+        if status: filters['status'] = status
+        log_export(db, user_id, 'users', format, len(users_data), filters)
         
-        return {"success": True, "data": users}
+        return {"success": True, "data": users_data}
         
     except Exception as e:
         logger.error(f"Error exporting users: {e}")
@@ -2770,9 +2842,12 @@ async def export_evaluations(
             "rating_content": e.rating_content,
             "rating_engagement": e.rating_engagement,
             "rating_overall": e.rating_overall,
-            "comments": e.comments,
+            "text_feedback": e.text_feedback,
+            "suggestions": e.suggestions,
             "sentiment": e.sentiment,
             "sentiment_score": e.sentiment_score,
+            "is_anomaly": e.is_anomaly,
+            "anomaly_score": e.anomaly_score,
             "submission_date": e.submission_date.isoformat() if e.submission_date else None
         } for e in evaluations]
         
@@ -2788,27 +2863,53 @@ async def export_evaluations(
 @router.get("/export/courses")
 async def export_courses(
     format: str = Query("json", regex="^(csv|json)$"),
+    program: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    year_level: Optional[int] = Query(None),
     user_id: Optional[int] = Query(None),
     db: Session = Depends(get_db)
 ):
-    """Export all courses data"""
+    """Export courses data with filters"""
     try:
-        courses = db.query(Course).all()
+        query = db.query(Course)
         
-        courses_data = [{
-            "id": c.id,
-            "subject_code": c.subject_code,
-            "subject_name": c.subject_name,
-            "program_id": c.program_id,
-            "year_level": c.year_level,
-            "semester": c.semester,
-            "is_active": c.is_active,
-            "created_at": c.created_at.isoformat() if c.created_at else None
-            # Note: updated_at not included as it may not exist in database
-        } for c in courses]
+        # Apply filters
+        if program and program != 'all':
+            program_obj = db.query(Program).filter(Program.program_code == program).first()
+            if program_obj:
+                query = query.filter(Course.program_id == program_obj.id)
+        
+        if status and status != 'all':
+            is_active = status.lower() == 'active'
+            query = query.filter(Course.is_active == is_active)
+        
+        if year_level and year_level != 0:
+            query = query.filter(Course.year_level == year_level)
+        
+        courses = query.all()
+        
+        courses_data = []
+        for c in courses:
+            program_obj = db.query(Program).filter(Program.id == c.program_id).first() if c.program_id else None
+            courses_data.append({
+                "id": c.id,
+                "subject_code": c.subject_code,
+                "subject_name": c.subject_name,
+                "program_code": program_obj.program_code if program_obj else None,
+                "program_name": program_obj.program_name if program_obj else None,
+                "year_level": c.year_level,
+                "semester": c.semester,
+                "units": c.units,
+                "is_active": c.is_active,
+                "created_at": c.created_at.isoformat() if c.created_at else None
+            })
         
         # Log export
-        log_export(db, user_id, 'courses', format, len(courses_data), {})
+        filters = {}
+        if program: filters['program'] = program
+        if status: filters['status'] = status
+        if year_level: filters['year_level'] = year_level
+        log_export(db, user_id, 'courses', format, len(courses_data), filters)
         
         return {"success": True, "data": courses_data}
         
@@ -2879,6 +2980,89 @@ async def export_analytics(
         
     except Exception as e:
         logger.error(f"Error exporting analytics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/export/audit-logs")
+async def export_audit_logs(
+    format: str = Query("csv", regex="^(csv|json)$"),
+    action: Optional[str] = Query(None),
+    category: Optional[str] = Query(None),
+    user: Optional[str] = Query(None),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    severity: Optional[str] = Query(None),
+    user_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Export audit logs with filters"""
+    try:
+        query = db.query(AuditLog)
+        
+        # Apply filters
+        if action and action != 'all':
+            query = query.filter(AuditLog.action == action)
+        
+        if category and category != 'all':
+            query = query.filter(AuditLog.category == category)
+        
+        if severity and severity != 'all':
+            query = query.filter(AuditLog.severity == severity)
+        
+        if user and user != 'all':
+            query = query.filter(AuditLog.user_id == int(user))
+        
+        # Date range filtering
+        if start_date:
+            try:
+                start = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+                query = query.filter(AuditLog.timestamp >= start)
+            except:
+                pass
+        
+        if end_date:
+            try:
+                end = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                query = query.filter(AuditLog.timestamp <= end)
+            except:
+                pass
+        
+        # Order by most recent first
+        query = query.order_by(AuditLog.timestamp.desc())
+        
+        audit_logs = query.all()
+        
+        logs_data = []
+        for log in audit_logs:
+            # Get user info
+            log_user = db.query(User).filter(User.id == log.user_id).first() if log.user_id else None
+            
+            logs_data.append({
+                "id": log.id,
+                "user_id": log.user_id,
+                "user_email": log_user.email if log_user else None,
+                "user_name": f"{log_user.first_name} {log_user.last_name}" if log_user else "System",
+                "action": log.action,
+                "category": log.category,
+                "details": log.details,
+                "severity": log.severity,
+                "ip_address": log.ip_address,
+                "timestamp": log.timestamp.isoformat() if log.timestamp else None
+            })
+        
+        # Log this export
+        filters = {}
+        if action: filters['action'] = action
+        if category: filters['category'] = category
+        if user: filters['user'] = user
+        if start_date: filters['start_date'] = start_date
+        if end_date: filters['end_date'] = end_date
+        if severity: filters['severity'] = severity
+        log_export(db, user_id, 'audit_logs', format, len(logs_data), filters)
+        
+        return {"success": True, "data": logs_data}
+        
+    except Exception as e:
+        logger.error(f"Error exporting audit logs: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/export/custom")

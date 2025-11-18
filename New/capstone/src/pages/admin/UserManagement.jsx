@@ -67,6 +67,8 @@ export default function UserManagement() {
           page_size: pageSize,
           role: roleFilter !== 'all' ? roleFilter : undefined,
           status: statusFilter !== 'all' ? statusFilter : undefined,
+          program: programFilter !== 'all' ? programFilter : undefined,
+          year_level: yearLevelFilter !== 'all' ? parseInt(yearLevelFilter) : undefined,
           search: searchTerm || undefined
         }),
         adminAPI.getPrograms(),
@@ -85,7 +87,7 @@ export default function UserManagement() {
         pagination: usersResponse?.pagination || {}
       }
     },
-    [currentUser?.id, currentUser?.role, currentPage, pageSize, roleFilter, statusFilter, searchTerm]
+    [currentUser?.id, currentUser?.role, currentPage, pageSize, roleFilter, statusFilter, programFilter, yearLevelFilter, searchTerm]
   )
 
   // Update allUsers and programs when data changes
@@ -113,33 +115,22 @@ export default function UserManagement() {
     }
   }, [currentUser?.role, currentUser?.id, navigate])
 
+  // Reset program and year level filters when role changes away from student
+  useEffect(() => {
+    if (roleFilter !== 'student') {
+      setProgramFilter('all')
+      setYearLevelFilter('all')
+    }
+  }, [roleFilter])
+
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [roleFilter, statusFilter, searchTerm, yearLevelFilter])
+  }, [roleFilter, statusFilter, searchTerm, yearLevelFilter, programFilter])
 
-  // Client-side filtering for program only (server handles role, status, search)
-  const filteredUsers = useMemo(() => {
-    return allUsers.filter(user => {
-      // Program filter
-      if (programFilter !== 'all') {
-        const matchesProgram = user.program === programFilter || 
-          (user.assignedPrograms && user.assignedPrograms.includes(programFilter))
-        if (!matchesProgram) return false
-      }
-      
-      // Year level filter (only for students)
-      if (yearLevelFilter !== 'all' && user.role === 'student') {
-        const userYearLevel = user.year_level || user.yearLevel
-        if (userYearLevel !== parseInt(yearLevelFilter)) return false
-      }
-      
-      return true
-    })
-  }, [allUsers, programFilter, yearLevelFilter])
-
-  // Use filteredUsers directly (server-side pagination already applied)
-  const paginatedUsers = filteredUsers
+  // Server now handles all filtering (role, status, program, year_level, search)
+  // Use allUsers directly since filtering is done server-side
+  const paginatedUsers = allUsers
 
   // Handlers
   const handleAddUser = () => {
@@ -238,6 +229,9 @@ export default function UserManagement() {
           if (!row.first_name) rowErrors.push('Missing first name')
           if (!row.last_name) rowErrors.push('Missing last name')
           if (!row.school_id || row.school_id.trim() === '') rowErrors.push('Missing school_id')
+          
+          // Normalize role to lowercase for validation
+          row.role = row.role.toLowerCase()
           if (!validRoles.includes(row.role)) rowErrors.push(`Invalid role: ${row.role}`)
           
           if (row.role === 'student') {
@@ -299,6 +293,9 @@ export default function UserManagement() {
 
         // Skip invalid rows
         if (!row.email || !row.email.includes('@') || !row.first_name || !row.last_name) continue
+        
+        // Normalize role to lowercase for validation
+        row.role = row.role.toLowerCase()
         if (!['student', 'instructor', 'department_head', 'secretary', 'admin'].includes(row.role)) continue
 
         validUsers.push(row)
@@ -316,9 +313,12 @@ export default function UserManagement() {
         
         await Promise.all(batch.map(async (userData) => {
           try {
+            // Normalize role to lowercase
+            const normalizedRole = userData.role.toLowerCase()
+            
             // Get program ID if role is student
             let programId = null
-            if (userData.role === 'student' && userData.program) {
+            if (normalizedRole === 'student' && userData.program) {
               const programsResponse = await adminAPI.getPrograms()
               const matchingProgram = programsResponse?.data?.find(p => p.code === userData.program)
               programId = matchingProgram?.id
@@ -328,12 +328,12 @@ export default function UserManagement() {
               email: userData.email,
               first_name: userData.first_name,
               last_name: userData.last_name,
-              role: userData.role,
+              role: normalizedRole,
               password: userData.password || 'changeme123',
               department: userData.department || null,
               program_id: programId,
               year_level: userData.year_level ? parseInt(userData.year_level) : 1,
-              student_number: userData.student_number || null
+              school_id: userData.school_id || null
             })
             imported++
           } catch (err) {
@@ -436,7 +436,9 @@ export default function UserManagement() {
           department: formData.department || null,
           program_id: programId,
           year_level: formData.yearLevel || 1
-        }      const response = await adminAPI.createUser(userData)
+        };
+        
+        const response = await adminAPI.createUser(userData);
       
       // Trigger data reload
       retry()
@@ -741,10 +743,11 @@ export default function UserManagement() {
               <select
                 value={programFilter}
                 onChange={(e) => setProgramFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={roleFilter !== 'student'}
+                className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${roleFilter !== 'student' ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''}`}
               >
-                <option value="all">All Programs</option>
-                {programs.map(prog => (
+                <option value="all">{roleFilter === 'student' ? 'All Programs' : 'Select Student Role First'}</option>
+                {roleFilter === 'student' && programs.map(prog => (
                   <option key={prog} value={prog}>{prog}</option>
                 ))}
               </select>
@@ -766,13 +769,18 @@ export default function UserManagement() {
               <select
                 value={yearLevelFilter}
                 onChange={(e) => setYearLevelFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={roleFilter !== 'student'}
+                className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${roleFilter !== 'student' ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''}`}
               >
-                <option value="all">All Levels</option>
-                <option value="1">1st Year</option>
-                <option value="2">2nd Year</option>
-                <option value="3">3rd Year</option>
-                <option value="4">4th Year</option>
+                <option value="all">{roleFilter === 'student' ? 'All Levels' : 'Select Student Role First'}</option>
+                {roleFilter === 'student' && (
+                  <>
+                    <option value="1">1st Year</option>
+                    <option value="2">2nd Year</option>
+                    <option value="3">3rd Year</option>
+                    <option value="4">4th Year</option>
+                  </>
+                )}
               </select>
             </div>
           </div>
@@ -815,6 +823,7 @@ export default function UserManagement() {
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Name</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Email</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">School ID</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Role</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Program</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
@@ -841,6 +850,7 @@ export default function UserManagement() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">{user.email}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{user.school_id || 'N/A'}</td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
                         user.role === 'student' ? 'bg-green-100 text-green-800' :

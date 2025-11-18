@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { isSystemAdmin } from '../../utils/roleUtils'
 import { useAuth } from '../../context/AuthContext'
 import { adminAPI } from '../../services/api'
-import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
+import { LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
 
 export default function SystemSettings() {
   const navigate = useNavigate()
@@ -42,19 +42,39 @@ export default function SystemSettings() {
     lastBackup: 'October 21, 2025 02:00 AM'
   })
 
-  // Use timeout hook for API call
-  const { data: settingsData, loading, error, retry } = useApiWithTimeout(
-    () => adminAPI.getSettings(),
-    [currentUser?.id, currentUser?.role]
-  )
+  // Fetch all settings categories
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  // Update settings when data changes
   useEffect(() => {
-    if (settingsData) {
-      if (settingsData.security) setSecuritySettings(settingsData.security)
-      if (settingsData.backup) setBackupSettings(settingsData.backup)
+    const fetchAllSettings = async () => {
+      try {
+        setLoading(true)
+        const [general, email, security, backup] = await Promise.all([
+          adminAPI.getSettings('general'),
+          adminAPI.getSettings('email'),
+          adminAPI.getSettings('security'),
+          adminAPI.getSettings('backup')
+        ])
+        
+        if (general?.data) setGeneralSettings({ ...generalSettings, ...general.data })
+        if (email?.data) setEmailSettings({ ...emailSettings, ...email.data })
+        if (security?.data) setSecuritySettings({ ...securitySettings, ...security.data })
+        if (backup?.data) setBackupSettings({ ...backupSettings, ...backup.data })
+        
+        setError(null)
+      } catch (err) {
+        console.error('Failed to fetch settings:', err)
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [settingsData])
+    
+    if (currentUser?.id) {
+      fetchAllSettings()
+    }
+  }, [currentUser?.id])
 
   // Redirect if not system admin
   useEffect(() => {
@@ -161,7 +181,9 @@ export default function SystemSettings() {
   
   // Loading and error states
   if (loading) return <LoadingSpinner message="Loading settings..." />
-  if (error) return <ErrorDisplay error={error} onRetry={retry} />
+  if (error) return <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+    <p className="text-red-800">Failed to load settings: {error}</p>
+  </div>
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">

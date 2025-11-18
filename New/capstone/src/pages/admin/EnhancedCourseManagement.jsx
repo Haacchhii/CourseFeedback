@@ -52,6 +52,9 @@ export default function EnhancedCourseManagement() {
   const [sectionSemesterFilter, setSectionSemesterFilter] = useState('all')
   const [sectionYearFilter, setSectionYearFilter] = useState('all')
   
+  // Bulk Section Selection State
+  const [selectedSections, setSelectedSections] = useState([])
+  
   const [sectionFormData, setSectionFormData] = useState({
     program_id: '',
     year_level: '',
@@ -190,30 +193,8 @@ export default function EnhancedCourseManagement() {
     })
   }, [enhancedCourses, searchTerm, programFilter])
 
-  // Filter sections for enrollment tab
-  const filteredSections = useMemo(() => {
-    return sections.filter(section => {
-      const matchesSearch = sectionSearchTerm === '' ||
-        section.subject_code?.toLowerCase().includes(sectionSearchTerm.toLowerCase()) ||
-        section.subject_name?.toLowerCase().includes(sectionSearchTerm.toLowerCase()) ||
-        section.class_code?.toLowerCase().includes(sectionSearchTerm.toLowerCase()) ||
-        section.classCode?.toLowerCase().includes(sectionSearchTerm.toLowerCase()) ||
-        section.instructor_name?.toLowerCase().includes(sectionSearchTerm.toLowerCase()) ||
-        section.instructorName?.toLowerCase().includes(sectionSearchTerm.toLowerCase())
-      
-      // Support both snake_case and camelCase
-      const programCode = section.program_code || section.programCode
-      const matchesProgram = sectionProgramFilter === 'all' || programCode === sectionProgramFilter
-      
-      const semester = section.semester || section.semester
-      const matchesSemester = sectionSemesterFilter === 'all' || semester === parseInt(sectionSemesterFilter) || semester === sectionSemesterFilter
-      
-      const yearLevel = section.year_level || section.yearLevel
-      const matchesYear = sectionYearFilter === 'all' || yearLevel === parseInt(sectionYearFilter) || yearLevel === sectionYearFilter
-      
-      return matchesSearch && matchesProgram && matchesSemester && matchesYear
-    })
-  }, [sections, sectionSearchTerm, sectionProgramFilter, sectionSemesterFilter, sectionYearFilter])
+  // Server now handles filtering, use sections directly
+  const filteredSections = sections
 
   // Paginated sections (15 per page)
   const paginatedSections = useMemo(() => {
@@ -223,6 +204,13 @@ export default function EnhancedCourseManagement() {
   }, [filteredSections, sectionCurrentPage, sectionPageSize])
 
   const sectionTotalPages = Math.ceil(filteredSections.length / sectionPageSize)
+
+  // Load sections when enrollment tab is active or filters change
+  useEffect(() => {
+    if (activeTab === 'enrollment') {
+      loadSections()
+    }
+  }, [activeTab, sectionSearchTerm, sectionProgramFilter, sectionSemesterFilter, sectionYearFilter])
 
   // Reset to page 1 when filters change
   useEffect(() => {
@@ -652,7 +640,10 @@ export default function EnhancedCourseManagement() {
   const loadSections = async () => {
     try {
       const response = await adminAPI.getSections({
-        program_id: programFilter !== 'all' ? programFilter : null
+        search: sectionSearchTerm || undefined,
+        program_code: sectionProgramFilter !== 'all' ? sectionProgramFilter : undefined,
+        year_level: sectionYearFilter !== 'all' ? parseInt(sectionYearFilter) : undefined,
+        semester: sectionSemesterFilter !== 'all' ? parseInt(sectionSemesterFilter) : undefined
       })
       setSections(response?.data || [])
     } catch (err) {
@@ -1164,6 +1155,128 @@ student2@example.com,IT-PROG1-2024,email,
     }
   }
 
+  // Bulk Section Actions
+  const handleSelectSection = (sectionId) => {
+    setSelectedSections(prev => 
+      prev.includes(sectionId) 
+        ? prev.filter(id => id !== sectionId)
+        : [...prev, sectionId]
+    )
+  }
+
+  const handleSelectAllSections = () => {
+    if (selectedSections.length === paginatedSections.length) {
+      setSelectedSections([])
+    } else {
+      setSelectedSections(paginatedSections.map(s => s.id))
+    }
+  }
+
+  const handleBulkDeleteSections = async () => {
+    if (selectedSections.length === 0) {
+      alert('Please select sections to delete')
+      return
+    }
+
+    const sectionNames = sections
+      .filter(s => selectedSections.includes(s.id))
+      .map(s => s.class_code)
+      .join(', ')
+
+    if (!window.confirm(`⚠️ DELETE ${selectedSections.length} Section(s)?\n\nSections: ${sectionNames}\n\nThis will remove all student enrollments in these sections.\n\nThis action CANNOT be undone!`)) {
+      return
+    }
+
+    try {
+      setSubmitting(true)
+      let successCount = 0
+      let failCount = 0
+
+      for (const sectionId of selectedSections) {
+        try {
+          await adminAPI.deleteSection(sectionId)
+          successCount++
+        } catch (err) {
+          failCount++
+          console.error(`Failed to delete section ${sectionId}:`, err)
+        }
+      }
+
+      await loadSections()
+      setSelectedSections([])
+      alert(`✅ Bulk Delete Complete:\n${successCount} section(s) deleted successfully${failCount > 0 ? `\n${failCount} section(s) failed to delete` : ''}`)
+    } catch (err) {
+      console.error('Bulk delete error:', err)
+      alert(`Failed to delete sections: ${err.message}`)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleBulkActivateSections = async () => {
+    if (selectedSections.length === 0) {
+      alert('Please select sections to activate')
+      return
+    }
+
+    try {
+      setSubmitting(true)
+      let successCount = 0
+      let failCount = 0
+
+      for (const sectionId of selectedSections) {
+        try {
+          await adminAPI.updateSection(sectionId, { is_active: true })
+          successCount++
+        } catch (err) {
+          failCount++
+          console.error(`Failed to activate section ${sectionId}:`, err)
+        }
+      }
+
+      await loadSections()
+      setSelectedSections([])
+      alert(`✅ Bulk Activate Complete:\n${successCount} section(s) activated successfully${failCount > 0 ? `\n${failCount} section(s) failed to activate` : ''}`)
+    } catch (err) {
+      console.error('Bulk activate error:', err)
+      alert(`Failed to activate sections: ${err.message}`)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleBulkDeactivateSections = async () => {
+    if (selectedSections.length === 0) {
+      alert('Please select sections to deactivate')
+      return
+    }
+
+    try {
+      setSubmitting(true)
+      let successCount = 0
+      let failCount = 0
+
+      for (const sectionId of selectedSections) {
+        try {
+          await adminAPI.updateSection(sectionId, { is_active: false })
+          successCount++
+        } catch (err) {
+          failCount++
+          console.error(`Failed to deactivate section ${sectionId}:`, err)
+        }
+      }
+
+      await loadSections()
+      setSelectedSections([])
+      alert(`✅ Bulk Deactivate Complete:\n${successCount} section(s) deactivated successfully${failCount > 0 ? `\n${failCount} section(s) failed to deactivate` : ''}`)
+    } catch (err) {
+      console.error('Bulk deactivate error:', err)
+      alert(`Failed to deactivate sections: ${err.message}`)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   // Load sections when enrollment tab is active
   useEffect(() => {
     if (activeTab === 'enrollment') {
@@ -1373,7 +1486,6 @@ student2@example.com,IT-PROG1-2024,email,
                       </th>
                       <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Code</th>
                       <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Course Name</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Instructor</th>
                       <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Program</th>
                       <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Students</th>
                       <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Rating</th>
@@ -1397,7 +1509,6 @@ student2@example.com,IT-PROG1-2024,email,
                           <div className="font-medium text-gray-900">{course.name}</div>
                           <div className="text-xs text-gray-500">Year {course.yearLevel} • {course.semester}</div>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{course.instructor}</td>
                         <td className="px-6 py-4 text-sm text-gray-600">{course.program}</td>
                         <td className="px-6 py-4">
                           <div className="text-sm font-semibold text-gray-900">{course.enrolledStudents || 0}</div>
@@ -1593,6 +1704,57 @@ student2@example.com,IT-PROG1-2024,email,
               </div>
             </div>
 
+            {/* Bulk Actions Bar */}
+            {selectedSections.length > 0 && (
+              <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-4 mb-4 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <span className="text-white font-semibold">
+                      {selectedSections.length} section(s) selected
+                    </span>
+                    <button
+                      onClick={() => setSelectedSections([])}
+                      className="text-white/80 hover:text-white text-sm underline"
+                    >
+                      Clear selection
+                    </button>
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={handleBulkActivateSections}
+                      disabled={submitting}
+                      className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-semibold transition-all disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                      </svg>
+                      <span>Activate</span>
+                    </button>
+                    <button
+                      onClick={handleBulkDeactivateSections}
+                      disabled={submitting}
+                      className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-semibold transition-all disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
+                      </svg>
+                      <span>Deactivate</span>
+                    </button>
+                    <button
+                      onClick={handleBulkDeleteSections}
+                      disabled={submitting}
+                      className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold transition-all disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                      </svg>
+                      <span>Delete</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {submitting && !showSectionModal ? (
               <div className="text-center py-8">
                 <LoadingSpinner />
@@ -1609,12 +1771,40 @@ student2@example.com,IT-PROG1-2024,email,
               </div>
             ) : (
               <>
+                {/* Select All Checkbox */}
+                <div className="mb-4 flex items-center space-x-2 bg-gray-50 rounded-lg p-3">
+                  <input
+                    type="checkbox"
+                    checked={paginatedSections.length > 0 && selectedSections.length === paginatedSections.length}
+                    onChange={handleSelectAllSections}
+                    className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                  />
+                  <label className="text-sm font-semibold text-gray-700 cursor-pointer" onClick={handleSelectAllSections}>
+                    Select All ({paginatedSections.length} on this page)
+                  </label>
+                </div>
+
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {paginatedSections.map(section => (
                   <div
                     key={section.id}
-                    className="border-2 border-gray-200 rounded-xl p-4 hover:shadow-lg transition-all relative group"
+                    className={`border-2 rounded-xl p-4 hover:shadow-lg transition-all relative group ${
+                      selectedSections.includes(section.id) 
+                        ? 'border-indigo-500 bg-indigo-50' 
+                        : 'border-gray-200'
+                    }`}
                   >
+                    {/* Selection Checkbox */}
+                    <div className="absolute top-2 left-2 z-10">
+                      <input
+                        type="checkbox"
+                        checked={selectedSections.includes(section.id)}
+                        onChange={() => handleSelectSection(section.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                      />
+                    </div>
+
                     {/* Action Buttons */}
                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button

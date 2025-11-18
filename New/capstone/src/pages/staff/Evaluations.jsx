@@ -176,9 +176,14 @@ export default function Evaluations() {
         ...evaluation,
         courseName: course?.name || 'Unknown Course',
         courseProgram: course?.program || 'Unknown',
-        instructor: course?.instructor || 'Unknown',
         avgRating,
-        submittedDate
+        submittedDate: evaluation.submission_date 
+          ? new Date(evaluation.submission_date).toLocaleDateString('en-US', { 
+              year: 'numeric', 
+              month: '2-digit', 
+              day: '2-digit' 
+            })
+          : submittedDate
       }
     })
   }, [evaluations, courses])
@@ -189,8 +194,7 @@ export default function Evaluations() {
       const matchesSearch = searchTerm === '' || 
         evaluation.courseName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         evaluation.student.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        evaluation.comment.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        evaluation.instructor.toLowerCase().includes(searchTerm.toLowerCase())
+        evaluation.comment.toLowerCase().includes(searchTerm.toLowerCase())
       
       const matchesProgram = programFilter === 'all' || evaluation.courseProgram === programFilter
       const matchesSentiment = sentimentFilter === 'all' || evaluation.sentiment === sentimentFilter
@@ -640,24 +644,15 @@ export default function Evaluations() {
                 {filteredEvaluations.map((evaluation, index) => (
                   <tr key={evaluation.id || index} className="hover:bg-gray-50 transition-colors duration-200">
                     <td className="px-6 py-4">
-                      <div>
-                        <div className="text-sm font-semibold text-gray-900">
-                          {evaluation.courseName.length > 30 
-                            ? evaluation.courseName.substring(0, 30) + '...' 
-                            : evaluation.courseName
-                          }
-                        </div>
-                        <div className="text-xs text-gray-500 flex items-center mt-1">
-                          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"></path>
-                          </svg>
-                          {evaluation.instructor}
-                        </div>
+                      <div className="text-sm font-semibold text-gray-900">
+                        {evaluation.courseName.length > 40 
+                          ? evaluation.courseName.substring(0, 40) + '...' 
+                          : evaluation.courseName
+                        }
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{evaluation.student}</div>
-                      <div className="text-xs text-gray-500">Student ID: #{index + 1001}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full ${
