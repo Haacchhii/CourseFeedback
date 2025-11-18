@@ -64,7 +64,20 @@ export default function Login(){
       const response = await authAPI.login(lower, pw)
       
       if (response.success && response.token && response.user) {
-        // Check if user must change password on first login
+        // Check if this is first-time login (redirect to password change page)
+        if (response.user.firstLogin) {
+          // Navigate to first-time login page with user data and temp password
+          nav('/first-time-login', { 
+            state: { 
+              user: response.user, 
+              tempPassword: pw  // Pass the temp password they just used
+            } 
+          })
+          setLoading(false)
+          return
+        }
+        
+        // Check if user must change password on first login (legacy support)
         if (response.user.mustChangePassword) {
           // Store temp data and show password change modal
           setTempUser(response.user)

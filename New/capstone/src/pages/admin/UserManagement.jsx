@@ -27,6 +27,7 @@ export default function UserManagement() {
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [programFilter, setProgramFilter] = useState('all')
+  const [yearLevelFilter, setYearLevelFilter] = useState('all')
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showBulkImportModal, setShowBulkImportModal] = useState(false)
@@ -48,6 +49,7 @@ export default function UserManagement() {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    school_id: '',
     role: 'student',
     program: 'BSIT',
     yearLevel: 1,
@@ -114,18 +116,27 @@ export default function UserManagement() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [roleFilter, statusFilter, searchTerm])
+  }, [roleFilter, statusFilter, searchTerm, yearLevelFilter])
 
   // Client-side filtering for program only (server handles role, status, search)
   const filteredUsers = useMemo(() => {
-    if (programFilter === 'all') return allUsers
-    
     return allUsers.filter(user => {
-      if (user.program === programFilter) return true
-      if (user.assignedPrograms && user.assignedPrograms.includes(programFilter)) return true
-      return false
+      // Program filter
+      if (programFilter !== 'all') {
+        const matchesProgram = user.program === programFilter || 
+          (user.assignedPrograms && user.assignedPrograms.includes(programFilter))
+        if (!matchesProgram) return false
+      }
+      
+      // Year level filter (only for students)
+      if (yearLevelFilter !== 'all' && user.role === 'student') {
+        const userYearLevel = user.year_level || user.yearLevel
+        if (userYearLevel !== parseInt(yearLevelFilter)) return false
+      }
+      
+      return true
     })
-  }, [allUsers, programFilter])
+  }, [allUsers, programFilter, yearLevelFilter])
 
   // Use filteredUsers directly (server-side pagination already applied)
   const paginatedUsers = filteredUsers
@@ -200,7 +211,7 @@ export default function UserManagement() {
 
         // Parse header
         const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
-        const requiredHeaders = ['email', 'first_name', 'last_name', 'role']
+        const requiredHeaders = ['email', 'first_name', 'last_name', 'school_id', 'role']
         const missingHeaders = requiredHeaders.filter(h => !headers.includes(h))
         
         if (missingHeaders.length > 0) {
@@ -226,6 +237,7 @@ export default function UserManagement() {
           if (!row.email || !row.email.includes('@')) rowErrors.push('Invalid email')
           if (!row.first_name) rowErrors.push('Missing first name')
           if (!row.last_name) rowErrors.push('Missing last name')
+          if (!row.school_id || row.school_id.trim() === '') rowErrors.push('Missing school_id')
           if (!validRoles.includes(row.role)) rowErrors.push(`Invalid role: ${row.role}`)
           
           if (row.role === 'student') {
@@ -355,7 +367,7 @@ export default function UserManagement() {
   }
 
   const downloadCSVTemplate = () => {
-    const template = `email,first_name,last_name,role,program,year_level,student_number,password\nstudent@example.com,John,Doe,student,BSIT,1,2024001,\ninstructor@example.com,Jane,Smith,instructor,,,,\nsecretary@example.com,Bob,Johnson,secretary,,,,\n`
+    const template = `email,first_name,last_name,school_id,role,program,year_level\niturraldejose@lpubatangas.edu.ph,Jose,Iturralde,23130778,student,BSIT,1\njuandelacruz@lpubatangas.edu.ph,Juan,Dela Cruz,23140001,student,BSCS,2\nsecretary@lpubatangas.edu.ph,Maria,Santos,20100001,secretary,,,\ndepthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,,\n`
     const blob = new Blob([template], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -412,20 +424,19 @@ export default function UserManagement() {
         programId = matchingProgram?.id
       }
       
-      // Prepare API payload matching backend UserCreate model
-      // For students, password will be auto-generated on backend as Lpub@{student_number}
-      const userData = {
-        email: formData.email,
-        first_name: firstName,
-        last_name: lastName,
-        role: formData.role,
-        password: formData.role === 'student' ? 'temp' : (formData.password || 'changeme123'), // Backend will override for students
-        department: formData.department || null,
-        program_id: programId,
-        year_level: formData.yearLevel || 1
-      }
-      
-      const response = await adminAPI.createUser(userData)
+        // Prepare API payload matching backend UserCreate model
+        // For students, password will be auto-generated on backend as lpub@{school_id}
+        const userData = {
+          email: formData.email,
+          first_name: firstName,
+          last_name: lastName,
+          school_id: formData.school_id || null,
+          role: formData.role,
+          password: formData.role === 'student' ? 'temp' : (formData.password || 'changeme123'), // Backend will override for students
+          department: formData.department || null,
+          program_id: programId,
+          year_level: formData.yearLevel || 1
+        }      const response = await adminAPI.createUser(userData)
       
       // Trigger data reload
       retry()
@@ -501,16 +512,49 @@ export default function UserManagement() {
     }
   }
 
-  const handleBulkAction = (action) => {
+  const handleBulkAction = async (action) => {
     if (selectedUsers.length === 0) {
       alert('Please select users first')
       return
     }
     
     if (window.confirm(`${action} ${selectedUsers.length} selected users?`)) {
-      // In real app: await api.bulkAction(action, selectedUsers)
-      alert(`${action} completed for ${selectedUsers.length} users`)
-      setSelectedUsers([])
+      try {
+        setSubmitting(true)
+        
+        // Get user IDs from emails
+        const userIds = paginatedUsers
+          .filter(u => selectedUsers.includes(u.email))
+          .map(u => u.id)
+        
+        // Execute action based on type
+        if (action === 'Activate') {
+          await Promise.all(userIds.map(id => adminAPI.activateUser(id)))
+        } else if (action === 'Deactivate') {
+          await Promise.all(userIds.map(id => adminAPI.deactivateUser(id)))
+        } else if (action === 'Delete') {
+          await Promise.all(userIds.map(id => adminAPI.deleteUser(id)))
+        } else if (action === 'Reset Password') {
+          const newPassword = window.prompt(`Enter new password for ${selectedUsers.length} users (minimum 8 characters):`, 'changeme123')
+          if (!newPassword || newPassword.length < 8) {
+            alert('Password must be at least 8 characters long')
+            setSubmitting(false)
+            return
+          }
+          await Promise.all(userIds.map(id => adminAPI.resetPassword(id, newPassword)))
+        }
+        
+        alert(`${action} completed for ${selectedUsers.length} users`)
+        setSelectedUsers([])
+        
+        // Reload users
+        retry()
+      } catch (err) {
+        console.error('Bulk action error:', err)
+        alert(`Failed to ${action.toLowerCase()}: ${err.message}`)
+      } finally {
+        setSubmitting(false)
+      }
     }
   }
 
@@ -666,7 +710,7 @@ export default function UserManagement() {
 
         {/* Filters */}
         <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-          <div className="grid md:grid-cols-4 gap-4">
+          <div className="grid md:grid-cols-5 gap-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">🔍 Search</label>
               <input
@@ -717,6 +761,20 @@ export default function UserManagement() {
                 <option value="Inactive">Inactive</option>
               </select>
             </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">🎓 Year Level</label>
+              <select
+                value={yearLevelFilter}
+                onChange={(e) => setYearLevelFilter(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">All Levels</option>
+                <option value="1">1st Year</option>
+                <option value="2">2nd Year</option>
+                <option value="3">3rd Year</option>
+                <option value="4">4th Year</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -730,6 +788,9 @@ export default function UserManagement() {
               </button>
               <button onClick={() => handleBulkAction('Deactivate')} className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-all">
                 Deactivate
+              </button>
+              <button onClick={() => handleBulkAction('Reset Password')} className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all">
+                Reset Password
               </button>
               <button onClick={() => handleBulkAction('Delete')} className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all">
                 Delete
@@ -921,19 +982,37 @@ export default function UserManagement() {
               </div>
 
               <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">School ID Number *</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.school_id}
+                  onChange={(e) => setFormData({...formData, school_id: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="e.g., 23130778"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  This will be used to generate the temporary password: <span className="font-mono font-semibold">lpub@{formData.school_id || 'schoolid'}</span>
+                </p>
+              </div>
+
+              <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Password {formData.role !== 'student' && '*'}
+                  Password {formData.role !== 'student' && formData.role !== 'secretary' && formData.role !== 'department_head' && '*'}
                 </label>
-                {formData.role === 'student' ? (
+                {['student', 'secretary', 'department_head'].includes(formData.role) ? (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <div className="flex items-start space-x-3">
                       <svg className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                       </svg>
                       <div className="text-sm text-blue-700">
-                        <p className="font-semibold mb-1">Auto-Generated Password</p>
-                        <p>Password will be automatically generated as: <span className="font-mono font-bold">Lpub@{formData.email.split('@')[0] || 'studentnumber'}</span></p>
-                        <p className="mt-1 text-xs text-blue-600">Student will be required to change this password on first login.</p>
+                        <p className="font-semibold mb-1">🔒 Auto-Generated Temporary Password</p>
+                        <p>Password will be: <span className="font-mono font-bold bg-blue-100 px-2 py-1 rounded">lpub@{formData.school_id || 'schoolid'}</span></p>
+                        <p className="mt-2 text-xs text-blue-600">
+                          ✅ User will receive a welcome email<br/>
+                          ✅ Required to change password on first login
+                        </p>
                       </div>
                     </div>
                   </div>

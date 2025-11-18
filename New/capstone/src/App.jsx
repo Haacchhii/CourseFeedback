@@ -7,6 +7,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Index from './pages/common/Index'
 import Login from './pages/common/Login'
 import ForgotPassword from './pages/common/ForgotPassword'
+import FirstTimeLogin from './pages/auth/FirstTimeLogin'
 import NotFound from './pages/common/NotFound'
 
 // Admin Pages (System Administration)
@@ -39,6 +40,7 @@ export default function App(){
         {/* Login Pages */}
         <Route path="/login" element={<Login/>} />
         <Route path="/forgot" element={<ForgotPassword/>} />
+        <Route path="/first-time-login" element={<FirstTimeLogin/>} />
 
         {/* Admin Dashboard (Full Control) - Protected */}
         <Route path="/admin/dashboard" element={

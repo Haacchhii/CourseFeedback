@@ -1,0 +1,22 @@
+id,email,password_hash,first_name,last_name,role,department,is_active,last_login,created_at,updated_at,must_change_password
+1,admin@lpubatangas.edu.ph,$2b$12$92YAx.x1w7naUlEHACo77OuEvQaCW/PRHrDbzDlhk1JYRPC53D53O,System,Administrator,admin,IT Administration,true,2025-11-16 13:42:38.966113,2025-11-10 12:23:07.464092,2025-11-10 12:23:07.464092,false
+2,secretary1@lpubatangas.edu.ph,$2b$12$pW.Jqt7jTidBtdIJwtf51ehMRv3yBUxJCunm4jSEO/dGkknERt/ae,Maria,Santos,secretary,Academic Affairs,true,2025-11-16 13:42:28.49106,2025-11-10 12:23:07.464092,2025-11-10 12:23:07.464092,false
+3,secretary2@lpubatangas.edu.ph,$2b$12$ttHyfBi5n56gx/sIkeMhGeDdKL.cVvxGvRZNX49F8UcKt8CF1NjaG,Ana,Cruz,secretary,Student Affairs,false,,2025-11-10 12:23:07.464092,2025-11-16 17:59:35.699942,false
+4,depthead1@lpubatangas.edu.ph,$2b$12$jdekVUdTnjG/zXZg.MHirezRSbjRR/E7/L1Po1N.9GDqB5i1zkzQm,Dr. Robert,Johnson,department_head,Computer Science,true,,2025-11-10 12:23:07.464092,2025-11-10 12:23:07.464092,false
+5,depthead2@lpubatangas.edu.ph,$2b$12$rp/93YLTChKHrolH5qMyDeLpx0xDyO8KmXXVkM1QAyMJwH0qSnpDe,Dr. Lisa,Chen,department_head,Psychology,true,,2025-11-10 12:23:07.464092,2025-11-10 12:23:07.464092,false
+6,instructor1@lpubatangas.edu.ph,$2b$12$5BvJWMkMvT1w1.XVXyd5Du08bLCTFHEdthy88kA73SSgK6nP02lwu,Prof. John,Reyes,instructor,Computer Science,true,,2025-11-10 12:23:07.464092,2025-11-10 12:23:07.464092,false
+7,instructor2@lpubatangas.edu.ph,$2b$12$FuqO3X8o6JffXgLGnSyh.OGPeUGbc.5/zJxH45BlcClDHmZaHgwGy,Prof. Sarah,Garcia,instructor,Computer Science,true,,2025-11-10 12:23:07.464092,2025-11-10 12:23:07.464092,false
+8,instructor3@lpubatangas.edu.ph,$2b$12$gxqUMcWhTGG9K4LlvdwkJOpOUp.Y83PwE3Q1cLz8bTfqAWwxwWLjW,Prof. Michael,Tan,instructor,Information Technology,true,,2025-11-10 12:23:07.464092,2025-11-10 12:23:07.464092,false
+9,instructor4@lpubatangas.edu.ph,$2b$12$TSelP5JsVJksrDNmb9X5g.t7osE2CG3Dkdw4lAH/rSVBABt/K3fdK,Prof. Emma,Villanueva,instructor,Psychology,true,,2025-11-10 12:23:07.464092,2025-11-10 12:23:07.464092,false
+10,instructor5@lpubatangas.edu.ph,$2b$12$cAv36kD9p.3k6c3BWYb9TOCGOGUbWLYgmn9NCGrQdHnfkAmDD7iru,Prof. David,Ramos,instructor,Multimedia Arts,true,,2025-11-10 12:23:07.464092,2025-11-10 12:23:07.464092,false
+11,student1@lpubatangas.edu.ph,$2b$12$NnY/oM114HGTKM0XokNpS.38ubhRXoP0gtAAwBkNHzKVMgJB/7Rx6,Juan,Dela Cruz,student,,true,,2025-11-10 12:23:07.464092,2025-11-10 12:23:07.464092,false
+12,student2@lpubatangas.edu.ph,$2b$12$GEnnTEK6DG9nRa35fptJNuK80IX2qLLNHm5ey2mvmxhbv3HsM5en.,Maria,Reyes,student,,true,,2025-11-10 12:23:07.464092,2025-11-10 12:23:07.464092,false
+13,student3@lpubatangas.edu.ph,$2b$12$tEknX3YxJ3QGuBl4NAcg0.UqoU7daTGumNKgPDb0aZ4gQSfXLY5Ae,Pedro,Santos,student,,true,,2025-11-10 12:23:07.464092,2025-11-10 12:23:07.464092,false
+14,student4@lpubatangas.edu.ph,$2b$12$cC.YJsAbaua5eHzruksF3u09yteY3MvRWT.XQAz9V5Wf4iIQ4QWAW,Ana,Garcia,student,,true,,2025-11-10 12:23:07.464092,2025-11-10 12:23:07.464092,false
+15,student5@lpubatangas.edu.ph,$2b$12$5aZGhjpcsplkU3VHwpmwj.ztw17PCaoFXxfk0Iv9hKoaQsGGZ2cqW,Carlos,Mendoza,student,,true,,2025-11-10 12:23:07.464092,2025-11-10 12:23:07.464092,false
+16,student6@lpubatangas.edu.ph,$2b$12$J6k0isYajeigfVkpcEJD5.C6VMuZ4aWf0SUTozpnfRsgAN1fwQdua,Sofia,Torres,student,,true,,2025-11-10 12:23:07.464092,2025-11-10 12:23:07.464092,false
+17,student7@lpubatangas.edu.ph,$2b$12$cseM8Zj0YQVK1uFsgVeguOu2bphkste1AUdOYnklORWZsac4cnPIa,Miguel,Cruz,student,,true,,2025-11-10 12:23:07.464092,2025-11-10 12:23:07.464092,false
+18,student8@lpubatangas.edu.ph,$2b$12$.5iwrKld11XQfsAD8ont4esuKBwUZCN6RN43.8ysXDqSYly8BWyAy,Isabella,Ramos,student,,true,,2025-11-10 12:23:07.464092,2025-11-10 12:23:07.464092,false
+19,student9@lpubatangas.edu.ph,$2b$12$rwxNPVDl.ioggVHvS17Ni.GvaQwgvJh8zW8Wx/wMzbIg9je0ETdbC,Diego,Fernandez,student,,true,,2025-11-10 12:23:07.464092,2025-11-10 12:23:07.464092,false
+20,student10@lpubatangas.edu.ph,$2b$12$fmaeEjSJmGd1HyAokjPt5ehfckurSVT.2Q6yEKh18e0KUqw8WPspy,Valentina,Lopez,student,,false,,2025-11-10 12:23:07.464092,2025-11-16 20:15:53.112915,false
+24,iturraldejose@lpubatangas.edu.ph,$2b$12$yg0jtFouejlbamKICx7HLO8c8UD3SnpUUrZIjs6BVlwFi35/ZlhW6,Jose,Irineo N. Iturralde,student,,true,,2025-11-13 17:02:27.582419,2025-11-16 20:18:49.565991,false

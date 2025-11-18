@@ -1,0 +1,6 @@
+id,user_id,name,department,specialization,created_at,updated_at
+1,6,Prof. John Reyes,Computer Science,,2025-11-10 12:23:07.464092,2025-11-10 12:23:07.464092
+2,7,Prof. Sarah Garcia,Computer Science,,2025-11-10 12:23:07.464092,2025-11-10 12:23:07.464092
+3,8,Prof. Michael Tan,Information Technology,,2025-11-10 12:23:07.464092,2025-11-10 12:23:07.464092
+4,9,Prof. Emma Villanueva,Psychology,,2025-11-10 12:23:07.464092,2025-11-10 12:23:07.464092
+5,10,Prof. David Ramos,Multimedia Arts,,2025-11-10 12:23:07.464092,2025-11-10 12:23:07.464092

@@ -1,0 +1,368 @@
+id,subject_code,subject_name,program_id,year_level,is_active,created_at,units,semester
+1,Comp 1,Introduction to Computing,1,1,true,2025-11-06 16:33:17.785722,,1
+2,Comp 2,Computer Programming 1 (Fundamentals of Programming),1,1,true,2025-11-06 16:33:17.785722,,1
+3,CS 1,Digital Design,1,1,true,2025-11-06 16:33:17.785722,,1
+4,GEC-UTS,Understanding the Self,1,1,true,2025-11-06 16:33:17.785722,,1
+5,GEC-MATH,Mathematics in the Modern World,1,1,true,2025-11-06 16:33:17.785722,,1
+6,Math 1,College Algebra,1,1,true,2025-11-06 16:33:17.785722,,1
+7,BSC 1,Being Skills Course 1,1,1,true,2025-11-06 16:33:17.785722,,1
+8,PE 1,Physical Fitness & Gymnastic,1,1,true,2025-11-06 16:33:17.785722,,1
+9,NSTP 1,National Service Training Program 1,1,1,true,2025-11-06 16:33:17.785722,,1
+10,CS 2,Computer Organization and Architecture,1,1,true,2025-11-06 16:33:17.785722,,2
+11,CS 3,Operating Systems,1,1,true,2025-11-06 16:33:17.785722,,2
+12,CS 5,Multimedia Technologies,1,1,true,2025-11-06 16:33:17.785722,,2
+13,Comp 3,Computer Programming 2 (Intermediate Programming),1,1,true,2025-11-06 16:33:17.785722,,2
+14,Math 2,Plane and Spherical Trigonometry,1,1,true,2025-11-06 16:33:17.785722,,2
+15,Math 3,Analytic Geometry,1,1,true,2025-11-06 16:33:17.785722,,2
+16,BSC 2,Being Skills Course 2,1,1,true,2025-11-06 16:33:17.785722,,2
+17,EPC,English Proficiency,1,1,true,2025-11-06 16:33:17.785722,,2
+18,PE 2,Rhythmic Activities,1,1,true,2025-11-06 16:33:17.785722,,2
+19,NSTP 2,National Service Training Program 2,1,1,true,2025-11-06 16:33:17.785722,,2
+20,CS 6,Networking 1,1,1,true,2025-11-06 16:33:17.785722,,3
+21,CS 11,Elective 1,1,1,true,2025-11-06 16:33:17.785722,,3
+22,Comp 4,Data Structures & Algorithms,1,1,true,2025-11-06 16:33:17.785722,,3
+23,PE 3,Individual & Dual Sports,1,1,true,2025-11-06 16:33:17.785722,,3
+24,CS 4,Systems Analysis and Design,1,2,true,2025-11-06 16:33:17.785722,,1
+25,CS 8,Object-Oriented Programming,1,2,true,2025-11-06 16:33:17.785722,,1
+26,CS 9,Programming Languages,1,2,true,2025-11-06 16:33:17.785722,,1
+27,CS 10,Networking 2,1,2,true,2025-11-06 16:33:17.785722,,1
+28,CS 16,Elective 2,1,2,true,2025-11-06 16:33:17.785722,,1
+29,Math 4,Differential Calculus,1,2,true,2025-11-06 16:33:17.785722,,1
+30,Math 3C,Probability and Statistics,1,2,true,2025-11-06 16:33:17.785722,,1
+31,FL,Foreign Language,1,2,true,2025-11-06 16:33:17.785722,,1
+32,GEC-STS,"Science, Technology & Society",1,2,true,2025-11-06 16:33:17.785722,,1
+33,CS 7,Project Management,1,2,true,2025-11-06 16:33:17.785722,,2
+34,CS 11A,Computational Statistics,1,2,true,2025-11-06 16:33:17.785722,,2
+35,CS 14,Networking 3,1,2,true,2025-11-06 16:33:17.785722,,2
+36,CS 15,Software Engineering,1,2,true,2025-11-06 16:33:17.785722,,2
+37,CS 18,Elective 3,1,2,true,2025-11-06 16:33:17.785722,,2
+38,CS 18A,Artificial Intelligence and Machine Learning,1,2,true,2025-11-06 16:33:17.785722,,2
+39,Comp 5,Information Management,1,2,true,2025-11-06 16:33:17.785722,,2
+40,Math 5,Integral Calculus,1,2,true,2025-11-06 16:33:17.785722,,2
+41,GEC-TCW,The Contemporary World,1,2,true,2025-11-06 16:33:17.785722,,2
+42,CS 12,Discrete Structures,1,2,true,2025-11-06 16:33:17.785722,,3
+43,CS 13,CS Thesis Writing 1,1,2,true,2025-11-06 16:33:17.785722,,3
+44,Phys 1,Calculus-based Physics 1,1,2,true,2025-11-06 16:33:17.785722,,3
+45,PE 4,Team Sports & Recreation,1,2,true,2025-11-06 16:33:17.785722,,3
+46,CS 17,Automata Theory and Formal Languages,1,3,true,2025-11-06 16:33:17.785722,,1
+47,CS 19,Elective 4,1,3,true,2025-11-06 16:33:17.785722,,1
+48,CS 21,Networking 4,1,3,true,2025-11-06 16:33:17.785722,,1
+49,CS 22,CS Thesis Writing 2,1,3,true,2025-11-06 16:33:17.785722,,1
+50,Comp 6,Application Devt. & Emerging Technologies,1,3,true,2025-11-06 16:33:17.785722,,1
+51,Phys 2,Calculus-based Physics 2,1,3,true,2025-11-06 16:33:17.785722,,1
+52,GEC-RPH,Readings in Philippine History,1,3,true,2025-11-06 16:33:17.785722,,1
+53,GEC-ART,Art Appreciation,1,3,true,2025-11-06 16:33:17.785722,,1
+54,GEC-PCOM,Purposive Communication,1,3,true,2025-11-06 16:33:17.785722,,1
+55,CS 20,Modeling and Simulation,1,3,true,2025-11-06 16:33:17.785722,,2
+56,Rizal,The Life and Works of Rizal,1,3,true,2025-11-06 16:33:17.785722,,2
+57,GEC-ETHICS,Ethics (Professional Ethics),1,3,true,2025-11-06 16:33:17.785722,,2
+58,OJT,On-the-Job Training (500 Hours),1,3,true,2025-11-06 16:33:17.785722,,2
+59,CYBER 1,Introduction to Computers and Networking,2,1,true,2025-11-06 16:33:17.785722,,1
+60,CYBER 2,Introduction to Cybersecurity,2,1,true,2025-11-06 16:33:17.785722,,1
+61,CYBER 3,Programming Fundamentals,2,1,true,2025-11-06 16:33:17.785722,,1
+62,CyberElec1,Cybersecurity Elective 1,2,1,true,2025-11-06 16:33:17.785722,,1
+63,GEC-UTS,Understanding the Self,2,1,true,2025-11-06 16:33:17.785722,,1
+64,GEC-MATH,Mathematics in the Modern World,2,1,true,2025-11-06 16:33:17.785722,,1
+65,GEC-PCOM,Purposive Communication,2,1,true,2025-11-06 16:33:17.785722,,1
+66,BSC 1,Being Skills Course 1,2,1,true,2025-11-06 16:33:17.785722,,1
+67,PE1/PATHFit1,Physical Activities Towards Health and Fitness 1: Movement Competency Training,2,1,true,2025-11-06 16:33:17.785722,,1
+68,NSTP 1,National Service Training Program 1,2,1,true,2025-11-06 16:33:17.785722,,1
+69,CYBER 4,Computer Organization,2,1,true,2025-11-06 16:33:17.785722,,2
+70,CYBER 5,Network Security,2,1,true,2025-11-06 16:33:17.785722,,2
+71,CYBER 6,Cybersecurity and Digital Forensics,2,1,true,2025-11-06 16:33:17.785722,,2
+72,CyberElec2,Cybersecurity Elective 2,2,1,true,2025-11-06 16:33:17.785722,,2
+73,GEC-ART,Art Appreciation,2,1,true,2025-11-06 16:33:17.785722,,2
+74,GEC-STS,"Science, Technology and Society",2,1,true,2025-11-06 16:33:17.785722,,2
+75,Math 1,College Algebra,2,1,true,2025-11-06 16:33:17.785722,,2
+76,BSC 2,Being Skills Course 2,2,1,true,2025-11-06 16:33:17.785722,,2
+77,PE2/PATHFit2,Physical Activities Towards Health and Fitness 2: Exercise-Based Fitness Activities,2,1,true,2025-11-06 16:33:17.785722,,2
+78,NSTP 2,National Service Training Program 2,2,1,true,2025-11-06 16:33:17.785722,,2
+79,GEC-ETHICS,Ethics (Professional Ethics),2,1,true,2025-11-06 16:33:17.785722,,3
+80,CYBER 7,Discrete Structures,2,1,true,2025-11-06 16:33:17.785722,,3
+81,Math 2,Trigonometry,2,1,true,2025-11-06 16:33:17.785722,,3
+82,CYBER 8,CCNA 1 - Networking 1,2,2,true,2025-11-06 16:33:17.785722,,1
+83,CYBER 9,Operating Systems,2,2,true,2025-11-06 16:33:17.785722,,1
+84,CYBER 10,Machine Learning and Artificial Intelligence for Cybersecurity,2,2,true,2025-11-06 16:33:17.785722,,1
+85,CYBER 11,Security-Oriented Systems Analysis and Design,2,2,true,2025-11-06 16:33:17.785722,,1
+86,CYBER 12,IT Governance and Security Planning,2,2,true,2025-11-06 16:33:17.785722,,1
+87,CYBER 13,Cryptography and Cryptanalysis,2,2,true,2025-11-06 16:33:17.785722,,1
+88,CYBER 14,Ethical Hacking and Defense Strategy,2,2,true,2025-11-06 16:33:17.785722,,1
+89,IT 2,Accounting Principles,2,2,true,2025-11-06 16:33:17.785722,,1
+90,Math 3,Analytic Geometry,2,2,true,2025-11-06 16:33:17.785722,,1
+91,PE3/PATHFit3,Physical Activities Towards Health and Fitness 3: Philippine Traditional Dances,2,2,true,2025-11-06 16:33:17.785722,,1
+92,CYBER 15,CCNA 2 - Networking 2,2,2,true,2025-11-06 16:33:17.785722,,2
+93,CYBER 16,Server Administration and Security,2,2,true,2025-11-06 16:33:17.785722,,2
+94,CYBER 17,Capstone Project 1,2,2,true,2025-11-06 16:33:17.785722,,2
+95,CYBER 18,Information Security,2,2,true,2025-11-06 16:33:17.785722,,2
+96,GEC-TCW,The Contemporary World,2,2,true,2025-11-06 16:33:17.785722,,2
+97,EPC,English Proficiency,2,2,true,2025-11-06 16:33:17.785722,,2
+98,Math 3C,Probability and Statistics,2,2,true,2025-11-06 16:33:17.785722,,2
+99,Math 4,Differential Calculus,2,2,true,2025-11-06 16:33:17.785722,,2
+100,PE4/PATHFit4,Physical Activities Towards Health and Fitness 4: Martial Arts - Taekwondo,2,2,true,2025-11-06 16:33:17.785722,,2
+101,CYBER 19,CCNA 3 - Networking 3,2,2,true,2025-11-06 16:33:17.785722,,3
+102,CyberElec3,Cybersecurity Elective 3,2,2,true,2025-11-06 16:33:17.785722,,3
+103,Math 5,Integral Calculus,2,2,true,2025-11-06 16:33:17.785722,,3
+104,CYBER 20,Legal Aspects and Issues of Cybersecurity,2,3,true,2025-11-06 16:33:17.785722,,1
+105,CYBER 21,Cyber Incident Analysis and Response,2,3,true,2025-11-06 16:33:17.785722,,1
+106,CYBER 22,Capstone Project 2,2,3,true,2025-11-06 16:33:17.785722,,1
+107,CYBER 23,Seminars and Field Trip,2,3,true,2025-11-06 16:33:17.785722,,1
+108,CyberElec4,Cybersecurity Elective 4,2,3,true,2025-11-06 16:33:17.785722,,1
+109,FL,Foreign Language,2,3,true,2025-11-06 16:33:17.785722,,1
+110,Rizal,The Life and Works of Rizal,2,3,true,2025-11-06 16:33:17.785722,,1
+111,GEC-RPH,Readings in Philippine History,2,3,true,2025-11-06 16:33:17.785722,,1
+112,Phys 1,Calculus-based Physics 1,2,3,true,2025-11-06 16:33:17.785722,,1
+113,CYBER 24,OJT/Practicum for Cybersecurity (600 hours),2,3,true,2025-11-06 16:33:17.785722,,2
+114,Comp 1,Introduction to Computing,3,1,true,2025-11-06 16:33:17.785722,,1
+115,Comp 2,Computer Programming 1 (Fundamentals of Programming),3,1,true,2025-11-06 16:33:17.785722,,1
+116,GEC-UTS,Understanding the Self,3,1,true,2025-11-06 16:33:17.785722,,1
+117,GEC-MATH,Mathematics in the Modern World,3,1,true,2025-11-06 16:33:17.785722,,1
+118,GEC-TCW,The Contemporary World,3,1,true,2025-11-06 16:33:17.785722,,1
+119,GEC-ART,Art Appreciation,3,1,true,2025-11-06 16:33:17.785722,,1
+120,BSC 1,Being Skills Course 1,3,1,true,2025-11-06 16:33:17.785722,,1
+121,PE 1,Physical Fitness & Gymnastic,3,1,true,2025-11-06 16:33:17.785722,,1
+122,NSTP 1,National Service Training Program 1,3,1,true,2025-11-06 16:33:17.785722,,1
+123,Comp 3,Computer Programming 2 (Intermediate Programming),3,1,true,2025-11-06 16:33:17.785722,,2
+124,IT 1,Computer Organization,3,1,true,2025-11-06 16:33:17.785722,,2
+125,IT 3,Elective 1,3,1,true,2025-11-06 16:33:17.785722,,2
+126,GEC-PCOM,Purposive Communication,3,1,true,2025-11-06 16:33:17.785722,,2
+127,GEC-STS,"Science, Technology and Society",3,1,true,2025-11-06 16:33:17.785722,,2
+128,EPC,English Proficiency,3,1,true,2025-11-06 16:33:17.785722,,2
+129,Math 1,College Algebra,3,1,true,2025-11-06 16:33:17.785722,,2
+130,BSC 2,Being Skills Course 2,3,1,true,2025-11-06 16:33:17.785722,,2
+131,PE 2,Rhythmic Activities,3,1,true,2025-11-06 16:33:17.785722,,2
+132,NSTP 2,National Service Training Program 2,3,1,true,2025-11-06 16:33:17.785722,,2
+133,Comp 4,Data Structures and Algorithms,3,1,true,2025-11-06 16:33:17.785722,,3
+134,IT 5,Operating Systems,3,1,true,2025-11-06 16:33:17.785722,,3
+135,Math 2,Trigonometry,3,1,true,2025-11-06 16:33:17.785722,,3
+136,GEC-ETHICS,Ethics (Professional Ethics),3,2,true,2025-11-06 16:33:17.785722,,1
+137,IT 2,Accounting Principles,3,2,true,2025-11-06 16:33:17.785722,,1
+138,IT 4,Elective 2,3,2,true,2025-11-06 16:33:17.785722,,1
+139,IT 6,Networking 1,3,2,true,2025-11-06 16:33:17.785722,,1
+140,IT 7,Object-Oriented Programming,3,2,true,2025-11-06 16:33:17.785722,,1
+141,IT 8,Web Systems and Technologies,3,2,true,2025-11-06 16:33:17.785722,,1
+142,IT 9,Systems Analysis & Design,3,2,true,2025-11-06 16:33:17.785722,,1
+143,Math 3,Analytic Geometry,3,2,true,2025-11-06 16:33:17.785722,,1
+144,PE 3,Individual & Dual Sports,3,2,true,2025-11-06 16:33:17.785722,,1
+145,Comp 5,Information Management,3,2,true,2025-11-06 16:33:17.785722,,2
+146,IT 10,Human Computer Interaction (HCI),3,2,true,2025-11-06 16:33:17.785722,,2
+147,IT 11,Networking 2,3,2,true,2025-11-06 16:33:17.785722,,2
+148,IT 12,Elective 3,3,2,true,2025-11-06 16:33:17.785722,,2
+149,IT 14,Capstone Project 1,3,2,true,2025-11-06 16:33:17.785722,,2
+150,GEC-RPH,Readings in Philippine History,3,2,true,2025-11-06 16:33:17.785722,,2
+151,Math 3C,Probability and Statistics,3,2,true,2025-11-06 16:33:17.785722,,2
+152,Math 4,Differential Calculus,3,2,true,2025-11-06 16:33:17.785722,,2
+153,PE 4,Team Sports & Recreation,3,2,true,2025-11-06 16:33:17.785722,,2
+154,IT 13,Elective 4,3,2,true,2025-11-06 16:33:17.785722,,3
+155,IT 15,Networking 3,3,2,true,2025-11-06 16:33:17.785722,,3
+156,Math 5,Integral Calculus,3,2,true,2025-11-06 16:33:17.785722,,3
+157,Comp 6,Applications Development and Emerging Technologies,3,3,true,2025-11-06 16:33:17.785722,,1
+158,IT 16,Discrete Structures,3,3,true,2025-11-06 16:33:17.785722,,1
+159,IT 17,Computer Troubleshooting and Repair,3,3,true,2025-11-06 16:33:17.785722,,1
+160,IT 20,Networking 4,3,3,true,2025-11-06 16:33:17.785722,,1
+161,IT 21,Capstone Project 2 - Technopreneurship,3,3,true,2025-11-06 16:33:17.785722,,1
+162,FL,Foreign Language,3,3,true,2025-11-06 16:33:17.785722,,1
+163,Rizal,The Life and Works of Rizal,3,3,true,2025-11-06 16:33:17.785722,,1
+164,Phys 1,Calculus-based Physics 1,3,3,true,2025-11-06 16:33:17.785722,,1
+165,IT 18,OJT / Internship (600 hours),3,3,true,2025-11-06 16:33:17.785722,,2
+166,IT 19,Seminars & Field Trip,3,3,true,2025-11-06 16:33:17.785722,,2
+167,Phys 2,Calculus-based Physics 2,3,3,true,2025-11-06 16:33:17.785722,,2
+168,GEC-UTS,Understanding the Self,4,1,true,2025-11-06 16:33:17.785722,,1
+169,GEC-PCOM,Purposive Communication,4,1,true,2025-11-06 16:33:17.785722,,1
+170,JPL,Life and Works of Jose P. Laurel,4,1,true,2025-11-06 16:33:17.785722,,1
+171,PSY 1,Introduction to Psychology,4,1,true,2025-11-06 16:33:17.785722,,1
+172,EDUC 1,The Child and Adolescent Learners and Learning Principles,4,1,true,2025-11-06 16:33:17.785722,,1
+173,PE 1,Physical Fitness and Gymnastic,4,1,true,2025-11-06 16:33:17.785722,,1
+174,NSTP 1,National Service Training Program 1,4,1,true,2025-11-06 16:33:17.785722,,1
+175,BSC 1,Being Skills Course 1,4,1,true,2025-11-06 16:33:17.785722,,1
+176,GEC-MATH,Mathematics in the Modern World,4,1,true,2025-11-06 16:33:17.785722,,2
+177,GEC-RPH,Readings in Philippine History,4,1,true,2025-11-06 16:33:17.785722,,2
+178,PSY 2,Psychological Statistics,4,1,true,2025-11-06 16:33:17.785722,,2
+179,PSY 3,Developmental Psychology,4,1,true,2025-11-06 16:33:17.785722,,2
+180,PE 2,Rhythmic Activities,4,1,true,2025-11-06 16:33:17.785722,,2
+181,NSTP 2,National Service Training Program 2,4,1,true,2025-11-06 16:33:17.785722,,2
+182,BSC 2,Being Skills Course 2,4,1,true,2025-11-06 16:33:17.785722,,2
+183,GEC-TCW,The Contemporary World,4,2,true,2025-11-06 16:33:17.785722,,1
+184,GEC-ART,Art Appreciation,4,2,true,2025-11-06 16:33:17.785722,,1
+185,PSY 4,Sikolohiyang Pilipino,4,2,true,2025-11-06 16:33:17.785722,,1
+186,PSY 5,Theories of Personality,4,2,true,2025-11-06 16:33:17.785722,,1
+187,PSY 6,Social Psychology,4,2,true,2025-11-06 16:33:17.785722,,1
+188,ANA PHY,Anatomy and Physiology,4,2,true,2025-11-06 16:33:17.785722,,1
+189,EPC,English Proficiency Course,4,2,true,2025-11-06 16:33:17.785722,,1
+190,PE 3,Individual and Dual Sports,4,2,true,2025-11-06 16:33:17.785722,,1
+191,GEC-ETHICS,Ethics,4,2,true,2025-11-06 16:33:17.785722,,2
+192,GEC-STS,Science Technology & Society,4,2,true,2025-11-06 16:33:17.785722,,2
+193,PSY 7,Physiological Psychology,4,2,true,2025-11-06 16:33:17.785722,,2
+194,PSY 8,Cognitive Psychology,4,2,true,2025-11-06 16:33:17.785722,,2
+195,PSY 9,Experimental Psychology,4,2,true,2025-11-06 16:33:17.785722,,2
+196,Zoo,Zoology,4,2,true,2025-11-06 16:33:17.785722,,2
+197,PE 4,Team Sports and Recreation,4,2,true,2025-11-06 16:33:17.785722,,2
+198,PSY 10,Field Methods in Psychology,4,3,true,2025-11-06 16:33:17.785722,,1
+199,PSY 11,Abnormal Psychology,4,3,true,2025-11-06 16:33:17.785722,,1
+200,Chem 1,Inorganic and Organic Chemistry,4,3,true,2025-11-06 16:33:17.785722,,1
+201,EDUC 7,Facilitating Learner Centered Teaching,4,3,true,2025-11-06 16:33:17.785722,,1
+202,Rizal,"Life, Works and Writings of Rizal",4,3,true,2025-11-06 16:33:17.785722,,1
+203,VE,Values Education,4,3,true,2025-11-06 16:33:17.785722,,2
+204,Physics,General Physics,4,3,true,2025-11-06 16:33:17.785722,,2
+205,PSY 12,Psychological Assessment,4,3,true,2025-11-06 16:33:17.785722,,2
+206,PSY 13,Industrial/Organizational Psychology,4,3,true,2025-11-06 16:33:17.785722,,2
+207,PSY 14A,Research in Psychology 1,4,3,true,2025-11-06 16:33:17.785722,,2
+208,Psy Elec 1,Positive Psychology,4,4,true,2025-11-06 16:33:17.785722,,1
+209,SPED,Special Education,4,4,true,2025-11-06 16:33:17.785722,,1
+210,Psy Elec 2,Educational Psychology,4,4,true,2025-11-06 16:33:17.785722,,1
+211,PSY 14B,Research in Psychology 2,4,4,true,2025-11-06 16:33:17.785722,,1
+212,Psy Elec 3,Introduction to Counseling,4,4,true,2025-11-06 16:33:17.785722,,1
+213,FL,Foreign Language,4,4,true,2025-11-06 16:33:17.785722,,1
+214,PSY 15,Special Topic in Psychology 1,4,4,true,2025-11-06 16:33:17.785722,,2
+215,PSY 16,Special Topic in Psychology 2,4,4,true,2025-11-06 16:33:17.785722,,2
+216,PSY 17,Practicum in Psychology,4,4,true,2025-11-06 16:33:17.785722,,2
+217,GEC-UTS,Understanding the Self,5,1,true,2025-11-06 16:33:17.785722,,1
+218,GEC-PCOM,Purposive Communication,5,1,true,2025-11-06 16:33:17.785722,,1
+219,JPL,Life and Works of Jose P. Laurel,5,1,true,2025-11-06 16:33:17.785722,,1
+220,PSY 1,Introduction to Psychology,5,1,true,2025-11-06 16:33:17.785722,,1
+221,EDUC 1,The Child and Adolescent Learners and Learning Principles,5,1,true,2025-11-06 16:33:17.785722,,1
+222,BSC 1,Being Skills Course,5,1,true,2025-11-06 16:33:17.785722,,1
+223,PE 1,Physical Fitness and Gymnastic,5,1,true,2025-11-06 16:33:17.785722,,1
+224,NSTP 1,National Service Training Program 1,5,1,true,2025-11-06 16:33:17.785722,,1
+225,GEC-MATH,Mathematics in the Modern World,5,1,true,2025-11-06 16:33:17.785722,,2
+226,GEC-RPH,Readings in Philippine History,5,1,true,2025-11-06 16:33:17.785722,,2
+227,PSY 2,Psychological Statistics,5,1,true,2025-11-06 16:33:17.785722,,2
+228,PSY 3,Developmental Psychology,5,1,true,2025-11-06 16:33:17.785722,,2
+229,BSC 2,Being Skills Course 2,5,1,true,2025-11-06 16:33:17.785722,,2
+230,PE 2,Rhythmic Activities,5,1,true,2025-11-06 16:33:17.785722,,2
+231,NSTP 2,National Service Training Program 2,5,1,true,2025-11-06 16:33:17.785722,,2
+232,GEC-TCW,The Contemporary World,5,2,true,2025-11-06 16:33:17.785722,,1
+233,GEC-ART,Art Appreciation,5,2,true,2025-11-06 16:33:17.785722,,1
+234,EPC,English Proficiency Course,5,2,true,2025-11-06 16:33:17.785722,,1
+235,PSY 4,Sikolohiyang Pilipino,5,2,true,2025-11-06 16:33:17.785722,,1
+236,PSY 5,Theories of Personality,5,2,true,2025-11-06 16:33:17.785722,,1
+237,PSY 6,Social Psychology,5,2,true,2025-11-06 16:33:17.785722,,1
+238,PE 3,Individual and Dual Sports,5,2,true,2025-11-06 16:33:17.785722,,1
+239,GEC-ETHICS,Ethics,5,2,true,2025-11-06 16:33:17.785722,,2
+240,GEC-STS,Science Technology & Society,5,2,true,2025-11-06 16:33:17.785722,,2
+241,PSY 7,Physiological Psychology,5,2,true,2025-11-06 16:33:17.785722,,2
+242,PSY 8,Cognitive Psychology,5,2,true,2025-11-06 16:33:17.785722,,2
+243,PSY 9,Experimental Psychology,5,2,true,2025-11-06 16:33:17.785722,,2
+244,PE 4,Team Sports and Recreation,5,2,true,2025-11-06 16:33:17.785722,,2
+245,PSY 10,Field Methods in Psychology,5,3,true,2025-11-06 16:33:17.785722,,1
+246,PSY 11,Abnormal Psychology,5,3,true,2025-11-06 16:33:17.785722,,1
+247,EDUC 7,Facilitating Learner Centered Teaching,5,3,true,2025-11-06 16:33:17.785722,,1
+248,RIZAL,"Life, Works and Writings of Rizal",5,3,true,2025-11-06 16:33:17.785722,,1
+249,VE,Values Education,5,3,true,2025-11-06 16:33:17.785722,,2
+250,PSY 12,Psychological Assessment,5,3,true,2025-11-06 16:33:17.785722,,2
+251,PSY 13,Industrial/Organizational Psychology,5,3,true,2025-11-06 16:33:17.785722,,2
+252,PSY 14A,Research in Psychology 1,5,3,true,2025-11-06 16:33:17.785722,,2
+253,PSY ELEC 1,Positive Psychology,5,4,true,2025-11-06 16:33:17.785722,,1
+254,SPED,Special Education,5,4,true,2025-11-06 16:33:17.785722,,1
+255,PSY ELEC 2,Educational Psychology,5,4,true,2025-11-06 16:33:17.785722,,1
+256,PSY 14B,Research in Psychology 2,5,4,true,2025-11-06 16:33:17.785722,,1
+257,PSY ELEC 3,Introduction to Counseling,5,4,true,2025-11-06 16:33:17.785722,,1
+258,FL,Foreign Language,5,4,true,2025-11-06 16:33:17.785722,,1
+259,PSY 15,Special Topic in Psychology 1,5,4,true,2025-11-06 16:33:17.785722,,2
+260,PSY 16,Special Topic in Psychology 2,5,4,true,2025-11-06 16:33:17.785722,,2
+261,PSY 17,Practicum in Psychology,5,4,true,2025-11-06 16:33:17.785722,,2
+262,GEC-UTS,Understanding the Self,6,1,true,2025-11-06 16:33:17.785722,,1
+263,GEC-PCOM,Purposive Communication,6,1,true,2025-11-06 16:33:17.785722,,1
+264,MMA 1,Introduction to Multimedia Arts,6,1,true,2025-11-06 16:33:17.785722,,1
+265,MMA 2,Drawing 1,6,1,true,2025-11-06 16:33:17.785722,,1
+266,MMA 3,Color Theory,6,1,true,2025-11-06 16:33:17.785722,,1
+267,JPL,Life and Works of Jose P. Laurel,6,1,true,2025-11-06 16:33:17.785722,,1
+268,BSC 1,Being Skills Course 1,6,1,true,2025-11-06 16:33:17.785722,,1
+269,NSTP 1,National Service Training Program 1,6,1,true,2025-11-06 16:33:17.785722,,1
+270,PE 1,Physical Fitness and Gymnastic,6,1,true,2025-11-06 16:33:17.785722,,1
+271,GEC-RPH,Readings in Phil. History,6,1,true,2025-11-06 16:33:17.785722,,2
+272,GEC-MATH,Mathematics in the Modern World,6,1,true,2025-11-06 16:33:17.785722,,2
+273,MMA 4,Drawing 2,6,1,true,2025-11-06 16:33:17.785722,,2
+274,MMA 5,History of Graphic Design,6,1,true,2025-11-06 16:33:17.785722,,2
+275,MMA 6,Elements and Principles of Design,6,1,true,2025-11-06 16:33:17.785722,,2
+276,BSC 2,Being Skills Course 2,6,1,true,2025-11-06 16:33:17.785722,,2
+277,NSTP 2,National Service Training Program 2,6,1,true,2025-11-06 16:33:17.785722,,2
+278,PE 2,Rhythmic Activities,6,1,true,2025-11-06 16:33:17.785722,,2
+279,GEC-TCW,The Contemporary World,6,2,true,2025-11-06 16:33:17.785722,,1
+280,GEC-ART,Art Appreciation,6,2,true,2025-11-06 16:33:17.785722,,1
+281,MMA 7,Writing for New Media,6,2,true,2025-11-06 16:33:17.785722,,1
+282,MMA 8,Typography & Layout (Graphics),6,2,true,2025-11-06 16:33:17.785722,,1
+283,MMA 9,2D Animation 1,6,2,true,2025-11-06 16:33:17.785722,,1
+284,MMA 10,Digital Photography,6,2,true,2025-11-06 16:33:17.785722,,1
+285,EPC,English Proficiency Course,6,2,true,2025-11-06 16:33:17.785722,,1
+286,PE 3,Individual and Dual Sports,6,2,true,2025-11-06 16:33:17.785722,,1
+287,GEC-ETHICS,Ethics,6,2,true,2025-11-06 16:33:17.785722,,2
+288,GEC-STS,"Science, Technology and Society",6,2,true,2025-11-06 16:33:17.785722,,2
+289,HUM-GRB,Great Books,6,2,true,2025-11-06 16:33:17.785722,,2
+290,MMA 11,Advanced Digital Photography,6,2,true,2025-11-06 16:33:17.785722,,2
+291,MMA 12,2D Animation 2,6,2,true,2025-11-06 16:33:17.785722,,2
+292,MMA 13,Multimedia Publishing,6,2,true,2025-11-06 16:33:17.785722,,2
+293,MMA 14,Interactive Media Design,6,2,true,2025-11-06 16:33:17.785722,,2
+294,PE 4,Team Sports and Recreation,6,2,true,2025-11-06 16:33:17.785722,,2
+295,Educ 7,Facilitating Learner Centered Teaching,6,3,true,2025-11-06 16:33:17.785722,,1
+296,Rizal,Life and Works of Rizal,6,3,true,2025-11-06 16:33:17.785722,,1
+297,Math 1,Basic Statistics,6,3,true,2025-11-06 16:33:17.785722,,1
+298,MMA 15,Fundamentals in Film and Video Production,6,3,true,2025-11-06 16:33:17.785722,,1
+299,MMA 16,Game Design: Art Production,6,3,true,2025-11-06 16:33:17.785722,,1
+300,MMA 17,3D Modeling,6,3,true,2025-11-06 16:33:17.785722,,1
+301,MMA 18,Web Design,6,3,true,2025-11-06 16:33:17.785722,,1
+302,MMA 19,Research Methods,6,3,true,2025-11-06 16:33:17.785722,,1
+303,MMA 20,Advertising Principles and Practices,6,3,true,2025-11-06 16:33:17.785722,,2
+304,MMA 21,Post-Production Techniques,6,3,true,2025-11-06 16:33:17.785722,,2
+305,MMA 22,3D Animation,6,3,true,2025-11-06 16:33:17.785722,,2
+306,MMA 23,Advanced Web Design,6,3,true,2025-11-06 16:33:17.785722,,2
+307,MMA 24,Digital Sound Production,6,3,true,2025-11-06 16:33:17.785722,,2
+308,MMA 25,"Design Professions, Law, Regulation and Ethics",6,3,true,2025-11-06 16:33:17.785722,,2
+309,MMA 26,Capstone Project 1,6,3,true,2025-11-06 16:33:17.785722,,2
+310,MMA 27,Business Ventures in Multimedia,6,4,true,2025-11-06 16:33:17.785722,,1
+311,MMA 28,Multimedia Seminars,6,4,true,2025-11-06 16:33:17.785722,,1
+312,MMA 29,Brand Communications,6,4,true,2025-11-06 16:33:17.785722,,1
+313,MMA 30,Portfolio Preparation and Exhibit Design,6,4,true,2025-11-06 16:33:17.785722,,1
+314,MMA 31,Capstone Project 2,6,4,true,2025-11-06 16:33:17.785722,,1
+315,MMA 32,New Media Culture,6,4,true,2025-11-06 16:33:17.785722,,1
+316,FL,Foreign Language,6,4,true,2025-11-06 16:33:17.785722,,1
+317,MMA 33,Practicum,6,4,true,2025-11-06 16:33:17.785722,,2
+318,GEC-UTS,Understanding the Self,7,1,true,2025-11-06 16:33:17.785722,,1
+319,GEC-PCOM,Purposive Communication,7,1,true,2025-11-06 16:33:17.785722,,1
+320,ABCOMM 101,Introduction to Communication,7,1,true,2025-11-06 16:33:17.785722,,1
+321,ABCOMM 102,Introduction to Broadcasting,7,1,true,2025-11-06 16:33:17.785722,,1
+322,ABCOMM 103,Communication Media Laws and Ethics,7,1,true,2025-11-06 16:33:17.785722,,1
+323,JPL,Life and Works of Jose P. Laurel,7,1,true,2025-11-06 16:33:17.785722,,1
+324,PE 1,Physical Fitness and Gymnastics,7,1,true,2025-11-06 16:33:17.785722,,1
+325,NSTP 1,National Service Training Program 1,7,1,true,2025-11-06 16:33:17.785722,,1
+326,BSC 1,Being Skills Course 1,7,1,true,2025-11-06 16:33:17.785722,,1
+327,GEC-RPH,Readings in Philippine History,7,1,true,2025-11-06 16:33:17.785722,,2
+328,GEC-MATH,Mathematics in the Modern World,7,1,true,2025-11-06 16:33:17.785722,,2
+329,ABCOMM 104,Oral Communication and Public Speaking,7,1,true,2025-11-06 16:33:17.785722,,2
+330,ABCOMM 105,Communication Theories,7,1,true,2025-11-06 16:33:17.785722,,2
+331,ABCOMM 106,Writing for Print Media,7,1,true,2025-11-06 16:33:17.785722,,2
+332,PE 2,Rhythmic Activities,7,1,true,2025-11-06 16:33:17.785722,,2
+333,NSTP 2,National Service Training Program 2,7,1,true,2025-11-06 16:33:17.785722,,2
+334,BSC 2,Being Skills Course 2,7,1,true,2025-11-06 16:33:17.785722,,2
+335,GEC-TCW,The Contemporary World,7,2,true,2025-11-06 16:33:17.785722,,1
+336,GEC-ART,Art Appreciation,7,2,true,2025-11-06 16:33:17.785722,,1
+337,ABCOMM 201,Development Communication,7,2,true,2025-11-06 16:33:17.785722,,1
+338,ABCOMM 202,Writing for Radio and Television,7,2,true,2025-11-06 16:33:17.785722,,1
+339,ABCOMM 203,Communication Research 1,7,2,true,2025-11-06 16:33:17.785722,,1
+340,ABCOMM 204,Photography,7,2,true,2025-11-06 16:33:17.785722,,1
+341,EPC,English Proficiency Course,7,2,true,2025-11-06 16:33:17.785722,,1
+342,PE 3,Individual and Dual Sports,7,2,true,2025-11-06 16:33:17.785722,,1
+343,GEC-ETHICS,Ethics,7,2,true,2025-11-06 16:33:17.785722,,2
+344,GEC-STS,"Science, Technology and Society",7,2,true,2025-11-06 16:33:17.785722,,2
+345,ABCOMM 205,Organizational Communication,7,2,true,2025-11-06 16:33:17.785722,,2
+346,ABCOMM 206,Developmental Journalism,7,2,true,2025-11-06 16:33:17.785722,,2
+347,ABCOMM 207,Communication Research 2,7,2,true,2025-11-06 16:33:17.785722,,2
+348,ABCOMM 208,Introduction to Film,7,2,true,2025-11-06 16:33:17.785722,,2
+349,PE 4,Team Sports and Recreation,7,2,true,2025-11-06 16:33:17.785722,,2
+350,ABCOMM 301,Communication and Culture,7,3,true,2025-11-06 16:33:17.785722,,1
+351,ABCOMM 302,Radio and TV Production,7,3,true,2025-11-06 16:33:17.785722,,1
+352,ABCOMM 303,Public Relations and Advertising,7,3,true,2025-11-06 16:33:17.785722,,1
+353,ABCOMM 304,Online Journalism,7,3,true,2025-11-06 16:33:17.785722,,1
+354,ABCOMM 305,Communication Research 3,7,3,true,2025-11-06 16:33:17.785722,,1
+355,RIZAL,Life and Works of Rizal,7,3,true,2025-11-06 16:33:17.785722,,1
+356,ABCOMM 306,Integrated Marketing Communications,7,3,true,2025-11-06 16:33:17.785722,,2
+357,ABCOMM 307,Development Broadcasting,7,3,true,2025-11-06 16:33:17.785722,,2
+358,ABCOMM 308,Corporate Communication,7,3,true,2025-11-06 16:33:17.785722,,2
+359,ABCOMM 309,Multimedia Communication,7,3,true,2025-11-06 16:33:17.785722,,2
+360,ABCOMM 310,Communication Research 4,7,3,true,2025-11-06 16:33:17.785722,,2
+361,ABCOMM 401,Communication Seminar,7,4,true,2025-11-06 16:33:17.785722,,1
+362,ABCOMM 402,Communication Internship 1,7,4,true,2025-11-06 16:33:17.785722,,1
+363,ABCOMM 403,Communication Campaigns,7,4,true,2025-11-06 16:33:17.785722,,1
+364,ABCOMM 404,International Communication,7,4,true,2025-11-06 16:33:17.785722,,1
+365,FL,Foreign Language,7,4,true,2025-11-06 16:33:17.785722,,1
+366,ABCOMM 405,Communication Internship 2,7,4,true,2025-11-06 16:33:17.785722,,2
+367,ABCOMM 406,Communication Thesis,7,4,true,2025-11-06 16:33:17.785722,,2

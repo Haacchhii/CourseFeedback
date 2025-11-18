@@ -293,6 +293,37 @@ export const adminAPI = {
   },
 
   /**
+   * Update evaluation period (extend dates, etc.)
+   * @param {number} periodId - Period ID
+   * @param {Object} updateData - Data to update (endDate, startDate, name, etc.)
+   * @returns {Promise} Updated period
+   */
+  updatePeriod: async (periodId, updateData) => {
+    const currentUser = authAPI.getCurrentUser()
+    // Map camelCase to snake_case for backend
+    const backendData = {
+      end_date: updateData.endDate || updateData.end_date,
+      start_date: updateData.startDate || updateData.start_date,
+      name: updateData.name,
+      semester: updateData.semester,
+      academic_year: updateData.academicYear || updateData.academic_year
+    }
+    // Remove undefined values
+    Object.keys(backendData).forEach(key => backendData[key] === undefined && delete backendData[key])
+    return apiClient.put(`/admin/evaluation-periods/${periodId}?current_user_id=${currentUser?.id}`, backendData)
+  },
+
+  /**
+   * Delete evaluation period
+   * @param {number} periodId - Period ID
+   * @returns {Promise} Success message
+   */
+  deletePeriod: async (periodId) => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.delete(`/admin/evaluation-periods/${periodId}?current_user_id=${currentUser?.id}`)
+  },
+
+  /**
    * Get active evaluation period
    * @returns {Promise} Active period or null
    */

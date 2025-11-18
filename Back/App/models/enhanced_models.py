@@ -20,9 +20,11 @@ class User(Base):
     first_name = Column(String(100), nullable=True)  # Enhanced field
     last_name = Column(String(100), nullable=True)   # Enhanced field
     department = Column(String(100), nullable=True)  # Enhanced field
+    school_id = Column(String(50), nullable=True)    # School ID number (e.g., 23130778)
     is_active = Column(Boolean, default=True)        # Enhanced field
     last_login = Column(DateTime, nullable=True)     # Enhanced field
     must_change_password = Column(Boolean, default=False)  # Force password change on first login
+    first_login = Column(Boolean, default=True)      # Flag for first-time login flow
     created_at = Column(DateTime, default=now_local)
     updated_at = Column(DateTime, default=now_local, onupdate=now_local)
     

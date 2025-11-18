@@ -289,6 +289,29 @@ export default function EvaluationPeriodManagement() {
     }
   }
 
+  const handleDeletePastPeriod = async (periodId, periodName) => {
+    if (window.confirm(`⚠️ Delete "${periodName}"?\n\nThis will permanently delete this evaluation period and all associated data. This action cannot be undone!`)) {
+      try {
+        setSubmitting(true)
+        await adminAPI.deletePeriod(periodId)
+        
+        // Refresh periods
+        const response = await adminAPI.getPeriods()
+        const periods = response?.data || []
+        const current = periods.find(p => p.status === 'Open') || null
+        const past = periods.filter(p => p.status === 'Closed')
+        setCurrentPeriod(current)
+        setPastPeriods(past)
+        
+        alert(`Period "${periodName}" deleted successfully!`)
+      } catch (err) {
+        alert(`Failed to delete period: ${err.message}`)
+      } finally {
+        setSubmitting(false)
+      }
+    }
+  }
+
   if (!currentUser || !isSystemAdmin(currentUser)) return null
 
   // Loading and error states
@@ -570,7 +593,16 @@ export default function EvaluationPeriodManagement() {
                         </div>
                       </div>
                     </div>
-
+                    <button
+                      onClick={() => handleDeletePastPeriod(period.id, period.name)}
+                      disabled={submitting}
+                      className="px-4 py-2 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white rounded-lg transition-all font-semibold text-sm flex items-center space-x-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                      </svg>
+                      <span>Delete</span>
+                    </button>
                   </div>
                 </div>
               ))}

@@ -1,0 +1,8 @@
+id,program_code,program_name,department,is_active,created_at
+1,BSCS-DS,Bachelor of Science in Computer Science - Data Science,College of Computer Studies,true,2025-11-06 16:33:17.785722
+2,BS-CYBER,Bachelor of Science in Cybersecurity,College of Computer Studies,true,2025-11-06 16:33:17.785722
+3,BSIT,Bachelor of Science in Information Technology,College of Computer Studies,true,2025-11-06 16:33:17.785722
+4,BSPSY,Bachelor of Science in Psychology,College of Arts and Sciences,true,2025-11-06 16:33:17.785722
+5,BAPSY,Bachelor of Arts in Psychology,College of Arts and Sciences,true,2025-11-06 16:33:17.785722
+6,BMA,Bachelor of Multimedia Arts,College of Arts and Sciences,true,2025-11-06 16:33:17.785722
+7,ABCOMM,Bachelor of Arts in Communication,College of Arts and Sciences,true,2025-11-06 16:33:17.785722

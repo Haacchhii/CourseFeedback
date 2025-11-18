@@ -1,0 +1,68 @@
+id,user_id,user_email,action,category,severity,status,ip_address,details,created_at,entity_type,entity_id,timestamp
+1,,,EXPORT_CUSTOM_USERS_COURSES_EVALUATIONS_ANALYTICS,Data Export,Info,Success,,"{""format"":""csv"",""timestamp"":""2025-11-11T16:09:55.901480"",""export_type"":""custom_users_courses_evaluations_analytics"",""record_count"":387}",2025-11-11 16:09:55.903109,,,2025-11-16 18:53:29.579986
+2,1,,LOGIN,Authentication,Info,Success,127.0.0.1,"{""browser"":""Chrome""}",2025-11-13 13:24:59.885848,,,2025-11-16 18:53:29.579986
+3,1,,USER_CREATED,User Management,Info,Success,127.0.0.1,"{""role"":""student""}",2025-11-13 13:24:59.885848,,,2025-11-16 18:53:29.579986
+4,1,,SETTINGS_UPDATED,System Settings,Warning,Success,127.0.0.1,"{""category"":""email""}",2025-11-13 13:24:59.885848,,,2025-11-16 18:53:29.579986
+5,,,LOGIN,Authentication,Warning,Failed,192.168.1.100,"{""reason"":""Invalid credentials""}",2025-11-13 13:24:59.885848,,,2025-11-16 18:53:29.579986
+6,1,,EVALUATION_PERIOD_CREATED,Evaluation Management,Info,Success,127.0.0.1,"{""period_name"":""Midterm 2024-2025""}",2025-11-13 13:24:59.885848,,,2025-11-16 18:53:29.579986
+7,1,,LOGIN,Authentication,Info,Success,127.0.0.1,"{""browser"":""Chrome""}",2025-11-13 13:29:03.115375,,,2025-11-16 18:53:29.579986
+8,1,,USER_CREATED,User Management,Info,Success,127.0.0.1,"{""role"":""student""}",2025-11-13 13:29:03.115375,,,2025-11-16 18:53:29.579986
+9,1,,SETTINGS_UPDATED,System Settings,Warning,Success,127.0.0.1,"{""category"":""email""}",2025-11-13 13:29:03.115375,,,2025-11-16 18:53:29.579986
+10,,,LOGIN,Authentication,Warning,Failed,192.168.1.100,"{""reason"":""Invalid credentials""}",2025-11-13 13:29:03.115375,,,2025-11-16 18:53:29.579986
+11,1,,EVALUATION_PERIOD_CREATED,Evaluation Management,Info,Success,127.0.0.1,"{""period_name"":""Midterm 2024-2025""}",2025-11-13 13:29:03.115375,,,2025-11-16 18:53:29.579986
+12,1,,SETTINGS_UPDATED,System Settings,Warning,Success,,"{""category"":""Security"",""keys_updated"":[""passwordMinLength"",""passwordRequireUppercase"",""passwordRequireLowercase"",""passwordRequireNumbers"",""passwordRequireSpecialChars"",""sessionTimeout"",""maxLoginAttempts"",""lockoutDuration"",""twoFactorAuth"",""ipWhitelist"",""allowedDomains""]}",2025-11-13 15:37:47.398467,,,2025-11-16 18:53:29.579986
+13,1,,USER_CREATED,User Management,Info,Success,,"{""role"":""student"",""email"":""iturraldejose@lpubatangas.edu.ph""}",2025-11-13 17:02:27.756947,,,2025-11-16 18:53:29.579986
+14,,,EXPORT_USERS,Data Export,Info,Success,,"{""format"":""csv"",""timestamp"":""2025-11-13T17:50:22.860985"",""export_type"":""users"",""record_count"":21}",2025-11-13 17:50:22.862542,,,2025-11-16 18:53:29.579986
+15,,,EXPORT_COURSES,Data Export,Info,Success,,"{""format"":""csv"",""timestamp"":""2025-11-13T17:50:25.751504"",""export_type"":""courses"",""record_count"":367}",2025-11-13 17:50:25.751967,,,2025-11-16 18:53:29.579986
+16,,,EXPORT_USERS,Data Export,Info,Success,,"{""format"":""csv"",""timestamp"":""2025-11-13T17:50:28.569067"",""export_type"":""users"",""record_count"":21}",2025-11-13 17:50:28.569353,,,2025-11-16 18:53:29.579986
+17,,,EXPORT_COURSES,Data Export,Info,Success,,"{""format"":""csv"",""timestamp"":""2025-11-13T17:50:31.002353"",""export_type"":""courses"",""record_count"":367}",2025-11-13 17:50:31.00268,,,2025-11-16 18:53:29.579986
+18,1,,COURSE_UPDATED,Course Management,Info,Success,,"{""course_id"":320}",2025-11-13 18:51:40.661545,,,2025-11-16 18:53:29.579986
+19,1,,COURSE_UPDATED,Course Management,Info,Success,,"{""course_id"":320}",2025-11-13 18:51:59.229464,,,2025-11-16 18:53:29.579986
+20,1,,COURSE_UPDATED,Course Management,Info,Success,,"{""course_id"":320}",2025-11-13 18:57:53.931417,,,2025-11-16 18:53:29.579986
+21,1,,COURSE_UPDATED,Course Management,Info,Success,,"{""course_id"":320}",2025-11-13 18:58:03.874355,,,2025-11-16 18:53:29.579986
+22,1,,COURSE_UPDATED,Course Management,Info,Success,,"{""course_id"":320}",2025-11-13 18:58:16.0287,,,2025-11-16 18:53:29.579986
+23,1,,REMOVE_STUDENT_FROM_SECTION,Section Management,Info,Success,,"{""section_id"":5,""student_id"":7,""student_name"":""Miguel Cruz""}",2025-11-13 19:05:32.92985,,,2025-11-16 18:53:29.579986
+24,1,,SECTION_UPDATED,Section Management,Info,Success,,"{""class_code"":""CYBER 4-A"",""section_id"":15}",2025-11-15 11:33:07.815306,,,2025-11-16 18:53:29.579986
+25,1,,SECTION_UPDATED,Section Management,Info,Success,,"{""class_code"":""BSC 1-A"",""section_id"":12}",2025-11-15 11:33:19.763625,,,2025-11-16 18:53:29.579986
+26,,,EXPORT_USERS,Data Export,Info,Success,,"{""format"":""csv"",""timestamp"":""2025-11-15T12:11:21.797354"",""export_type"":""users"",""record_count"":21}",2025-11-15 12:11:21.7997,,,2025-11-16 18:53:29.579986
+27,,,EXPORT_COURSES,Data Export,Info,Success,,"{""format"":""csv"",""timestamp"":""2025-11-15T12:11:29.347931"",""export_type"":""courses"",""record_count"":367}",2025-11-15 12:11:29.34834,,,2025-11-16 18:53:29.579986
+28,,,EXPORT_COURSES,Data Export,Info,Success,,"{""format"":""json"",""timestamp"":""2025-11-15T12:12:02.222754"",""export_type"":""courses"",""record_count"":367}",2025-11-15 12:12:02.223093,,,2025-11-16 18:53:29.579986
+29,,,EXPORT_CUSTOM_USERS_COURSES_EVALUATIONS_ANALYTICS_AUDITLOGS,Data Export,Info,Success,,"{""format"":""csv"",""timestamp"":""2025-11-16T05:31:36.467437"",""export_type"":""custom_users_courses_evaluations_analytics_auditLogs"",""record_count"":389}",2025-11-16 05:31:36.470003,,,2025-11-16 18:53:29.579986
+30,,,EXPORT_COURSES,Data Export,Info,Success,,"{""format"":""csv"",""timestamp"":""2025-11-16T13:29:01.391178"",""export_type"":""courses"",""record_count"":367}",2025-11-16 13:29:01.401705,,,2025-11-16 18:53:29.579986
+31,,,EXPORT_COURSES,Data Export,Info,Success,,"{""format"":""csv"",""timestamp"":""2025-11-16T13:29:29.714528"",""export_type"":""courses"",""record_count"":367}",2025-11-16 13:29:29.71527,,,2025-11-16 18:53:29.579986
+32,,,EXPORT_USERS,Data Export,Info,Success,,"{""format"":""csv"",""timestamp"":""2025-11-16T13:30:26.002603"",""export_type"":""users"",""record_count"":21}",2025-11-16 13:30:26.002942,,,2025-11-16 18:53:29.579986
+33,,,EXPORT_COURSES,Data Export,Info,Success,,"{""format"":""csv"",""timestamp"":""2025-11-16T13:30:30.475891"",""export_type"":""courses"",""record_count"":367}",2025-11-16 13:30:30.477074,,,2025-11-16 18:53:29.579986
+34,,,EXPORT_USERS,Data Export,Info,Success,,"{""format"":""csv"",""timestamp"":""2025-11-16T13:31:51.675101"",""export_type"":""users"",""record_count"":21}",2025-11-16 13:31:51.675487,,,2025-11-16 18:53:29.579986
+35,,,EXPORT_COURSES,Data Export,Info,Success,,"{""format"":""csv"",""timestamp"":""2025-11-16T13:35:46.123780"",""export_type"":""courses"",""record_count"":367}",2025-11-16 13:35:46.12434,,,2025-11-16 18:53:29.579986
+36,,,EXPORT_COURSES,Data Export,Info,Success,,"{""format"":""csv"",""timestamp"":""2025-11-16T21:56:08.901854+08:00"",""export_type"":""courses"",""record_count"":367}",2025-11-16 13:56:08.905339,,,2025-11-16 18:53:29.579986
+37,,,EXPORT_COURSES,Data Export,Info,Success,,"{""format"":""csv"",""timestamp"":""2025-11-16T22:30:26.999047+08:00"",""export_type"":""courses"",""record_count"":367}",2025-11-16 14:30:27.002116,,,2025-11-16 18:53:29.579986
+38,1,,COURSE_UPDATED,Course Management,Info,Success,,"{""course_id"":320}",2025-11-16 14:42:50.944268,,,2025-11-16 18:53:29.579986
+39,1,,COURSE_UPDATED,Course Management,Info,Success,,"{""course_id"":320}",2025-11-16 14:43:05.451169,,,2025-11-16 18:53:29.579986
+40,1,,USER_DELETED,User Management,Info,Success,,"{""email"":""secretary2@lpubatangas.edu.ph"",""user_id"":3}",2025-11-16 17:59:35.931977,,,2025-11-16 18:53:29.579986
+41,1,,PERIOD_CREATED,Evaluation Management,Info,Success,,"{""period_name"":""1st Semester 2025-2026""}",2025-11-16 18:03:20.584978,,,2025-11-16 18:53:29.579986
+42,1,,PERIOD_CREATED,Evaluation Management,Info,Success,,"{""period_name"":""1st Semester 2025-2026""}",2025-11-16 18:03:54.479562,,,2025-11-16 18:53:29.579986
+43,1,,PERIOD_CREATED,Evaluation Management,Info,Success,,"{""period_name"":""1st Semester 2025-2026""}",2025-11-16 18:12:26.280637,,,2025-11-16 18:53:29.579986
+45,1,,DELETE,Program Section Management,Info,Success,,"{""section_name"":""BSCS-DS-3A""}",2025-11-16 19:10:32.150968,program_section,2,2025-11-16 19:10:32.150968
+46,1,,CREATE,Program Section Management,Info,Success,,"{""semester"":1,""program_id"":1,""year_level"":3,""school_year"":""2025-2026"",""section_name"":""BSCS-DS-3A""}",2025-11-16 19:10:45.801893,program_section,3,2025-11-16 19:10:45.801893
+47,1,,ASSIGN_STUDENTS,Program Section Management,Info,Success,,"{""student_ids"":[24],""skipped_count"":0,""assigned_count"":1}",2025-11-16 19:11:22.860968,program_section,3,2025-11-16 19:11:22.860968
+48,1,,ENROLL_STUDENTS,Section Management,Info,Success,,"{""section_id"":36,""skipped_count"":0,""enrolled_count"":1}",2025-11-16 20:10:38.675945,,,2025-11-16 20:10:28.605634
+49,1,,SECTION_UPDATED,Section Management,Info,Success,,"{""class_code"":""BSC 1-BSCS-DS-3A"",""section_id"":36}",2025-11-16 20:12:22.715953,,,2025-11-16 20:12:12.566075
+50,1,,PERIOD_CLOSED,Evaluation Management,Info,Success,,"{""period_id"":4,""period_name"":""1st Semester 2025-2026""}",2025-11-16 20:13:48.471741,,,2025-11-16 20:13:38.313009
+51,1,,PERIOD_CLOSED,Evaluation Management,Info,Success,,"{""period_id"":5,""period_name"":""1st Semester 2025-2026""}",2025-11-16 20:13:57.172353,,,2025-11-16 20:13:47.013947
+52,1,,PERIOD_CLOSED,Evaluation Management,Info,Success,,"{""period_id"":6,""period_name"":""1st Semester 2025-2026""}",2025-11-16 20:14:01.869897,,,2025-11-16 20:13:51.713904
+53,1,,PERIOD_CLOSED,Evaluation Management,Info,Success,,"{""period_id"":1,""period_name"":""First Semester Evaluation 2024-2025""}",2025-11-16 20:14:07.029107,,,2025-11-16 20:13:56.871338
+54,1,,PERIOD_CLOSED,Evaluation Management,Info,Success,,"{""period_id"":2,""period_name"":""First Semester Evaluation 2024-2025""}",2025-11-16 20:14:12.086312,,,2025-11-16 20:14:01.928399
+55,1,,PERIOD_CLOSED,Evaluation Management,Info,Success,,"{""period_id"":3,""period_name"":""First Semester Evaluation 2024-2025""}",2025-11-16 20:14:16.711617,,,2025-11-16 20:14:06.558485
+56,1,,USER_DELETED,User Management,Info,Success,,"{""email"":""student10@lpubatangas.edu.ph"",""user_id"":20}",2025-11-16 20:15:53.321575,,,2025-11-16 20:15:43.169598
+57,1,,USER_UPDATED,User Management,Info,Success,,"{""email"":""iturraldejose@lpubatangas.edu.ph"",""user_id"":24}",2025-11-16 20:16:00.415639,,,2025-11-16 20:15:50.265578
+58,1,,PASSWORD_RESET,User Management,Warning,Success,,"{""email"":""iturraldejose@lpubatangas.edu.ph"",""user_id"":24}",2025-11-16 20:18:49.784737,,,2025-11-16 20:18:39.623878
+59,1,,CREATE,Program Section Management,Info,Success,,"{""semester"":1,""program_id"":3,""year_level"":3,""school_year"":""2025-2026"",""section_name"":""BSIT-3A""}",2025-11-17 03:21:40.860072,program_section,4,2025-11-17 03:21:40.860072
+60,1,,PERIOD_CREATED,Evaluation Management,Info,Success,,"{""period_name"":""1st Semester 2025-2026""}",2025-11-17 03:25:13.848722,,,2025-11-17 03:25:03.734311
+61,1,,PERIOD_CREATED,Evaluation Management,Info,Success,,"{""period_name"":""1st Semester 2025-2026""}",2025-11-17 03:25:16.466793,,,2025-11-17 03:25:06.354183
+62,1,,PERIOD_CREATED,Evaluation Management,Info,Success,,"{""period_name"":""1st Semester 2025-2026""}",2025-11-17 03:25:17.565735,,,2025-11-17 03:25:07.454271
+63,,,EXPORT_COURSES,Data Export,Info,Success,,"{""format"":""csv"",""timestamp"":""2025-11-17T11:28:03.545544+08:00"",""export_type"":""courses"",""record_count"":367}",2025-11-17 03:28:03.546524,,,2025-11-17 03:27:52.868754
+64,,,EXPORT_COURSES,Data Export,Info,Success,,"{""format"":""csv"",""timestamp"":""2025-11-17T11:28:35.694841+08:00"",""export_type"":""courses"",""record_count"":367}",2025-11-17 03:28:35.695247,,,2025-11-17 03:28:25.069002
+65,,,EXPORT_COURSES,Data Export,Info,Success,,"{""format"":""json"",""timestamp"":""2025-11-17T11:28:58.133979+08:00"",""export_type"":""courses"",""record_count"":367}",2025-11-17 03:28:58.134736,,,2025-11-17 03:28:47.386973
+66,,,EXPORT_COURSES,Data Export,Info,Success,,"{""format"":""json"",""timestamp"":""2025-11-17T11:29:05.522181+08:00"",""export_type"":""courses"",""record_count"":367}",2025-11-17 03:29:05.522649,,,2025-11-17 03:28:54.96805
+67,1,,SECTION_UPDATED,Section Management,Info,Success,,"{""class_code"":""Comp 1-BSCS-DS-3A"",""section_id"":37}",2025-11-17 14:32:02.539607,,,2025-11-17 14:31:52.570302
+68,,,EXPORT_USERS,Data Export,Info,Success,,"{""format"":""csv"",""timestamp"":""2025-11-17T22:36:41.395933+08:00"",""export_type"":""users"",""record_count"":21}",2025-11-17 14:36:41.396429,,,2025-11-17 14:36:31.422558

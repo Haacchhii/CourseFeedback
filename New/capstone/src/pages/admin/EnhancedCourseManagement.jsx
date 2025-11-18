@@ -197,13 +197,19 @@ export default function EnhancedCourseManagement() {
         section.subject_code?.toLowerCase().includes(sectionSearchTerm.toLowerCase()) ||
         section.subject_name?.toLowerCase().includes(sectionSearchTerm.toLowerCase()) ||
         section.class_code?.toLowerCase().includes(sectionSearchTerm.toLowerCase()) ||
-        section.instructor_name?.toLowerCase().includes(sectionSearchTerm.toLowerCase())
+        section.classCode?.toLowerCase().includes(sectionSearchTerm.toLowerCase()) ||
+        section.instructor_name?.toLowerCase().includes(sectionSearchTerm.toLowerCase()) ||
+        section.instructorName?.toLowerCase().includes(sectionSearchTerm.toLowerCase())
       
-      const matchesProgram = sectionProgramFilter === 'all' || section.program_code === sectionProgramFilter
+      // Support both snake_case and camelCase
+      const programCode = section.program_code || section.programCode
+      const matchesProgram = sectionProgramFilter === 'all' || programCode === sectionProgramFilter
       
-      const matchesSemester = sectionSemesterFilter === 'all' || section.semester === parseInt(sectionSemesterFilter)
+      const semester = section.semester || section.semester
+      const matchesSemester = sectionSemesterFilter === 'all' || semester === parseInt(sectionSemesterFilter) || semester === sectionSemesterFilter
       
-      const matchesYear = sectionYearFilter === 'all' || section.year_level === parseInt(sectionYearFilter)
+      const yearLevel = section.year_level || section.yearLevel
+      const matchesYear = sectionYearFilter === 'all' || yearLevel === parseInt(sectionYearFilter) || yearLevel === sectionYearFilter
       
       return matchesSearch && matchesProgram && matchesSemester && matchesYear
     })

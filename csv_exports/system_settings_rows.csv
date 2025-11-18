@@ -1,0 +1,51 @@
+id,category,key,value,data_type,description,is_public,updated_by,updated_at
+1,general,institution_name,Lyceum of the Philippines University - Batangas,string,Full institution name,false,,2025-11-13 13:24:59.885848
+2,general,institution_short_name,LPU Batangas,string,Short institution name,false,,2025-11-13 13:24:59.885848
+3,general,academic_year,2024-2025,string,Current academic year,false,,2025-11-13 13:24:59.885848
+4,general,current_semester,First Semester,string,Current semester,false,,2025-11-13 13:24:59.885848
+5,general,rating_scale,4,number,Maximum rating scale,false,,2025-11-13 13:24:59.885848
+6,general,timezone,Asia/Manila,string,System timezone,false,,2025-11-13 13:24:59.885848
+7,general,date_format,MM/DD/YYYY,string,Date display format,false,,2025-11-13 13:24:59.885848
+8,general,language,English,string,System language,false,,2025-11-13 13:24:59.885848
+9,email,smtp_host,smtp.gmail.com,string,SMTP server hostname,false,,2025-11-13 13:24:59.885848
+10,email,smtp_port,587,number,SMTP server port,false,,2025-11-13 13:24:59.885848
+11,email,smtp_username,noreply@lpubatangas.edu.ph,string,SMTP username,false,,2025-11-13 13:24:59.885848
+12,email,smtp_password,,string,SMTP password (encrypted),false,,2025-11-13 13:24:59.885848
+13,email,from_email,noreply@lpubatangas.edu.ph,string,From email address,false,,2025-11-13 13:24:59.885848
+14,email,from_name,LPU Evaluation System,string,From name,false,,2025-11-13 13:24:59.885848
+15,email,enable_notifications,true,boolean,Enable email notifications,false,,2025-11-13 13:24:59.885848
+16,email,reminder_frequency,3,number,Days between reminders,false,,2025-11-13 13:24:59.885848
+17,security,password_min_length,8,number,Minimum password length,false,,2025-11-13 13:24:59.885848
+18,security,password_require_uppercase,true,boolean,Require uppercase letters,false,,2025-11-13 13:24:59.885848
+19,security,password_require_lowercase,true,boolean,Require lowercase letters,false,,2025-11-13 13:24:59.885848
+20,security,password_require_numbers,true,boolean,Require numbers,false,,2025-11-13 13:24:59.885848
+21,security,password_require_special_chars,true,boolean,Require special characters,false,,2025-11-13 13:24:59.885848
+22,security,session_timeout,60,number,Session timeout in minutes,false,,2025-11-13 13:24:59.885848
+23,security,max_login_attempts,5,number,Maximum login attempts,false,,2025-11-13 13:24:59.885848
+24,security,lockout_duration,30,number,Account lockout duration in minutes,false,,2025-11-13 13:24:59.885848
+25,security,two_factor_auth,false,boolean,Enable two-factor authentication,false,,2025-11-13 13:24:59.885848
+26,security,allowed_domains,@lpubatangas.edu.ph,string,Allowed email domains,false,,2025-11-13 13:24:59.885848
+27,backup,auto_backup,true,boolean,Enable automatic backups,false,,2025-11-13 13:24:59.885848
+28,backup,backup_frequency,daily,string,Backup frequency,false,,2025-11-13 13:24:59.885848
+29,backup,backup_time,02:00,string,Backup time (HH:MM),false,,2025-11-13 13:24:59.885848
+30,backup,retention_days,30,number,Backup retention in days,false,,2025-11-13 13:24:59.885848
+31,backup,include_evaluations,true,boolean,Include evaluations in backup,false,,2025-11-13 13:24:59.885848
+32,backup,include_users,true,boolean,Include users in backup,false,,2025-11-13 13:24:59.885848
+33,backup,include_courses,true,boolean,Include courses in backup,false,,2025-11-13 13:24:59.885848
+34,backup,backup_location,cloud,string,Backup storage location,false,,2025-11-13 13:24:59.885848
+69,evaluation,allow_anonymous,false,boolean,Allow anonymous evaluations,false,,2025-11-13 13:25:13.680218
+70,evaluation,require_comment,true,boolean,Require text comments,false,,2025-11-13 13:25:13.680218
+71,evaluation,min_comment_length,50,number,Minimum comment length in characters,false,,2025-11-13 13:25:13.680218
+72,evaluation,allow_edit,false,boolean,Allow students to edit submitted evaluations,false,,2025-11-13 13:25:13.680218
+73,evaluation,edit_deadline_hours,24,number,Hours after submission to allow edits,false,,2025-11-13 13:25:13.680218
+108,Security,passwordMinLength,8,number,,false,1,2025-11-13 15:37:37.587776
+109,Security,passwordRequireUppercase,true,boolean,,false,1,2025-11-13 15:37:37.587776
+110,Security,passwordRequireLowercase,true,boolean,,false,1,2025-11-13 15:37:37.587776
+111,Security,passwordRequireNumbers,true,boolean,,false,1,2025-11-13 15:37:37.587776
+112,Security,passwordRequireSpecialChars,true,boolean,,false,1,2025-11-13 15:37:37.587776
+113,Security,sessionTimeout,60,number,,false,1,2025-11-13 15:37:37.587776
+114,Security,maxLoginAttempts,5,number,,false,1,2025-11-13 15:37:37.587776
+115,Security,lockoutDuration,30,number,,false,1,2025-11-13 15:37:37.587776
+116,Security,twoFactorAuth,false,boolean,,false,1,2025-11-13 15:37:37.587776
+117,Security,ipWhitelist,,string,,false,1,2025-11-13 15:37:37.587776
+118,Security,allowedDomains,@lpubatangas.edu.ph,string,,false,1,2025-11-13 15:37:37.587776

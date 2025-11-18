@@ -51,7 +51,7 @@ async def login(request: LoginRequest, db = Depends(get_db)):
         
         # Get user from users table
         query = text("""
-            SELECT id, email, role, password_hash, first_name, last_name, department, is_active, must_change_password
+            SELECT id, email, role, password_hash, first_name, last_name, department, school_id, is_active, must_change_password, first_login
             FROM users
             WHERE LOWER(email) = :email
         """)
@@ -91,9 +91,11 @@ async def login(request: LoginRequest, db = Depends(get_db)):
             'role': user_data.role,
             'name': full_name or user_data.email.split('@')[0],
             'department': user_data.department,
+            'schoolId': user_data.school_id if hasattr(user_data, 'school_id') else None,
             'firstName': user_data.first_name,
             'lastName': user_data.last_name,
-            'mustChangePassword': user_data.must_change_password if hasattr(user_data, 'must_change_password') else False
+            'mustChangePassword': user_data.must_change_password if hasattr(user_data, 'must_change_password') else False,
+            'firstLogin': user_data.first_login if hasattr(user_data, 'first_login') else False
         }
         
         # Generate JWT token
@@ -304,7 +306,7 @@ async def change_password(request: ChangePasswordRequest, db = Depends(get_db)):
         
         # Get user data
         query = text("""
-            SELECT id, email, password_hash, must_change_password, first_name, last_name
+            SELECT id, email, password_hash, must_change_password, first_login, first_name, last_name
             FROM users
             WHERE id = :user_id
         """)
@@ -342,6 +344,7 @@ async def change_password(request: ChangePasswordRequest, db = Depends(get_db)):
             UPDATE users
             SET password_hash = :password_hash,
                 must_change_password = FALSE,
+                first_login = FALSE,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = :user_id
         """)

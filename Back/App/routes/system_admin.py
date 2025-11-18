@@ -25,6 +25,7 @@ import logging
 import bcrypt
 import json
 from config import now_local
+from services.welcome_email_service import send_welcome_email, send_bulk_welcome_emails
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -41,6 +42,7 @@ class UserCreate(BaseModel):
     last_name: str
     role: str  # student, department_head, secretary, admin
     department: Optional[str] = None
+    school_id: Optional[str] = None  # School ID number (required for students)
     program_id: Optional[int] = None
     year_level: Optional[int] = None
     password: str
@@ -207,22 +209,37 @@ async def create_user(
         if existing_user:
             raise HTTPException(status_code=400, detail="Email already exists")
         
-        # Determine if password should be auto-generated (for students)
+        # Determine school_id and auto-generate password for students
         must_change_password = False
+        first_login = False
         actual_password = user_data.password
         generated_password_info = None
+        school_id = user_data.school_id
         
-        # Auto-generate password for students using pattern: Lpub@{student_number}
+        # Auto-generate password using pattern: lpub@{school_id}
         if user_data.role == "student":
-            # Extract student number from email or use provided student_number
-            # Email format: studentnumber@lpubatangas.edu.ph
-            email_parts = user_data.email.split('@')
-            if len(email_parts) > 0:
-                student_number = email_parts[0]  # Get the part before @
-                actual_password = f"Lpub@{student_number}"
+            # If school_id not provided, extract from email
+            if not school_id:
+                email_parts = user_data.email.split('@')
+                if len(email_parts) > 0:
+                    school_id = email_parts[0]  # Get the part before @
+            
+            # Generate temporary password: lpub@{school_id}
+            if school_id:
+                actual_password = f"lpub@{school_id}"
                 must_change_password = True
+                first_login = True
                 generated_password_info = actual_password
-                logger.info(f"Auto-generated password for student: {user_data.email}")
+                logger.info(f"Auto-generated password for student {user_data.email}: {actual_password}")
+        
+        # For secretary and department_head, also set first_login
+        elif user_data.role in ["secretary", "department_head"]:
+            first_login = True
+            must_change_password = True
+            # If school_id provided, use it for password generation
+            if school_id:
+                actual_password = f"lpub@{school_id}"
+                generated_password_info = actual_password
         
         # Hash password
         password_hash = bcrypt.hashpw(actual_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
@@ -235,21 +252,22 @@ async def create_user(
             last_name=user_data.last_name,
             role=user_data.role,
             department=user_data.department,
+            school_id=school_id,
             is_active=True,
-            must_change_password=must_change_password
+            must_change_password=must_change_password,
+            first_login=first_login
         )
         db.add(new_user)
         db.flush()  # Get the user ID
         
         # Create role-specific record
         if user_data.role == "student" and user_data.program_id:
-            # Use student number from email if available
-            email_parts = user_data.email.split('@')
-            student_number = email_parts[0] if len(email_parts) > 0 else f"STU{new_user.id:05d}"
+            # Use school_id as student_number
+            student_number = school_id or f"STU{new_user.id:05d}"
             
             student = Student(
                 user_id=new_user.id,
-                student_number=student_number,  # Use actual student number from email
+                student_number=student_number,
                 program_id=user_data.program_id,
                 year_level=user_data.year_level or 1
             )
@@ -278,6 +296,20 @@ async def create_user(
             details={"email": user_data.email, "role": user_data.role}
         )
         
+        # Send welcome email with credentials
+        email_result = None
+        if generated_password_info and school_id:
+            email_result = await send_welcome_email(
+                email=user_data.email,
+                first_name=user_data.first_name,
+                last_name=user_data.last_name,
+                school_id=school_id,
+                role=user_data.role,
+                temp_password=generated_password_info,
+                login_url="http://localhost:5173/login"  # Update with production URL
+            )
+            logger.info(f"Welcome email sent to {user_data.email}: {email_result['message']}")
+        
         # Build response with generated password info if applicable
         response = {
             "success": True,
@@ -285,10 +317,14 @@ async def create_user(
             "user_id": new_user.id
         }
         
-        # Include generated password for admin to communicate to student
+        # Include generated password and email status
         if generated_password_info:
             response["generated_password"] = generated_password_info
             response["message"] = f"User created successfully. Temporary password: {generated_password_info} (student must change on first login)"
+            
+            if email_result:
+                response["email_sent"] = email_result.get("email_sent", False)
+                response["email_status"] = "prepared" if not email_result.get("email_sent") else "sent"
         
         return response
         

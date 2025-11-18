@@ -1,0 +1,15 @@
+id,user_id,export_type,format,filters,file_size,record_count,status,error_message,created_at
+1,1,users,csv,"{""role"":""student""}",15360,250,Completed,,2025-11-11 13:24:59.885848
+2,1,evaluations,excel,"{""semester"":""First Semester""}",51200,450,Completed,,2025-11-12 13:24:59.885848
+3,1,courses,json,{},8192,100,Completed,,2025-11-13 01:24:59.885848
+4,1,analytics,pdf,"{""department"":""CCS""}",102400,1,Completed,,2025-11-13 07:24:59.885848
+5,1,users,csv,"{""role"":""student""}",15360,250,Completed,,2025-11-11 13:29:03.115375
+6,1,evaluations,excel,"{""semester"":""First Semester""}",51200,450,Completed,,2025-11-12 13:29:03.115375
+7,1,courses,json,{},8192,100,Completed,,2025-11-13 01:29:03.115375
+8,1,analytics,pdf,"{""department"":""CCS""}",102400,1,Completed,,2025-11-13 07:29:03.115375
+9,,courses,csv,{},,367,completed,,2025-11-16 14:30:27.047702
+10,,courses,csv,{},,367,completed,,2025-11-17 03:28:03.645592
+11,,courses,csv,{},,367,completed,,2025-11-17 03:28:35.795432
+12,,courses,json,{},,367,completed,,2025-11-17 03:28:58.237873
+13,,courses,json,{},,367,completed,,2025-11-17 03:29:05.618323
+14,,users,csv,{},,21,completed,,2025-11-17 14:36:41.478539
