@@ -1,9 +1,9 @@
 import React, { useMemo, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { isAdmin, isStaffMember } from '../../utils/roleUtils'
 import { useAuth } from '../../context/AuthContext'
-import { adminAPI, deptHeadAPI, secretaryAPI, instructorAPI } from '../../services/api'
+import { adminAPI, deptHeadAPI, secretaryAPI } from '../../services/api'
 import CategoryMetricsDisplay, { CategoryComparisonWidget } from '../../components/CategoryMetricsDisplay'
 import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
 import CompletionTracker from '../../components/staff/CompletionTracker'
@@ -26,6 +26,11 @@ export default function Dashboard() {
   const [selectedCourses, setSelectedCourses] = useState('all')
   const [showFilters, setShowFilters] = useState(false)
 
+  // Evaluation Period states
+  const [evaluationPeriods, setEvaluationPeriods] = useState([])
+  const [selectedPeriod, setSelectedPeriod] = useState(null)
+  const [activePeriod, setActivePeriod] = useState(null)
+
   // Modal states
   const [showContactAdminModal, setShowContactAdminModal] = useState(false)
 
@@ -39,22 +44,19 @@ export default function Dashboard() {
       if (!currentUser) return
       
       try {
-        let programsResponse, yearLevelsResponse
+        let programsResponse, yearLevelsResponse, periodsResponse
         
         if (currentUser.role === 'secretary') {
-          [programsResponse, yearLevelsResponse] = await Promise.all([
+          [programsResponse, yearLevelsResponse, periodsResponse] = await Promise.all([
             secretaryAPI.getPrograms(),
-            secretaryAPI.getYearLevels()
+            secretaryAPI.getYearLevels(),
+            secretaryAPI.getEvaluationPeriods()
           ])
         } else if (currentUser.role === 'department_head') {
-          [programsResponse, yearLevelsResponse] = await Promise.all([
+          [programsResponse, yearLevelsResponse, periodsResponse] = await Promise.all([
             deptHeadAPI.getPrograms(),
-            deptHeadAPI.getYearLevels()
-          ])
-        } else if (currentUser.role === 'instructor') {
-          [programsResponse, yearLevelsResponse] = await Promise.all([
-            instructorAPI.getPrograms(),
-            instructorAPI.getYearLevels()
+            deptHeadAPI.getYearLevels(),
+            deptHeadAPI.getEvaluationPeriods()
           ])
         }
         
@@ -63,6 +65,14 @@ export default function Dashboard() {
         }
         if (yearLevelsResponse?.data) {
           setYearLevelOptions(yearLevelsResponse.data)
+        }
+        if (periodsResponse?.data) {
+          setEvaluationPeriods(periodsResponse.data)
+          const active = periodsResponse.data.find(p => p.status === 'active' || p.status === 'Active')
+          if (active) {
+            setActivePeriod(active.id)
+            setSelectedPeriod(active.id)
+          }
         }
       } catch (err) {
         console.error('Error fetching filter options:', err)
@@ -90,7 +100,7 @@ export default function Dashboard() {
       return
     }
     
-    // Only staff members (secretary/dept head/instructor) can access this dashboard
+    // Only staff members (secretary/dept head) can access this dashboard
     if (!isStaffMember(currentUser)) {
       navigate('/')
       return
@@ -102,31 +112,42 @@ export default function Dashboard() {
     async () => {
       if (!currentUser) return null
       
+      // Don't fetch if no period is selected and no active period exists
+      if (!selectedPeriod && !activePeriod) return null
+      
       const filters = {}
       if (selectedProgram !== 'all') filters.program_id = selectedProgram
       if (selectedYearLevel !== 'all') filters.year_level = selectedYearLevel
       if (selectedSemester !== 'all') filters.semester = selectedSemester
+      if (selectedPeriod) filters.period_id = selectedPeriod
       
-      let response
+      let dashboardResponse, evaluationsResponse
       if (currentUser.role === 'secretary') {
-        response = await secretaryAPI.getDashboard(filters)
+        [dashboardResponse, evaluationsResponse] = await Promise.all([
+          secretaryAPI.getDashboard(filters),
+          secretaryAPI.getEvaluations({ ...filters, page: 1, page_size: 50 }) // Limit for performance
+        ])
       } else if (currentUser.role === 'department_head') {
-        response = await deptHeadAPI.getDashboard(filters)
-      } else if (currentUser.role === 'instructor') {
-        response = await instructorAPI.getDashboard(filters)
+        [dashboardResponse, evaluationsResponse] = await Promise.all([
+          deptHeadAPI.getDashboard(filters),
+          deptHeadAPI.getEvaluations({ ...filters, page: 1, page_size: 50 }) // Limit for performance
+        ])
       } else {
         throw new Error(`Unsupported staff role: ${currentUser.role}`)
       }
       
-      return response?.data || response
+      return {
+        dashboard: dashboardResponse?.data || dashboardResponse,
+        evaluations: Array.isArray(evaluationsResponse) ? evaluationsResponse : (evaluationsResponse?.data || [])
+      }
     },
-    [currentUser?.id, currentUser?.role, selectedProgram, selectedYearLevel, selectedSemester]
+    [currentUser?.id, currentUser?.role, selectedProgram, selectedYearLevel, selectedSemester, selectedPeriod]
   )
 
   // Update dashboardData when apiData changes
   useEffect(() => {
     if (apiData) {
-      setDashboardData(apiData)
+      setDashboardData(apiData.dashboard)
     }
   }, [apiData])
 
@@ -138,7 +159,6 @@ export default function Dashboard() {
         totalEvaluations: 0,
         totalEnrolledStudents: 0,
         participationRate: 0,
-        avgRating: '0.0',
         sentimentData: [
           { name: 'Positive', value: 0, color: '#10b981' },
           { name: 'Neutral', value: 0, color: '#f59e0b' },
@@ -155,7 +175,6 @@ export default function Dashboard() {
       totalEvaluations: dashboardData.total_evaluations || 0,
       totalEnrolledStudents: dashboardData.total_enrolled_students || 0,
       participationRate: dashboardData.participation_rate || 0,
-      avgRating: (dashboardData.avg_rating || dashboardData.average_rating || 0).toFixed(1),
       sentimentData: [
         { name: 'Positive', value: sentiment.positive || 0, color: '#10b981' },
         { name: 'Neutral', value: sentiment.neutral || 0, color: '#f59e0b' },
@@ -165,11 +184,50 @@ export default function Dashboard() {
     }
   }, [dashboardData])
 
-  // Year level sentiment data - placeholder for now since API doesn't provide this
+  // Year level sentiment data - calculate from evaluations
   const yearLevelSentiment = useMemo(() => {
-    // Return empty array for now - this would need a separate API endpoint
-    return []
-  }, [])
+    console.log('[DASHBOARD] apiData:', apiData)
+    console.log('[DASHBOARD] apiData?.evaluations:', apiData?.evaluations)
+    
+    if (!apiData || !apiData.evaluations || apiData.evaluations.length === 0) {
+      console.log('[DASHBOARD] No evaluations data - apiData structure:', JSON.stringify(apiData, null, 2))
+      return []
+    }
+    
+    const evaluations = apiData.evaluations
+    console.log('[DASHBOARD] Evaluations count:', evaluations.length)
+    console.log('[DASHBOARD] First evaluation sample:', evaluations[0])
+    console.log('[DASHBOARD] First eval fields:', Object.keys(evaluations[0] || {}))
+    
+    const yearLevels = [1, 2, 3, 4]
+    
+    const result = yearLevels.map(level => {
+      const levelEvals = evaluations.filter(e => e.yearLevel === level || e.year_level === level)
+      console.log(`[DASHBOARD] Year ${level}: found ${levelEvals.length} evaluations`)
+      if (levelEvals.length > 0) {
+        console.log(`[DASHBOARD] Sample eval for Year ${level}:`, levelEvals[0])
+        console.log(`[DASHBOARD] Sample eval sentiment value:`, levelEvals[0].sentiment)
+        console.log(`[DASHBOARD] All sentiments for Year ${level}:`, levelEvals.map(e => e.sentiment))
+      }
+      const positive = levelEvals.filter(e => e.sentiment === 'positive').length
+      const neutral = levelEvals.filter(e => e.sentiment === 'neutral').length
+      const negative = levelEvals.filter(e => e.sentiment === 'negative').length
+      
+      console.log(`[DASHBOARD] Year ${level} sentiments - P:${positive} N:${neutral} Neg:${negative}`)
+      
+      return {
+        name: `Year ${level}`,
+        positive,
+        neutral,
+        negative,
+        total: positive + neutral + negative
+      }
+    }).filter(level => level.total > 0)
+    
+    console.log('[DASHBOARD] Year level sentiment result:', JSON.stringify(result, null, 2))
+    console.log('[DASHBOARD] Result array length:', result.length)
+    return result
+  }, [apiData])
 
   if (!currentUser) return null
 
@@ -179,98 +237,86 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9]">
-      {/* Enhanced LPU Header */}
+      {/* Enhanced LPU Header with Better Spacing */}
       <header className="lpu-header">
-        <div className="container mx-auto px-6 py-6">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg">
-                <span className="text-[#7a0000] font-bold text-xl">LPU</span>
+        <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-8 lg:py-10 max-w-screen-2xl">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+            <div className="flex items-center space-x-5">
+              <div className="w-14 h-14 lg:w-16 lg:h-16 bg-white rounded-full flex items-center justify-center shadow-lg flex-shrink-0">
+                <span className="text-[#7a0000] font-bold text-xl lg:text-2xl">LPU</span>
               </div>
               <div>
-                <h1 className="lpu-header-title text-3xl">Course Insight Guardian</h1>
-                <p className="lpu-header-subtitle text-lg">
+                <h1 className="lpu-header-title text-3xl lg:text-4xl">Course Insight Guardian</h1>
+                <p className="lpu-header-subtitle text-base lg:text-lg mt-1">
                   {isAdmin(currentUser) ? 'Academic Excellence Dashboard' : `${currentUser.department} Analytics Hub`}
                 </p>
               </div>
             </div>
-            <div className="bg-white/20 backdrop-blur-sm rounded-xl px-6 py-4 text-right">
+            <div className="bg-white/20 backdrop-blur-sm rounded-xl px-6 lg:px-8 py-4 lg:py-5 text-left lg:text-right w-full lg:w-auto">
               <p className="text-[#ffd700] text-sm font-medium">Welcome back,</p>
-              <p className="text-white font-bold text-lg">{currentUser.name}</p>
-              <div className="flex items-center justify-end space-x-2 mt-1">
-                <div className="w-2 h-2 bg-[#ffd700] rounded-full"></div>
-                <span className="text-white text-xs">Online</span>
+              <p className="text-white font-bold text-lg lg:text-xl mt-1">{currentUser.name}</p>
+              <div className="flex items-center justify-start lg:justify-end space-x-2 mt-2">
+                <div className="w-2 h-2 bg-[#ffd700] rounded-full animate-pulse"></div>
+                <span className="text-white text-xs font-medium">Online</span>
               </div>
             </div>
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-6 py-8">
-        {/* Enhanced Statistics Cards */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+      <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-10 lg:py-12 max-w-screen-2xl">
+        
+        {/* Show warning if no active period and no selection */}
+        {!activePeriod && !selectedPeriod ? (
+          <div className="lpu-card text-center py-16 mb-10">
+            <svg className="w-20 h-20 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <h3 className="text-xl font-semibold text-gray-700 mb-2">No Active Evaluation Period</h3>
+            <p className="text-gray-500 mb-4">There is currently no active evaluation period.</p>
+            <p className="text-gray-500">Please contact the administrator to activate an evaluation period, or select a specific period from the filter below.</p>
+          </div>
+        ) : (
+          <>
+        {/* Enhanced Statistics Cards with Improved Spacing */}
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 lg:gap-6 mb-12">
           {/* Total Courses Card - Navigates to Courses page */}
-          <div 
-            className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200 cursor-pointer group"
+          <div
+            className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 hover:shadow-card-hover transition-all duration-250 cursor-pointer group"
             onClick={() => navigate('/courses')}
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-semibold text-white/90 mb-2">Total Courses</h3>
-                <p className="text-3xl font-bold text-white">{stats.totalCourses}</p>
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex-1">
+                <h3 className="text-xs lg:text-sm font-bold text-white/80 uppercase tracking-wide mb-3">Total Courses</h3>
+                <p className="text-4xl lg:text-5xl font-bold text-white">{stats.totalCourses}</p>
               </div>
-              <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center group-hover:bg-white/30 transition-all duration-200">
-                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-16 h-16 lg:w-18 lg:h-18 bg-white/20 rounded-xl flex items-center justify-center group-hover:bg-white/30 transition-all duration-250 flex-shrink-0">
+                <svg className="w-8 h-8 lg:w-9 lg:h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
                 </svg>
               </div>
             </div>
           </div>
-          
+
           {/* Participation Rate Card - Navigates to Evaluations page */}
-          <div 
-            className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200 cursor-pointer group"
+          <div
+            className="bg-gradient-to-br from-[#C41E3A] to-[#9D1535] rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 hover:shadow-card-hover transition-all duration-250 cursor-pointer group"
             onClick={() => navigate('/evaluations')}
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-semibold text-white/90 mb-2">Participation Rate</h3>
-                <p className="text-3xl font-bold text-white">{stats.participationRate}%</p>
-                <div className="w-full bg-white/30 rounded-full h-2 mt-2">
-                  <div 
-                    className="bg-white rounded-full h-2 transition-all duration-300"
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex-1">
+                <h3 className="text-xs lg:text-sm font-bold text-white/80 uppercase tracking-wide mb-3">Participation Rate</h3>
+                <p className="text-4xl lg:text-5xl font-bold text-white mb-3">{stats.participationRate}%</p>
+                <div className="w-full bg-white/30 rounded-full h-2.5">
+                  <div
+                    className="bg-white rounded-full h-2.5 transition-all duration-500"
                     style={{ width: `${stats.participationRate}%` }}
                   ></div>
                 </div>
               </div>
-              <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center group-hover:bg-white/30 transition-all duration-200">
-                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-16 h-16 lg:w-18 lg:h-18 bg-white/20 rounded-xl flex items-center justify-center group-hover:bg-white/30 transition-all duration-250 flex-shrink-0">
+                <svg className="w-8 h-8 lg:w-9 lg:h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-                </svg>
-              </div>
-            </div>
-          </div>
-          
-          {/* Average Rating Card - Navigates to Sentiment Analysis page */}
-          <div 
-            className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200 cursor-pointer group"
-            onClick={() => navigate('/sentiment')}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-semibold text-white/90 mb-2">Average Rating</h3>
-                <p className="text-3xl font-bold text-white">{stats.avgRating}/4.0</p>
-                <div className="flex items-center mt-1">
-                  {[1,2,3,4].map(star => (
-                    <svg key={star} className={`w-4 h-4 ${star <= Math.round(stats.avgRating) ? 'text-yellow-300' : 'text-white/30'}`} fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
-                    </svg>
-                  ))}
-                </div>
-              </div>
-              <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center group-hover:bg-white/30 transition-all duration-200">
-                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path>
                 </svg>
               </div>
             </div>
@@ -313,6 +359,25 @@ export default function Dashboard() {
                     {programOptions.map((program) => (
                       <option key={program.id} value={program.id}>
                         {program.program_code || program.code} - {program.program_name || program.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Evaluation Period Filter */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    📅 Evaluation Period
+                  </label>
+                  <select
+                    value={selectedPeriod || ''}
+                    onChange={(e) => setSelectedPeriod(e.target.value)}
+                    className="lpu-select"
+                  >
+                    <option value="">Select Period</option>
+                    {evaluationPeriods.map((period) => (
+                      <option key={period.id} value={period.id}>
+                        {period.name} {period.status === 'active' || period.status === 'Active' ? '(Active)' : ''}
                       </option>
                     ))}
                   </select>
@@ -437,22 +502,21 @@ export default function Dashboard() {
                     boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
                   }}
                 />
-                <Bar dataKey="positive" stackId="a" fill="#10b981" name="Positive" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="neutral" stackId="a" fill="#f59e0b" name="Neutral" radius={[4, 4, 0, 0]} minPointSize={2} />
-                <Bar dataKey="negative" stackId="a" fill="#ef4444" name="Negative" radius={[4, 4, 0, 0]} minPointSize={2} />
+                <Legend 
+                  wrapperStyle={{ paddingTop: '20px' }}
+                  iconType="rect"
+                />
+                <Bar dataKey="positive" fill="#10b981" name="Positive" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="neutral" fill="#f59e0b" name="Neutral" radius={[4, 4, 0, 0]} minPointSize={2} />
+                <Bar dataKey="negative" fill="#ef4444" name="Negative" radius={[4, 4, 0, 0]} minPointSize={2} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Completion Tracking Widget */}
+        {/* Course Completion Table (includes completion tracking) */}
         <div className="mb-8">
-          <CompletionTracker />
-        </div>
-
-        {/* Course Completion Table */}
-        <div className="mb-8">
-          <CourseCompletionTable />
+          <CourseCompletionTable selectedPeriod={selectedPeriod} />
         </div>
 
         {/* Quick Actions */}
@@ -511,23 +575,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Category-based Performance Metrics */}
-        <div className="mb-8">
-          <CategoryMetricsDisplay 
-            evaluations={[]}
-            title="Detailed Evaluation Category Performance"
-            description="Comprehensive breakdown of student evaluations across all questionnaire categories"
-          />
-        </div>
-
-        {/* Performance Highlights Widget */}
-        <div className="mb-8">
-          <CategoryComparisonWidget 
-            evaluations={[]}
-            title="Performance Highlights & Areas for Improvement"
-          />
-        </div>
-
         {/* Recent Feedback Table */}
         <div className="lpu-card">
           <div className="flex items-center justify-between border-b border-gray-200 pb-4 mb-6">
@@ -557,7 +604,8 @@ export default function Dashboard() {
             </button>
           </div>
         </div>
-
+        </>
+        )}
 
       </div>
 

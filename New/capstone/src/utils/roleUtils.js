@@ -24,7 +24,7 @@ export function filterCoursesByAccess(courses, user) {
   // Admin has full access
   if (isAdmin(user)) return courses
   
-  // Secretary/Dept Head/Instructor have department-wide access
+  // Secretary/Dept Head have department-wide access
   if (isStaffMember(user)) return courses
   
   // Other roles (if any) are limited to their assigned programs
@@ -42,7 +42,7 @@ export function filterEvaluationsByAccess(evaluations, courses, user) {
   // Admin has full access
   if (isAdmin(user)) return evaluations
   
-  // Secretary/Dept Head/Instructor have department-wide access
+  // Secretary/Dept Head have department-wide access
   if (isStaffMember(user)) return evaluations
   
   // Other roles (if any) are limited to their assigned programs
@@ -151,7 +151,6 @@ export function getRoleDisplayName(user) {
     case 'admin': return 'Administrator'
     case 'secretary': return 'Secretary'
     case 'department_head': return 'Department Head'
-    case 'instructor': return 'Instructor'
     case 'student': return 'Student'
     default: return user.role || 'User'
   }
@@ -170,8 +169,6 @@ export function getRoleBasedAPI(user, apiModule) {
       return apiModule.secretaryAPI
     case 'department_head':
       return apiModule.deptHeadAPI
-    case 'instructor':
-      return apiModule.instructorAPI
     case 'student':
       return apiModule.studentAPI
     default:

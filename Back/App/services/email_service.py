@@ -1,6 +1,7 @@
 """
 Email Service Module
 Handles all email notifications for the Course Feedback System
+Uses Resend API as primary method with SMTP fallback
 """
 
 import smtplib
@@ -19,21 +20,103 @@ import sys
 sys.path.append(str(Path(__file__).parent.parent))
 from config import settings
 
+# Import Resend
+try:
+    import resend
+    RESEND_AVAILABLE = True
+except ImportError:
+    RESEND_AVAILABLE = False
+    print("⚠️ Resend package not installed. Falling back to SMTP only.")
+
 
 class EmailService:
-    """Service for sending emails via SMTP"""
+    """Service for sending emails via Resend API (primary) or SMTP (fallback)"""
     
     def __init__(self):
-        """Initialize email service with SMTP configuration"""
+        """Initialize email service with Resend and SMTP configuration"""
+        # Resend configuration
+        self.resend_api_key = getattr(settings, 'RESEND_API_KEY', None)
+        self.resend_from_email = getattr(settings, 'RESEND_FROM_EMAIL', 'onboarding@resend.dev')
+        self.resend_from_name = getattr(settings, 'RESEND_FROM_NAME', 'LPU Course Feedback System')
+        self.resend_enabled = bool(self.resend_api_key and RESEND_AVAILABLE)
+        
+        # SMTP configuration (backup)
         self.smtp_server = getattr(settings, 'SMTP_SERVER', 'smtp.gmail.com')
         self.smtp_port = getattr(settings, 'SMTP_PORT', 587)
         self.smtp_username = getattr(settings, 'SMTP_USERNAME', None)
         self.smtp_password = getattr(settings, 'SMTP_PASSWORD', None)
         self.smtp_from_email = getattr(settings, 'SMTP_FROM_EMAIL', self.smtp_username)
         self.smtp_from_name = getattr(settings, 'SMTP_FROM_NAME', 'LPU Course Feedback System')
-        self.enabled = all([self.smtp_server, self.smtp_username, self.smtp_password])
+        self.smtp_enabled = all([self.smtp_server, self.smtp_username, self.smtp_password])
+        
+        # Configure Resend API key if available
+        if self.resend_enabled:
+            resend.api_key = self.resend_api_key
+            print("✅ Resend API configured (primary email method)")
+        
+        self.enabled = self.resend_enabled or self.smtp_enabled
+        
+        if not self.enabled:
+            print("⚠️ No email service configured (neither Resend nor SMTP)")
         
     def send_email(
+        self,
+        to_emails: List[str],
+        subject: str,
+        html_body: str,
+        text_body: Optional[str] = None,
+        attachments: Optional[List[Dict]] = None,
+        max_retries: int = 3
+    ) -> bool:
+        """
+        Send an email using Resend API (primary) or SMTP (fallback) with retry logic
+        
+        Args:
+            to_emails: List of recipient email addresses
+            subject: Email subject
+            html_body: HTML email body
+            text_body: Plain text email body (optional)
+            attachments: List of attachment dicts with 'filename' and 'content' keys
+            max_retries: Maximum number of retry attempts (default: 3)
+            
+        Returns:
+            bool: True if sent successfully, False otherwise
+        """
+        if not self.enabled:
+            print("⚠️ Email service not configured. Skipping email send.")
+            return False
+        
+        # Retry logic with exponential backoff
+        import time
+        
+        for attempt in range(1, max_retries + 1):
+            try:
+                result = self._send_email_attempt(to_emails, subject, html_body, text_body, attachments)
+                if result:
+                    return True
+                    
+                # If attempt failed and we have retries left
+                if attempt < max_retries:
+                    wait_time = 2 ** attempt  # Exponential backoff: 2s, 4s, 8s
+                    print(f"⏳ Retry attempt {attempt}/{max_retries} in {wait_time}s...")
+                    time.sleep(wait_time)
+                else:
+                    print(f"❌ All {max_retries} email send attempts failed")
+                    return False
+                    
+            except Exception as e:
+                print(f"❌ Email send attempt {attempt} error: {str(e)}")
+                if attempt < max_retries:
+                    wait_time = 2 ** attempt
+                    print(f"⏳ Retrying in {wait_time}s...")
+                    time.sleep(wait_time)
+                else:
+                    print(f"❌ All {max_retries} attempts exhausted")
+                    return False
+        
+        return False
+    
+    def _send_email_attempt(
         self,
         to_emails: List[str],
         subject: str,
@@ -42,64 +125,92 @@ class EmailService:
         attachments: Optional[List[Dict]] = None
     ) -> bool:
         """
-        Send an email
-        
-        Args:
-            to_emails: List of recipient email addresses
-            subject: Email subject
-            html_body: HTML email body
-            text_body: Plain text email body (optional)
-            attachments: List of attachment dicts with 'filename' and 'content' keys
-            
-        Returns:
-            bool: True if sent successfully, False otherwise
+        Single attempt to send email using Resend API (primary) or SMTP (fallback)
+        Internal method called by send_email with retry logic
         """
         if not self.enabled:
-            print("⚠️ Email service not configured. Skipping email send.")
             return False
-            
-        try:
-            # Create message
-            message = MIMEMultipart("alternative")
-            message["Subject"] = subject
-            message["From"] = f"{self.smtp_from_name} <{self.smtp_from_email}>"
-            message["To"] = ", ".join(to_emails)
-            
-            # Add text and HTML parts
-            if text_body:
-                part1 = MIMEText(text_body, "plain")
-                message.attach(part1)
+        
+        # Try Resend first if available
+        if self.resend_enabled:
+            try:
+                print(f"📧 Attempting to send via Resend to {', '.join(to_emails)}...")
                 
-            part2 = MIMEText(html_body, "html")
-            message.attach(part2)
-            
-            # Add attachments if any
-            if attachments:
-                for attachment in attachments:
-                    part = MIMEBase("application", "octet-stream")
-                    part.set_payload(attachment['content'])
-                    encoders.encode_base64(part)
-                    part.add_header(
-                        "Content-Disposition",
-                        f"attachment; filename= {attachment['filename']}",
-                    )
-                    message.attach(part)
-            
-            # Create SSL context
-            context = ssl.create_default_context()
-            
-            # Send email
-            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
-                server.starttls(context=context)
-                server.login(self.smtp_username, self.smtp_password)
-                server.sendmail(self.smtp_from_email, to_emails, message.as_string())
+                params = {
+                    "from": f"{self.resend_from_name} <{self.resend_from_email}>",
+                    "to": to_emails,
+                    "subject": subject,
+                    "html": html_body,
+                }
                 
-            print(f"✅ Email sent successfully to {', '.join(to_emails)}")
-            return True
-            
-        except Exception as e:
-            print(f"❌ Failed to send email: {str(e)}")
-            return False
+                # Add text body if provided
+                if text_body:
+                    params["text"] = text_body
+                
+                # Note: Resend attachments use different format than SMTP
+                # Will need to be implemented separately if needed
+                
+                response = resend.Emails.send(params)
+                print(f"✅ Email sent successfully via Resend to {', '.join(to_emails)}")
+                print(f"   Resend ID: {response.get('id', 'N/A')}")
+                return True
+                
+            except Exception as e:
+                print(f"⚠️ Resend failed: {str(e)}")
+                if self.smtp_enabled:
+                    print("   Falling back to SMTP...")
+                else:
+                    print("   No SMTP backup configured")
+                    return False
+        
+        # Fallback to SMTP if Resend failed or not available
+        if self.smtp_enabled:
+            try:
+                print(f"📧 Sending via SMTP to {', '.join(to_emails)}...")
+                
+                # Create message
+                message = MIMEMultipart("alternative")
+                message["Subject"] = subject
+                message["From"] = f"{self.smtp_from_name} <{self.smtp_from_email}>"
+                message["To"] = ", ".join(to_emails)
+                
+                # Add text and HTML parts
+                if text_body:
+                    part1 = MIMEText(text_body, "plain")
+                    message.attach(part1)
+                    
+                part2 = MIMEText(html_body, "html")
+                message.attach(part2)
+                
+                # Add attachments if any
+                if attachments:
+                    for attachment in attachments:
+                        part = MIMEBase("application", "octet-stream")
+                        part.set_payload(attachment['content'])
+                        encoders.encode_base64(part)
+                        part.add_header(
+                            "Content-Disposition",
+                            f"attachment; filename= {attachment['filename']}",
+                        )
+                        message.attach(part)
+                
+                # Create SSL context
+                context = ssl.create_default_context()
+                
+                # Send email
+                with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                    server.starttls(context=context)
+                    server.login(self.smtp_username, self.smtp_password)
+                    server.sendmail(self.smtp_from_email, to_emails, message.as_string())
+                    
+                print(f"✅ Email sent successfully via SMTP to {', '.join(to_emails)}")
+                return True
+                
+            except Exception as e:
+                print(f"❌ SMTP send failed: {str(e)}")
+                return False
+        
+        return False
     
     def send_evaluation_period_start(
         self,
@@ -110,6 +221,10 @@ class EmailService:
         courses_count: int
     ) -> bool:
         """Send notification when evaluation period starts"""
+        
+        # Get frontend URL from environment
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+        dashboard_url = f"{frontend_url}/student/dashboard"
         
         subject = f"📝 Evaluation Period Started: {period_name}"
         
@@ -158,7 +273,7 @@ class EmailService:
                     </ul>
                     
                     <center>
-                        <a href="http://localhost:5173/student/dashboard" class="button">
+                        <a href="{dashboard_url}" class="button">
                             Start Evaluating Now →
                         </a>
                     </center>
@@ -192,393 +307,9 @@ class EmailService:
         Your feedback is valuable in helping us improve the quality of education.
         Please log in to complete your course evaluations.
         
-        Login at: http://localhost:5173/student/dashboard
+        Login at: {dashboard_url}
         
         Note: Evaluations must be completed before {end_date}.
-        
-        ---
-        LPU Batangas Course Feedback System
-        """
-        
-        return self.send_email(to_emails, subject, html_body, text_body)
-    
-    def send_evaluation_reminder(
-        self,
-        to_emails: List[str],
-        period_name: str,
-        end_date: str,
-        pending_courses: List[str],
-        days_remaining: int
-    ) -> bool:
-        """Send reminder for pending evaluations"""
-        
-        urgency = "🔴 URGENT" if days_remaining <= 2 else "⚠️ REMINDER"
-        subject = f"{urgency}: {len(pending_courses)} Course Evaluations Pending"
-        
-        courses_list = "".join([f"<li>{course}</li>" for course in pending_courses])
-        
-        html_body = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <style>
-                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                .header {{ background: {'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' if days_remaining <= 2 else 'linear-gradient(135deg, #ffd89b 0%, #19547b 100%)'}; 
-                          color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
-                .content {{ background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }}
-                .button {{ display: inline-block; padding: 12px 30px; background: #f5576c; 
-                          color: white; text-decoration: none; border-radius: 5px; margin-top: 20px; }}
-                .warning-box {{ background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; 
-                               margin: 20px 0; border-radius: 5px; }}
-                .urgent-box {{ background: #f8d7da; padding: 15px; border-left: 4px solid #dc3545; 
-                               margin: 20px 0; border-radius: 5px; }}
-                .footer {{ text-align: center; margin-top: 20px; color: #666; font-size: 12px; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1>{"⏰ Evaluation Deadline Approaching" if days_remaining > 2 else "🚨 URGENT: Deadline Tomorrow!"}</h1>
-                </div>
-                <div class="content">
-                    <h2>Dear Student,</h2>
-                    <p>You have <strong>{len(pending_courses)} pending course evaluation(s)</strong> 
-                    that need to be completed.</p>
-                    
-                    <div class="{'urgent-box' if days_remaining <= 2 else 'warning-box'}">
-                        <strong>{"🔴 URGENT:" if days_remaining <= 2 else "⚠️ Reminder:"}</strong><br>
-                        Deadline: <strong>{end_date}</strong><br>
-                        Time Remaining: <strong>{days_remaining} day(s)</strong>
-                    </div>
-                    
-                    <p><strong>Pending Courses:</strong></p>
-                    <ul>
-                        {courses_list}
-                    </ul>
-                    
-                    <p>{"⚠️ Please complete your evaluations as soon as possible to avoid missing the deadline!" if days_remaining <= 2 else "Don't forget to share your valuable feedback before the deadline."}</p>
-                    
-                    <center>
-                        <a href="http://localhost:5173/student/dashboard" class="button">
-                            Complete Evaluations Now →
-                        </a>
-                    </center>
-                </div>
-                <div class="footer">
-                    <p>LPU Batangas Course Feedback System</p>
-                    <p>This is an automated message. Please do not reply to this email.</p>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
-        
-        text_body = f"""
-        {urgency}: {len(pending_courses)} Course Evaluations Pending
-        
-        Dear Student,
-        
-        You have {len(pending_courses)} pending course evaluation(s) that need to be completed.
-        
-        Deadline: {end_date}
-        Time Remaining: {days_remaining} day(s)
-        
-        Pending Courses:
-        {chr(10).join(['- ' + course for course in pending_courses])}
-        
-        Please complete your evaluations as soon as possible.
-        
-        Login at: http://localhost:5173/student/dashboard
-        
-        ---
-        LPU Batangas Course Feedback System
-        """
-        
-        return self.send_email(to_emails, subject, html_body, text_body)
-    
-    def send_evaluation_period_ending(
-        self,
-        to_emails: List[str],
-        period_name: str,
-        end_date: str,
-        hours_remaining: int
-    ) -> bool:
-        """Send final warning before period ends"""
-        
-        subject = f"🚨 FINAL NOTICE: Evaluation Period Ends in {hours_remaining} Hours"
-        
-        html_body = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <style>
-                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                .header {{ background: linear-gradient(135deg, #ff0844 0%, #ffb199 100%); 
-                          color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
-                .content {{ background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }}
-                .button {{ display: inline-block; padding: 12px 30px; background: #ff0844; 
-                          color: white; text-decoration: none; border-radius: 5px; margin-top: 20px; }}
-                .critical-box {{ background: #f8d7da; padding: 20px; border: 3px solid #dc3545; 
-                                margin: 20px 0; border-radius: 5px; text-align: center; }}
-                .footer {{ text-align: center; margin-top: 20px; color: #666; font-size: 12px; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1>🚨 FINAL NOTICE</h1>
-                    <h2>Evaluation Period Ending Soon</h2>
-                </div>
-                <div class="content">
-                    <h2>Dear Student,</h2>
-                    <p><strong>This is your FINAL reminder!</strong></p>
-                    
-                    <div class="critical-box">
-                        <h2 style="margin: 0; color: #dc3545;">⏰ {hours_remaining} HOURS REMAINING</h2>
-                        <p style="margin: 10px 0 0 0; font-size: 18px;">
-                            Deadline: <strong>{end_date}</strong>
-                        </p>
-                    </div>
-                    
-                    <p>The evaluation period <strong>{period_name}</strong> will close in 
-                    <strong>{hours_remaining} hours</strong>. After this time, you will no longer 
-                    be able to submit evaluations.</p>
-                    
-                    <p><strong>⚠️ ACTION REQUIRED:</strong></p>
-                    <ul>
-                        <li>Complete all pending course evaluations immediately</li>
-                        <li>Your feedback is crucial for improving course quality</li>
-                        <li>This is your last chance to participate</li>
-                    </ul>
-                    
-                    <center>
-                        <a href="http://localhost:5173/student/dashboard" class="button">
-                            🚀 COMPLETE NOW - DON'T MISS OUT!
-                        </a>
-                    </center>
-                    
-                    <p style="margin-top: 30px; font-size: 14px; color: #dc3545; text-align: center;">
-                        <strong>After {end_date}, the evaluation system will be closed.</strong>
-                    </p>
-                </div>
-                <div class="footer">
-                    <p>LPU Batangas Course Feedback System</p>
-                    <p>This is an automated message. Please do not reply to this email.</p>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
-        
-        text_body = f"""
-        🚨 FINAL NOTICE: Evaluation Period Ends in {hours_remaining} Hours
-        
-        Dear Student,
-        
-        This is your FINAL reminder!
-        
-        ⏰ {hours_remaining} HOURS REMAINING
-        Deadline: {end_date}
-        
-        The evaluation period {period_name} will close soon. After this time, 
-        you will no longer be able to submit evaluations.
-        
-        ACTION REQUIRED:
-        - Complete all pending course evaluations immediately
-        - Your feedback is crucial for improving course quality
-        - This is your last chance to participate
-        
-        Login at: http://localhost:5173/student/dashboard
-        
-        After {end_date}, the evaluation system will be closed.
-        
-        ---
-        LPU Batangas Course Feedback System
-        """
-        
-        return self.send_email(to_emails, subject, html_body, text_body)
-    
-    def send_evaluation_submitted_confirmation(
-        self,
-        to_email: str,
-        student_name: str,
-        course_name: str,
-        submission_date: str
-    ) -> bool:
-        """Send confirmation after student submits evaluation"""
-        
-        subject = f"✅ Evaluation Submitted: {course_name}"
-        
-        html_body = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <style>
-                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                .header {{ background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); 
-                          color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
-                .content {{ background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }}
-                .success-box {{ background: #d4edda; padding: 15px; border-left: 4px solid #28a745; 
-                               margin: 20px 0; border-radius: 5px; }}
-                .footer {{ text-align: center; margin-top: 20px; color: #666; font-size: 12px; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1>✅ Evaluation Submitted Successfully</h1>
-                </div>
-                <div class="content">
-                    <h2>Dear {student_name},</h2>
-                    <p>Thank you for completing your course evaluation!</p>
-                    
-                    <div class="success-box">
-                        <strong>📋 Submission Details:</strong><br>
-                        Course: {course_name}<br>
-                        Submitted: {submission_date}<br>
-                        Status: <strong style="color: #28a745;">✓ Confirmed</strong>
-                    </div>
-                    
-                    <p>Your feedback has been recorded and will help improve the quality of education.</p>
-                    
-                    <p><strong>What happens next?</strong></p>
-                    <ul>
-                        <li>Your responses are kept anonymous</li>
-                        <li>Feedback will be analyzed and shared with instructors</li>
-                        <li>Results contribute to course improvement initiatives</li>
-                    </ul>
-                    
-                    <p>If you have more courses to evaluate, please return to your dashboard.</p>
-                </div>
-                <div class="footer">
-                    <p>LPU Batangas Course Feedback System</p>
-                    <p>This is an automated confirmation. Please do not reply to this email.</p>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
-        
-        text_body = f"""
-        ✅ Evaluation Submitted Successfully
-        
-        Dear {student_name},
-        
-        Thank you for completing your course evaluation!
-        
-        Submission Details:
-        - Course: {course_name}
-        - Submitted: {submission_date}
-        - Status: ✓ Confirmed
-        
-        Your feedback has been recorded and will help improve the quality of education.
-        
-        Your responses are kept anonymous and will be analyzed to improve course quality.
-        
-        ---
-        LPU Batangas Course Feedback System
-        """
-        
-        return self.send_email([to_email], subject, html_body, text_body)
-    
-    def send_admin_evaluation_summary(
-        self,
-        to_emails: List[str],
-        period_name: str,
-        total_evaluations: int,
-        response_rate: float,
-        anomalies_detected: int,
-        avg_sentiment: str
-    ) -> bool:
-        """Send evaluation summary report to administrators"""
-        
-        subject = f"📊 Evaluation Period Summary: {period_name}"
-        
-        html_body = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <style>
-                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                          color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
-                .content {{ background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }}
-                .stats-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0; }}
-                .stat-box {{ background: white; padding: 20px; border-radius: 8px; text-align: center; 
-                            box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
-                .stat-value {{ font-size: 32px; font-weight: bold; color: #667eea; margin: 10px 0; }}
-                .stat-label {{ color: #666; font-size: 14px; }}
-                .footer {{ text-align: center; margin-top: 20px; color: #666; font-size: 12px; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1>📊 Evaluation Period Summary</h1>
-                    <p style="margin: 0;">{period_name}</p>
-                </div>
-                <div class="content">
-                    <h2>Administrator Report</h2>
-                    <p>Here's a summary of the completed evaluation period:</p>
-                    
-                    <div class="stats-grid">
-                        <div class="stat-box">
-                            <div class="stat-value">{total_evaluations}</div>
-                            <div class="stat-label">Total Evaluations</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-value">{response_rate}%</div>
-                            <div class="stat-label">Response Rate</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-value">{anomalies_detected}</div>
-                            <div class="stat-label">Anomalies Detected</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-value">{avg_sentiment}</div>
-                            <div class="stat-label">Avg Sentiment</div>
-                        </div>
-                    </div>
-                    
-                    <p><strong>Key Insights:</strong></p>
-                    <ul>
-                        <li>ML-powered sentiment analysis completed</li>
-                        <li>Anomaly detection identified potentially invalid responses</li>
-                        <li>Detailed reports available in the admin dashboard</li>
-                    </ul>
-                    
-                    <p>Log in to the admin dashboard to view detailed analytics and export reports.</p>
-                </div>
-                <div class="footer">
-                    <p>LPU Batangas Course Feedback System</p>
-                    <p>This is an automated report. Please do not reply to this email.</p>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
-        
-        text_body = f"""
-        📊 Evaluation Period Summary: {period_name}
-        
-        Administrator Report
-        
-        Summary:
-        - Total Evaluations: {total_evaluations}
-        - Response Rate: {response_rate}%
-        - Anomalies Detected: {anomalies_detected}
-        - Average Sentiment: {avg_sentiment}
-        
-        Key Insights:
-        - ML-powered sentiment analysis completed
-        - Anomaly detection identified potentially invalid responses
-        - Detailed reports available in the admin dashboard
-        
-        Log in to view detailed analytics and export reports.
         
         ---
         LPU Batangas Course Feedback System
@@ -589,3 +320,106 @@ class EmailService:
 
 # Singleton instance
 email_service = EmailService()
+
+
+# Standalone function for password reset (for backward compatibility)
+def send_password_reset_email(to_email: str, reset_token: str, user_name: str) -> bool:
+    """
+    Send password reset email with reset link
+    
+    Args:
+        to_email: Recipient email address
+        reset_token: Password reset token
+        user_name: User's full name
+        
+    Returns:
+        bool: True if sent successfully, False otherwise
+    """
+    reset_link = f"http://localhost:5173/reset-password?token={reset_token}"
+    
+    subject = "🔐 Password Reset Request - LPU Course Feedback"
+    
+    html_body = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+            .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+            .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                      color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
+            .content {{ background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }}
+            .button {{ display: inline-block; padding: 15px 30px; background: #667eea; 
+                      color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; 
+                      font-weight: bold; }}
+            .warning-box {{ background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; 
+                           margin: 20px 0; border-radius: 5px; }}
+            .footer {{ text-align: center; margin-top: 20px; color: #666; font-size: 12px; }}
+            .token-box {{ background: #f0f0f0; padding: 10px; border-radius: 5px; 
+                         font-family: monospace; word-break: break-all; margin: 10px 0; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🔐 Password Reset Request</h1>
+            </div>
+            <div class="content">
+                <h2>Hello {user_name},</h2>
+                <p>We received a request to reset your password for the LPU Course Feedback System.</p>
+                
+                <p>Click the button below to reset your password:</p>
+                
+                <center>
+                    <a href="{reset_link}" class="button">
+                        Reset Password →
+                    </a>
+                </center>
+                
+                <p style="font-size: 14px; color: #666;">
+                    Or copy and paste this link into your browser:<br>
+                    <span class="token-box">{reset_link}</span>
+                </p>
+                
+                <div class="warning-box">
+                    <strong>⚠️ Security Notice:</strong><br>
+                    • This link will expire in 1 hour<br>
+                    • If you didn't request this reset, please ignore this email<br>
+                    • Never share this link with anyone
+                </div>
+                
+                <p>If the button doesn't work, you can also use this reset token manually:</p>
+                <div class="token-box">{reset_token}</div>
+            </div>
+            <div class="footer">
+                <p>LPU Batangas Course Feedback System</p>
+                <p>This is an automated message. Please do not reply to this email.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    text_body = f"""
+    Password Reset Request - LPU Course Feedback System
+    
+    Hello {user_name},
+    
+    We received a request to reset your password.
+    
+    Click this link to reset your password:
+    {reset_link}
+    
+    Or use this reset token manually:
+    {reset_token}
+    
+    Security Notice:
+    - This link will expire in 1 hour
+    - If you didn't request this reset, please ignore this email
+    - Never share this link with anyone
+    
+    ---
+    LPU Batangas Course Feedback System
+    """
+    
+    return email_service.send_email([to_email], subject, html_body, text_body)

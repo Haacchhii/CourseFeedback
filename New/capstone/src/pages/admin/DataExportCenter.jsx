@@ -11,7 +11,6 @@ export default function DataExportCenter() {
   const { user: currentUser } = useAuth()
   
   const [activeTab, setActiveTab] = useState('quick')
-  const [showScheduleModal, setShowScheduleModal] = useState(false)
   const [exportFormat, setExportFormat] = useState('csv')
   const [dateRange, setDateRange] = useState('all')
   const [includeFilters, setIncludeFilters] = useState({
@@ -20,14 +19,6 @@ export default function DataExportCenter() {
     evaluations: true,
     analytics: true,
     auditLogs: false
-  })
-
-  const [scheduleSettings, setScheduleSettings] = useState({
-    frequency: 'weekly',
-    dayOfWeek: 'Monday',
-    time: '02:00',
-    format: 'csv',
-    recipients: currentUser?.email || ''
   })
   
   // Export Modal State
@@ -69,6 +60,8 @@ export default function DataExportCenter() {
     courses: { total: 0 },
     evaluations: { total: 0 }
   })
+  const [programs, setPrograms] = useState([])
+  const [evaluationPeriods, setEvaluationPeriods] = useState([])
 
   // Redirect if not system admin
   useEffect(() => {
@@ -113,6 +106,32 @@ export default function DataExportCenter() {
     fetchStats()
   }, [])
 
+  // Fetch programs for filter dropdowns
+  useEffect(() => {
+    const fetchPrograms = async () => {
+      try {
+        const response = await adminAPI.getPrograms()
+        setPrograms(response?.data || [])
+      } catch (err) {
+        console.error('Failed to fetch programs:', err)
+      }
+    }
+    fetchPrograms()
+  }, [])
+
+  // Fetch evaluation periods for filter dropdowns
+  useEffect(() => {
+    const fetchPeriods = async () => {
+      try {
+        const response = await adminAPI.getPeriods()
+        setEvaluationPeriods(response?.data || [])
+      } catch (err) {
+        console.error('Failed to fetch evaluation periods:', err)
+      }
+    }
+    fetchPeriods()
+  }, [])
+
   const handleQuickExport = (type) => {
     // Open export modal with selected type
     setSelectedExportType(type)
@@ -124,10 +143,8 @@ export default function DataExportCenter() {
       userStatus: 'all',
       evalDateRange: 'all',
       evalProgram: 'all',
-      evalSemester: 'all',
-      evalInstructor: 'all',
+      evalPeriod: 'all',
       courseProgram: 'all',
-      courseStatus: 'all',
       courseYearLevel: 'all',
       analyticsReportType: 'summary',
       analyticsDateRange: 'semester',
@@ -163,14 +180,13 @@ export default function DataExportCenter() {
       } else if (selectedExportType === 'All Evaluations') {
         if (exportFilters.evalDateRange !== 'all') options.dateRange = exportFilters.evalDateRange
         if (exportFilters.evalProgram !== 'all') options.program = exportFilters.evalProgram
-        if (exportFilters.evalSemester !== 'all') options.semester = exportFilters.evalSemester
-        if (exportFilters.evalInstructor !== 'all') options.instructor = exportFilters.evalInstructor
+        if (exportFilters.evalPeriod !== 'all') options.period_id = exportFilters.evalPeriod
         data = await adminAPI.exportEvaluations(options)
         downloadData(data, `evaluations_export_${timestamp}.${modalFormat}`, modalFormat)
       } else if (selectedExportType === 'All Courses') {
         if (exportFilters.courseProgram !== 'all') options.program = exportFilters.courseProgram
         if (exportFilters.courseStatus !== 'all') options.status = exportFilters.courseStatus
-        if (exportFilters.courseYearLevel !== 'all') options.yearLevel = exportFilters.courseYearLevel
+        if (exportFilters.courseYearLevel !== 'all') options.year_level = exportFilters.courseYearLevel
         data = await adminAPI.exportCourses(options)
         downloadData(data, `courses_export_${timestamp}.${modalFormat}`, modalFormat)
       } else if (selectedExportType === 'Audit Logs') {
@@ -534,37 +550,7 @@ export default function DataExportCenter() {
     }
   }
 
-  const handleScheduleExport = async (e) => {
-    e.preventDefault()
-    
-    try {
-      setLoading(true)
-      
-      const scheduleData = {
-        frequency: scheduleSettings.frequency,
-        time: scheduleSettings.time,
-        format: scheduleSettings.format,
-        recipients: scheduleSettings.recipients,
-        day_of_week: scheduleSettings.frequency === 'weekly' ? scheduleSettings.dayOfWeek : null,
-        day_of_month: scheduleSettings.frequency === 'monthly' ? parseInt(scheduleSettings.dayOfMonth) : null,
-        is_active: true
-      }
-      
-      const response = await adminAPI.scheduleExport(scheduleData)
-      
-      if (response.success) {
-        alert(`✅ Export scheduled successfully!\n\nFrequency: ${scheduleSettings.frequency}\nTime: ${scheduleSettings.time}\nRecipients: ${scheduleSettings.recipients}`)
-        setShowScheduleModal(false)
-      } else {
-        throw new Error(response.message || 'Failed to schedule export')
-      }
-    } catch (err) {
-      console.error('Schedule export error:', err)
-      alert(`Failed to schedule export: ${err.message}`)
-    } finally {
-      setLoading(false)
-    }
-  }
+
 
   const handleDownload = (file) => {
     alert(`Downloading ${file.filename}...`)
@@ -577,7 +563,7 @@ export default function DataExportCenter() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-600"></div>
           <p className="mt-4 text-gray-600">Loading export center...</p>
         </div>
       </div>
@@ -597,7 +583,7 @@ export default function DataExportCenter() {
             <p className="text-gray-600 mb-4">{error}</p>
             <button 
               onClick={() => window.location.reload()} 
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700"
             >
               Retry
             </button>
@@ -610,38 +596,31 @@ export default function DataExportCenter() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Header */}
-      <header className="bg-gradient-to-r from-green-600 to-green-700 shadow-xl border-b-4 border-green-800">
-        <div className="container mx-auto px-6 py-6">
+      <header className="lpu-header">
+        <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-8 lg:py-10 max-w-screen-2xl">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-4">
-              <button onClick={() => navigate('/admin/dashboard')} className="w-12 h-12 bg-white/20 hover:bg-white/30 rounded-xl flex items-center justify-center transition-all">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
-                </svg>
-              </button>
+              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg">
+                <span className="text-[#7a0000] font-bold text-xl">LPU</span>
+              </div>
               <div>
-                <h1 className="text-3xl font-bold text-white">Data Export Center</h1>
-                <p className="text-green-100 text-sm mt-1">Export system data in multiple formats</p>
+                <h1 className="lpu-header-title text-3xl">Data Export Center</h1>
+                <p className="lpu-header-subtitle text-lg">Export system data in multiple formats</p>
               </div>
             </div>
-            <button onClick={() => setShowScheduleModal(true)} className="bg-white hover:bg-green-50 text-green-600 font-semibold px-6 py-3 rounded-xl shadow-lg transition-all flex items-center space-x-2">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-              <span>Schedule Export</span>
-            </button>
+
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-6 py-8">
+      <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-10 lg:py-12 max-w-screen-2xl">
         {/* Tabs */}
-        <div className="bg-white rounded-xl shadow-md mb-6 p-2 grid grid-cols-2 gap-2">
+        <div className="bg-white rounded-card shadow-card mb-12 p-2 grid grid-cols-2 gap-2">
           <button
             onClick={() => setActiveTab('quick')}
             className={`py-3 px-4 rounded-lg font-semibold transition-all ${
               activeTab === 'quick'
-                ? 'bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg'
+                ? 'bg-gradient-to-r from-red-700 to-red-900 text-white shadow-lg'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
@@ -651,7 +630,7 @@ export default function DataExportCenter() {
             onClick={() => setActiveTab('history')}
             className={`py-3 px-4 rounded-lg font-semibold transition-all ${
               activeTab === 'history'
-                ? 'bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg'
+                ? 'bg-gradient-to-r from-red-700 to-red-900 text-white shadow-lg'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
@@ -662,20 +641,20 @@ export default function DataExportCenter() {
         {/* Quick Export Tab */}
         {activeTab === 'quick' && (
           <>
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
-              <p className="text-sm text-blue-900 font-semibold mb-1">⚡ Quick Export Options</p>
-              <p className="text-sm text-blue-700">Export commonly requested data sets with one click.</p>
+            <div className="bg-red-50 border border-yellow-200 rounded-card p-4 mb-12">
+              <p className="text-sm text-red-900 font-semibold mb-1">⚡ Quick Export Options</p>
+              <p className="text-sm text-red-700">Export commonly requested data sets with one click.</p>
             </div>
 
             {/* Format Selector - REMOVED: Will be replaced with modal in Phase 4 */}
             {/* Format selection will be per-export via modal pop-up */}
 
             {/* Quick Export Cards */}
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all border-2 border-transparent hover:border-blue-500">
+            <div className="grid md:grid-cols-2 gap-5 lg:gap-6">
+              <div className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all border-2 border-transparent hover:border-yellow-500">
                 <div className="flex items-center mb-4">
-                  <div className="w-16 h-16 bg-blue-100 rounded-xl flex items-center justify-center mr-4">
-                    <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-16 h-16 bg-red-100 rounded-xl flex items-center justify-center mr-4">
+                    <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
                     </svg>
                   </div>
@@ -687,7 +666,7 @@ export default function DataExportCenter() {
                 <p className="text-sm text-gray-600 mb-4">Export complete user database including students, heads, and administrators.</p>
                 <button
                   onClick={() => handleQuickExport('All Users')}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-5 rounded-button transition-all duration-250 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                   disabled={exporting}
                 >
                   {exporting ? (
@@ -701,10 +680,10 @@ export default function DataExportCenter() {
                 </button>
               </div>
 
-              <div className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all border-2 border-transparent hover:border-purple-500">
+              <div className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all border-2 border-transparent hover:border-yellow-500">
                 <div className="flex items-center mb-4">
-                  <div className="w-16 h-16 bg-purple-100 rounded-xl flex items-center justify-center mr-4">
-                    <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-16 h-16 bg-yellow-100 rounded-xl flex items-center justify-center mr-4">
+                    <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
                     </svg>
                   </div>
@@ -716,16 +695,16 @@ export default function DataExportCenter() {
                 <p className="text-sm text-gray-600 mb-4">Export all course data including instructors, programs, and enrollment info.</p>
                 <button
                   onClick={() => handleQuickExport('All Courses')}
-                  className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-4 rounded-lg transition-all"
+                  className="w-full bg-yellow-600 hover:bg-amber-700 text-white font-semibold py-3 px-5 rounded-button transition-all duration-250"
                 >
                   Export Courses →
                 </button>
               </div>
 
-              <div className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all border-2 border-transparent hover:border-green-500">
+              <div className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all border-2 border-transparent hover:border-yellow-500">
                 <div className="flex items-center mb-4">
-                  <div className="w-16 h-16 bg-green-100 rounded-xl flex items-center justify-center mr-4">
-                    <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-16 h-16 bg-yellow-100 rounded-xl flex items-center justify-center mr-4">
+                    <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
                     </svg>
                   </div>
@@ -737,7 +716,7 @@ export default function DataExportCenter() {
                 <p className="text-sm text-gray-600 mb-4">Export all evaluation responses with ratings and comments.</p>
                 <button
                   onClick={() => handleQuickExport('All Evaluations')}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition-all"
+                  className="w-full bg-yellow-600 hover:bg-amber-700 text-white font-semibold py-3 px-5 rounded-button transition-all duration-250"
                 >
                   Export Evaluations →
                 </button>
@@ -758,7 +737,7 @@ export default function DataExportCenter() {
                 <p className="text-sm text-gray-600 mb-4">Export system audit logs for compliance and security review.</p>
                 <button
                   onClick={() => handleQuickExport('Audit Logs')}
-                  className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-lg transition-all"
+                  className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-5 rounded-button transition-all duration-250"
                 >
                   Export Logs →
                 </button>
@@ -778,12 +757,12 @@ export default function DataExportCenter() {
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Select Data to Export</h3>
                 <div className="space-y-3">
-                  <label className="flex items-center p-4 border-2 border-gray-200 rounded-lg hover:border-green-500 transition-all cursor-pointer">
+                  <label className="flex items-center p-4 border-2 border-gray-200 rounded-lg hover:border-yellow-500 transition-all cursor-pointer">
                     <input
                       type="checkbox"
                       checked={includeFilters.users}
                       onChange={(e) => setIncludeFilters({...includeFilters, users: e.target.checked})}
-                      className="w-5 h-5 text-green-600 rounded focus:ring-2 focus:ring-green-500 mr-3"
+                      className="w-5 h-5 text-yellow-600 rounded focus:ring-2 focus:ring-green-500 mr-3"
                     />
                     <div className="flex-1">
                       <span className="text-sm font-semibold text-gray-900">User Data</span>
@@ -791,12 +770,12 @@ export default function DataExportCenter() {
                     </div>
                   </label>
 
-                  <label className="flex items-center p-4 border-2 border-gray-200 rounded-lg hover:border-green-500 transition-all cursor-pointer">
+                  <label className="flex items-center p-4 border-2 border-gray-200 rounded-lg hover:border-yellow-500 transition-all cursor-pointer">
                     <input
                       type="checkbox"
                       checked={includeFilters.courses}
                       onChange={(e) => setIncludeFilters({...includeFilters, courses: e.target.checked})}
-                      className="w-5 h-5 text-green-600 rounded focus:ring-2 focus:ring-green-500 mr-3"
+                      className="w-5 h-5 text-yellow-600 rounded focus:ring-2 focus:ring-green-500 mr-3"
                     />
                     <div className="flex-1">
                       <span className="text-sm font-semibold text-gray-900">Course Data</span>
@@ -804,12 +783,12 @@ export default function DataExportCenter() {
                     </div>
                   </label>
 
-                  <label className="flex items-center p-4 border-2 border-gray-200 rounded-lg hover:border-green-500 transition-all cursor-pointer">
+                  <label className="flex items-center p-4 border-2 border-gray-200 rounded-lg hover:border-yellow-500 transition-all cursor-pointer">
                     <input
                       type="checkbox"
                       checked={includeFilters.evaluations}
                       onChange={(e) => setIncludeFilters({...includeFilters, evaluations: e.target.checked})}
-                      className="w-5 h-5 text-green-600 rounded focus:ring-2 focus:ring-green-500 mr-3"
+                      className="w-5 h-5 text-yellow-600 rounded focus:ring-2 focus:ring-green-500 mr-3"
                     />
                     <div className="flex-1">
                       <span className="text-sm font-semibold text-gray-900">Evaluation Data</span>
@@ -817,12 +796,12 @@ export default function DataExportCenter() {
                     </div>
                   </label>
 
-                  <label className="flex items-center p-4 border-2 border-gray-200 rounded-lg hover:border-green-500 transition-all cursor-pointer">
+                  <label className="flex items-center p-4 border-2 border-gray-200 rounded-lg hover:border-yellow-500 transition-all cursor-pointer">
                     <input
                       type="checkbox"
                       checked={includeFilters.analytics}
                       onChange={(e) => setIncludeFilters({...includeFilters, analytics: e.target.checked})}
-                      className="w-5 h-5 text-green-600 rounded focus:ring-2 focus:ring-green-500 mr-3"
+                      className="w-5 h-5 text-yellow-600 rounded focus:ring-2 focus:ring-green-500 mr-3"
                     />
                     <div className="flex-1">
                       <span className="text-sm font-semibold text-gray-900">Analytics Data</span>
@@ -830,12 +809,12 @@ export default function DataExportCenter() {
                     </div>
                   </label>
 
-                  <label className="flex items-center p-4 border-2 border-gray-200 rounded-lg hover:border-green-500 transition-all cursor-pointer">
+                  <label className="flex items-center p-4 border-2 border-gray-200 rounded-lg hover:border-yellow-500 transition-all cursor-pointer">
                     <input
                       type="checkbox"
                       checked={includeFilters.auditLogs}
                       onChange={(e) => setIncludeFilters({...includeFilters, auditLogs: e.target.checked})}
-                      className="w-5 h-5 text-green-600 rounded focus:ring-2 focus:ring-green-500 mr-3"
+                      className="w-5 h-5 text-yellow-600 rounded focus:ring-2 focus:ring-green-500 mr-3"
                     />
                     <div className="flex-1">
                       <span className="text-sm font-semibold text-gray-900">Audit Logs</span>
@@ -873,8 +852,8 @@ export default function DataExportCenter() {
                       onClick={() => setExportFormat(format)}
                       className={`p-4 rounded-lg border-2 transition-all ${
                         exportFormat === format
-                          ? 'border-green-500 bg-green-50'
-                          : 'border-gray-200 hover:border-green-300'
+                          ? 'border-yellow-500 bg-yellow-50'
+                          : 'border-gray-200 hover:border-yellow-300'
                       }`}
                     >
                       <p className="font-bold text-gray-900">{format.toUpperCase()}</p>
@@ -885,7 +864,7 @@ export default function DataExportCenter() {
 
               <button
                 onClick={handleCustomExport}
-                className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold py-4 px-6 rounded-lg shadow-lg transition-all"
+                className="w-full bg-gradient-to-r from-red-700 to-red-900 hover:from-red-700 hover:to-red-900 text-white font-semibold py-4 px-6 rounded-lg shadow-lg transition-all"
               >
                 📥 Export Custom Data
               </button>
@@ -895,7 +874,7 @@ export default function DataExportCenter() {
 
         {/* Export History Tab */}
         {activeTab === 'history' && (
-          <div className="bg-white rounded-xl shadow-md overflow-hidden">
+          <div className="bg-white rounded-card shadow-card overflow-hidden">
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-2xl font-bold text-gray-900">📜 Export History</h2>
               <p className="text-sm text-gray-600 mt-1">View and download previous exports</p>
@@ -920,7 +899,7 @@ export default function DataExportCenter() {
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">{file.filename}</td>
                       <td className="px-6 py-4 text-sm text-gray-600">{file.type}</td>
                       <td className="px-6 py-4">
-                        <span className="inline-flex px-2 py-1 text-xs font-semibold bg-blue-100 text-blue-800 rounded">
+                        <span className="inline-flex px-2 py-1 text-xs font-semibold bg-red-100 text-red-800 rounded">
                           {file.format}
                         </span>
                       </td>
@@ -929,7 +908,7 @@ export default function DataExportCenter() {
                         {new Date(file.date).toLocaleString()}
                       </td>
                       <td className="px-6 py-4">
-                        <span className="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                        <span className="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
                           {file.status}
                         </span>
                       </td>
@@ -937,7 +916,7 @@ export default function DataExportCenter() {
                         <div className="flex items-center justify-center space-x-2">
                           <button
                             onClick={() => handleDownload(file)}
-                            className="p-2 bg-green-100 hover:bg-green-200 text-green-600 rounded-lg transition-all"
+                            className="p-2 bg-yellow-100 hover:bg-amber-200 text-yellow-600 rounded-lg transition-all"
                             title="Download"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -958,12 +937,12 @@ export default function DataExportCenter() {
       {/* Export Configuration Modal */}
       {showExportModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-700 p-6 rounded-t-2xl">
+          <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl">
+            <div className="bg-gradient-to-r from-red-800 to-red-900 p-6 rounded-t-2xl flex-shrink-0">
               <div className="flex justify-between items-center">
                 <div>
                   <h2 className="text-2xl font-bold text-white">📥 Configure Export: {selectedExportType}</h2>
-                  <p className="text-blue-100 mt-1">Select format and apply filters</p>
+                  <p className="text-red-100 mt-1">Select format and apply filters</p>
                 </div>
                 <button
                   onClick={() => setShowExportModal(false)}
@@ -976,7 +955,7 @@ export default function DataExportCenter() {
               </div>
             </div>
 
-            <div className="p-6 space-y-6">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
               {/* Format Selection */}
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-3">Export Format *</label>
@@ -988,15 +967,15 @@ export default function DataExportCenter() {
                       onClick={() => setModalFormat(format)}
                       className={`p-4 rounded-lg border-2 transition-all ${
                         modalFormat === format
-                          ? 'border-blue-600 bg-blue-50 shadow-md'
-                          : 'border-gray-300 hover:border-blue-300'
+                          ? 'border-yellow-600 bg-red-50 shadow-md'
+                          : 'border-gray-300 hover:border-yellow-300'
                       }`}
                     >
                       <div className="flex flex-col items-center gap-2">
-                        <svg className={`w-8 h-8 ${modalFormat === format ? 'text-blue-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className={`w-8 h-8 ${modalFormat === format ? 'text-red-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
-                        <span className={`text-sm font-semibold uppercase ${modalFormat === format ? 'text-blue-600' : 'text-gray-600'}`}>
+                        <span className={`text-sm font-semibold uppercase ${modalFormat === format ? 'text-red-600' : 'text-gray-600'}`}>
                           {format}
                         </span>
                       </div>
@@ -1009,7 +988,7 @@ export default function DataExportCenter() {
               {selectedExportType === 'All Users' && (
                 <div className="bg-gray-50 rounded-xl p-4 space-y-4">
                   <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
                     </svg>
                     User Filters
@@ -1024,7 +1003,6 @@ export default function DataExportCenter() {
                       >
                         <option value="all">All Roles</option>
                         <option value="student">Students</option>
-                        <option value="instructor">Instructors</option>
                         <option value="secretary">Secretaries</option>
                         <option value="department_head">Department Heads</option>
                         <option value="admin">Admins</option>
@@ -1038,10 +1016,9 @@ export default function DataExportCenter() {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="all">All Programs</option>
-                        <option value="BSIT">BSIT</option>
-                        <option value="BSCS-DS">BSCS-DS</option>
-                        <option value="BS-CYBER">BS-CYBER</option>
-                        <option value="BSPSY">BSPSY</option>
+                        {programs.map(prog => (
+                          <option key={prog.id} value={prog.code}>{prog.code} - {prog.name}</option>
+                        ))}
                       </select>
                     </div>
                     <div>
@@ -1063,7 +1040,7 @@ export default function DataExportCenter() {
               {selectedExportType === 'All Evaluations' && (
                 <div className="bg-gray-50 rounded-xl p-4 space-y-4">
                   <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
                     </svg>
                     Evaluation Filters
@@ -1091,34 +1068,25 @@ export default function DataExportCenter() {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="all">All Programs</option>
-                        <option value="BSIT">BSIT</option>
-                        <option value="BSCS-DS">BSCS-DS</option>
-                        <option value="BS-CYBER">BS-CYBER</option>
-                        <option value="BSPSY">BSPSY</option>
+                        {programs.map(prog => (
+                          <option key={prog.id} value={prog.code}>{prog.code} - {prog.name}</option>
+                        ))}
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Semester</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Evaluation Period</label>
                       <select
-                        value={exportFilters.evalSemester}
-                        onChange={(e) => setExportFilters({...exportFilters, evalSemester: e.target.value})}
+                        value={exportFilters.evalPeriod}
+                        onChange={(e) => setExportFilters({...exportFilters, evalPeriod: e.target.value})}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       >
-                        <option value="all">All Semesters</option>
-                        <option value="1st Semester">1st Semester</option>
-                        <option value="2nd Semester">2nd Semester</option>
-                        <option value="Summer">Summer</option>
+                        <option value="all">All Periods</option>
+                        {evaluationPeriods.map(period => (
+                          <option key={period.id} value={period.id}>
+                            {period.name} ({period.academic_year}, {period.semester === 1 ? 'First' : period.semester === 2 ? 'Second' : 'Summer'} Semester) - {period.status}
+                          </option>
+                        ))}
                       </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Instructor</label>
-                      <input
-                        type="text"
-                        placeholder="Instructor name (optional)"
-                        value={exportFilters.evalInstructor}
-                        onChange={(e) => setExportFilters({...exportFilters, evalInstructor: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      />
                     </div>
                   </div>
                 </div>
@@ -1127,7 +1095,7 @@ export default function DataExportCenter() {
               {selectedExportType === 'All Courses' && (
                 <div className="bg-gray-50 rounded-xl p-4 space-y-4">
                   <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                    <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
                     </svg>
                     Course Filters
@@ -1141,10 +1109,9 @@ export default function DataExportCenter() {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="all">All Programs</option>
-                        <option value="BSIT">BSIT</option>
-                        <option value="BSCS-DS">BSCS-DS</option>
-                        <option value="BS-CYBER">BS-CYBER</option>
-                        <option value="BSPSY">BSPSY</option>
+                        {programs.map(prog => (
+                          <option key={prog.id} value={prog.code}>{prog.code} - {prog.name}</option>
+                        ))}
                       </select>
                     </div>
                     <div>
@@ -1209,44 +1176,41 @@ export default function DataExportCenter() {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="all">All Actions</option>
-                        <option value="CREATE">Create</option>
-                        <option value="UPDATE">Update</option>
-                        <option value="DELETE">Delete</option>
-                        <option value="LOGIN">Login</option>
-                        <option value="LOGOUT">Logout</option>
-                        <option value="EXPORT">Export</option>
-                        <option value="IMPORT">Import</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">User Role</label>
-                      <select
-                        value={exportFilters.auditUser}
-                        onChange={(e) => setExportFilters({...exportFilters, auditUser: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="all">All Users</option>
-                        <option value="admin">Admins</option>
-                        <option value="secretary">Secretaries</option>
-                        <option value="department_head">Department Heads</option>
-                        <option value="instructor">Instructors</option>
-                        <option value="student">Students</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-                      <select
-                        value={exportFilters.auditCategory}
-                        onChange={(e) => setExportFilters({...exportFilters, auditCategory: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="all">All Categories</option>
-                        <option value="User Management">User Management</option>
-                        <option value="Course Management">Course Management</option>
-                        <option value="Evaluation">Evaluation</option>
-                        <option value="Section Management">Section Management</option>
-                        <option value="System Settings">System Settings</option>
-                        <option value="Security">Security</option>
+                        <optgroup label="Authentication">
+                          <option value="LOGIN">Login</option>
+                          <option value="LOGOUT">Logout</option>
+                          <option value="LOGIN_FAILED">Login Failed</option>
+                          <option value="PASSWORD_RESET">Password Reset</option>
+                          <option value="PASSWORD_CHANGED">Password Changed</option>
+                        </optgroup>
+                        <optgroup label="User Management">
+                          <option value="CREATE_USER">Create User</option>
+                          <option value="UPDATE_USER">Update User</option>
+                          <option value="DELETE_USER">Delete User</option>
+                          <option value="USER_ACTIVATED">User Activated</option>
+                          <option value="USER_DEACTIVATED">User Deactivated</option>
+                        </optgroup>
+                        <optgroup label="Course Management">
+                          <option value="CREATE_COURSE">Create Course</option>
+                          <option value="UPDATE_COURSE">Update Course</option>
+                          <option value="DELETE_COURSE">Delete Course</option>
+                        </optgroup>
+                        <optgroup label="Section Management">
+                          <option value="CREATE_SECTION">Create Section</option>
+                          <option value="UPDATE_SECTION">Update Section</option>
+                          <option value="DELETE_SECTION">Delete Section</option>
+                          <option value="ENROLL_STUDENTS">Enroll Students</option>
+                        </optgroup>
+                        <optgroup label="Evaluation">
+                          <option value="SUBMIT_EVALUATION">Submit Evaluation</option>
+                          <option value="CREATE_PERIOD">Create Period</option>
+                          <option value="UPDATE_PERIOD">Update Period</option>
+                        </optgroup>
+                        <optgroup label="System">
+                          <option value="EXPORT_DATA">Export Data</option>
+                          <option value="IMPORT_DATA">Import Data</option>
+                          <option value="SETTINGS_UPDATED">Settings Updated</option>
+                        </optgroup>
                       </select>
                     </div>
                     <div>
@@ -1259,23 +1223,23 @@ export default function DataExportCenter() {
                         <option value="all">All Severities</option>
                         <option value="Info">Info</option>
                         <option value="Warning">Warning</option>
-                        <option value="Error">Error</option>
                         <option value="Critical">Critical</option>
                       </select>
                     </div>
+
                   </div>
                 </div>
               )}
 
               {/* Info Box */}
-              <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
+              <div className="bg-red-50 border-2 border-yellow-200 rounded-xl p-4">
                 <div className="flex items-start gap-3">
-                  <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                   </svg>
                   <div>
-                    <p className="text-sm font-semibold text-blue-900">Export Information</p>
-                    <p className="text-sm text-blue-800 mt-1">
+                    <p className="text-sm font-semibold text-red-900">Export Information</p>
+                    <p className="text-sm text-red-800 mt-1">
                       Format: <span className="font-semibold uppercase">{modalFormat}</span> | 
                       Type: <span className="font-semibold">{selectedExportType}</span>
                       {selectedExportType === 'All Users' && exportFilters.userRole !== 'all' && ` | Role: ${exportFilters.userRole}`}
@@ -1299,7 +1263,7 @@ export default function DataExportCenter() {
                   type="button"
                   onClick={handleConfirmExport}
                   disabled={exporting}
-                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg font-semibold transition-all flex items-center gap-2"
+                  className="px-6 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white rounded-lg font-semibold transition-all flex items-center gap-2"
                 >
                   {exporting ? (
                     <>
@@ -1321,105 +1285,11 @@ export default function DataExportCenter() {
         </div>
       )}
 
-      {/* Schedule Export Modal */}
-      {showScheduleModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl">
-            <div className="bg-gradient-to-r from-green-600 to-green-700 p-6 border-b-4 border-green-800">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-white">⏰ Schedule Automatic Export</h2>
-                <button onClick={() => setShowScheduleModal(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-                  </svg>
-                </button>
-              </div>
-            </div>
-            
-            <form onSubmit={handleScheduleExport} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Frequency</label>
-                <select
-                  value={scheduleSettings.frequency}
-                  onChange={(e) => setScheduleSettings({...scheduleSettings, frequency: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                >
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="monthly">Monthly</option>
-                </select>
-              </div>
 
-              {scheduleSettings.frequency === 'weekly' && (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Day of Week</label>
-                  <select
-                    value={scheduleSettings.dayOfWeek}
-                    onChange={(e) => setScheduleSettings({...scheduleSettings, dayOfWeek: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  >
-                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
-                      <option key={day} value={day}>{day}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Time</label>
-                <input
-                  type="time"
-                  value={scheduleSettings.time}
-                  onChange={(e) => setScheduleSettings({...scheduleSettings, time: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Format</label>
-                <select
-                  value={scheduleSettings.format}
-                  onChange={(e) => setScheduleSettings({...scheduleSettings, format: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                >
-                  <option value="csv">CSV</option>
-                  <option value="excel">Excel</option>
-                  <option value="pdf">PDF</option>
-                  <option value="json">JSON</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Email Recipients</label>
-                <input
-                  type="email"
-                  value={scheduleSettings.recipients}
-                  onChange={(e) => setScheduleSettings({...scheduleSettings, recipients: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  placeholder="email@example.com"
-                />
-                <p className="text-xs text-gray-500 mt-1">Separate multiple emails with commas</p>
-              </div>
-
-              <div className="flex space-x-4 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowScheduleModal(false)}
-                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all"
-                >
-                  Schedule Export
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
+
+
+
+

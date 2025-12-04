@@ -13,9 +13,10 @@ from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from sqlalchemy.orm import Session
 from sqlalchemy import text, func, and_, or_
 from database.connection import get_db
+from middleware.auth import get_current_user, require_admin, require_staff
 from models.enhanced_models import (
     User, Student, DepartmentHead, Secretary, Course, ClassSection,
-    Evaluation, EvaluationPeriod, AuditLog, ExportHistory, SystemSettings, Program,
+    Evaluation, EvaluationPeriod, AuditLog, ExportHistory, Program,
     Enrollment
 )
 from typing import Optional, List
@@ -26,6 +27,7 @@ import bcrypt
 import json
 from config import now_local
 from services.welcome_email_service import send_welcome_email, send_bulk_welcome_emails
+from utils.validation import InputValidator, validate_export_filters, ValidationError
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -66,11 +68,11 @@ class EvaluationPeriodCreate(BaseModel):
     start_date: date  # Accept date format
     end_date: date    # Accept date format
 
-class SystemSettingsUpdate(BaseModel):
-    model_config = {"extra": "ignore"}  # Ignore extra fields from frontend
-    
-    category: str
-    settings: dict
+# class SystemSettingsUpdate(BaseModel):
+#     model_config = {"extra": "ignore"}  # Ignore extra fields from frontend
+#     
+#     category: str
+#     settings: dict
 
 class AuditLogCreate(BaseModel):
     model_config = {"extra": "ignore"}  # Ignore extra fields from frontend
@@ -123,10 +125,19 @@ async def get_all_users(
     status: Optional[str] = None,
     program: Optional[str] = None,
     year_level: Optional[int] = None,
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Get paginated list of all users with filters"""
     try:
+        # Validate inputs
+        page, page_size = InputValidator.validate_page_params(page, page_size)
+        search = InputValidator.sanitize_search_query(search)
+        role = InputValidator.validate_role(role)
+        status = InputValidator.validate_status(status)
+        program = InputValidator.validate_program_code(program)
+        year_level = InputValidator.validate_year_level(year_level)
+        
         # Build base query
         query = db.query(User)
         
@@ -145,7 +156,8 @@ async def get_all_users(
             query = query.filter(User.role == role)
         
         if status:
-            is_active = status == "active"
+            # Accept both 'Active'/'Inactive' (frontend) and 'active'/'inactive' (lowercase)
+            is_active = status.lower() == "active"
             query = query.filter(User.is_active == is_active)
         
         # Filter by program and/or year level (for students)
@@ -224,6 +236,9 @@ async def get_all_users(
             }
         }
         
+    except ValidationError as e:
+        logger.warning(f"Validation error in get_all_users: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Error fetching users: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -231,15 +246,76 @@ async def get_all_users(
 @router.post("/users")
 async def create_user(
     user_data: UserCreate,
-    current_user_id: int = Query(...),
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """Create a new user"""
+    """Create a new user with enrollment list validation"""
     try:
+        from services.enrollment_validation import EnrollmentValidationService
+        
+        current_user_id = current_user['id']
+        
         # Check if email already exists
         existing_user = db.query(User).filter(User.email == user_data.email).first()
         if existing_user:
             raise HTTPException(status_code=400, detail="Email already exists")
+        
+        # VALIDATE AGAINST ENROLLMENT LIST (for students only)
+        if user_data.role == "student":
+            # Require school_id (student_number) for students
+            if not user_data.school_id:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Student number (school_id) is required for student accounts"
+                )
+            
+            # Check if enrollment list exists
+            enrollment_service = EnrollmentValidationService()
+            has_enrollment_list = enrollment_service.check_enrollment_list_exists(db)
+            
+            if has_enrollment_list:
+                # Validate against enrollment list
+                validation = enrollment_service.validate_student_enrollment(
+                    db,
+                    student_number=user_data.school_id,
+                    program_id=user_data.program_id,
+                    first_name=user_data.first_name,
+                    last_name=user_data.last_name
+                )
+                
+                if not validation["valid"]:
+                    error_detail = {
+                        "error": validation["error"],
+                        "message": validation["message"],
+                        "suggestion": validation.get("suggestion")
+                    }
+                    
+                    # Include enrolled vs attempted program info if available
+                    if "enrolled_program" in validation:
+                        error_detail["enrolled_program"] = validation["enrolled_program"]
+                        error_detail["attempted_program"] = validation["attempted_program"]
+                    
+                    raise HTTPException(status_code=400, detail=error_detail)
+                
+                # If validation passed, use enrollment data to populate fields
+                enrollment_info = validation["enrollment"]
+                
+                # Auto-fill from enrollment list (overrides user input)
+                user_data.first_name = enrollment_info["first_name"]
+                user_data.last_name = enrollment_info["last_name"]
+                user_data.program_id = enrollment_info["program_id"]
+                user_data.year_level = enrollment_info["year_level"]
+                
+                # Use enrollment email if provided
+                if enrollment_info["email"] and not user_data.email:
+                    user_data.email = enrollment_info["email"]
+                
+                # Log warnings if any
+                if validation.get("warnings"):
+                    for warning in validation["warnings"]:
+                        logger.warning(f"Name mismatch warning for {user_data.school_id}: {warning}")
+                
+                logger.info(f"✅ Student validated against enrollment list: {user_data.school_id} -> {enrollment_info['program_code']}")
         
         # Determine school_id and auto-generate password for students
         must_change_password = False
@@ -294,16 +370,20 @@ async def create_user(
         
         # Create role-specific record
         if user_data.role == "student" and user_data.program_id:
-            # Use school_id as student_number
-            student_number = school_id or f"STU{new_user.id:05d}"
+            # CRITICAL: student_number should be school_id (the student's ID number)
+            # Do NOT use user.id or names - use the actual school_id from the CSV
+            student_number = school_id if school_id else f"STU{new_user.id:05d}"
+            
+            logger.info(f"Creating student record: user_id={new_user.id}, email={user_data.email}, school_id={school_id}, student_number={student_number}")
             
             student = Student(
                 user_id=new_user.id,
-                student_number=student_number,
+                student_number=student_number,  # This is the student's school ID number
                 program_id=user_data.program_id,
                 year_level=user_data.year_level or 1
             )
             db.add(student)
+            logger.info(f"✅ Student record created: student_number={student_number} for user {user_data.email}")
         elif user_data.role == "department_head":
             dept_head = DepartmentHead(
                 user_id=new_user.id,
@@ -337,10 +417,10 @@ async def create_user(
                 last_name=user_data.last_name,
                 school_id=school_id,
                 role=user_data.role,
-                temp_password=generated_password_info,
-                login_url="http://localhost:5173/login"  # Update with production URL
+                temp_password=generated_password_info
+                # login_url will use FRONTEND_URL from .env
             )
-            logger.info(f"Welcome email sent to {user_data.email}: {email_result['message']}")
+            logger.info(f"Welcome email result for {user_data.email}: {email_result['message']}")
         
         # Build response with generated password info if applicable
         response = {
@@ -371,11 +451,13 @@ async def create_user(
 async def update_user(
     user_id: int,
     user_data: UserUpdate,
-    current_user_id: int = Query(...),
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Update an existing user"""
     try:
+        current_user_id = current_user['id']
+        
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
@@ -418,11 +500,13 @@ async def update_user(
 @router.delete("/users/{user_id}")
 async def delete_user(
     user_id: int,
-    current_user_id: int = Query(...),
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Delete a user (soft delete by setting is_active=False)"""
     try:
+        current_user_id = current_user['id']
+        
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
@@ -454,11 +538,13 @@ async def delete_user(
 async def reset_user_password(
     user_id: int,
     new_password: str = Body(..., embed=True),
-    current_user_id: int = Query(...),
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Reset a user's password"""
     try:
+        current_user_id = current_user['id']
+        
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
@@ -488,7 +574,10 @@ async def reset_user_password(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/users/stats")
-async def get_user_stats(db: Session = Depends(get_db)):
+async def get_user_stats(
+    current_user: dict = Depends(require_staff),
+    db: Session = Depends(get_db)
+):
     """Get user statistics"""
     try:
         total_users = db.query(func.count(User.id)).scalar()
@@ -521,6 +610,7 @@ async def get_user_stats(db: Session = Depends(get_db)):
 @router.get("/evaluation-periods")
 async def get_evaluation_periods(
     status: Optional[str] = None,
+    current_user: dict = Depends(require_staff),
     db: Session = Depends(get_db)
 ):
     """Get all evaluation periods"""
@@ -534,21 +624,19 @@ async def get_evaluation_periods(
         
         periods_data = []
         for p in periods:
-            # Calculate total evaluations needed (students × enrolled sections)
+            # Calculate total evaluation records for this period (pending + completed)
             total_evaluations = db.execute(text("""
-                SELECT COUNT(DISTINCT e.id)
-                FROM enrollments e
-                WHERE e.evaluation_period_id = :period_id
+                SELECT COUNT(*)
+                FROM evaluations
+                WHERE evaluation_period_id = :period_id
             """), {"period_id": p.id}).scalar() or 0
             
-            # Calculate completed evaluations
+            # Calculate completed evaluations (those with submission_date)
             completed_evaluations = db.execute(text("""
-                SELECT COUNT(DISTINCT ev.id)
-                FROM evaluations ev
-                JOIN enrollments e ON ev.student_id = e.student_id 
-                    AND ev.class_section_id = e.class_section_id
-                WHERE e.evaluation_period_id = :period_id
-                AND ev.submission_date IS NOT NULL
+                SELECT COUNT(*)
+                FROM evaluations
+                WHERE evaluation_period_id = :period_id
+                AND submission_date IS NOT NULL
             """), {"period_id": p.id}).scalar() or 0
             
             # Calculate participation rate
@@ -563,6 +651,9 @@ async def get_evaluation_periods(
                 end_date = p.end_date
             days_remaining = max(0, (end_date - today).days)
             
+            # Normalize status for frontend (map active->Open, closed->Closed)
+            display_status = "Open" if p.status in ["active", "Open"] else "Closed" if p.status in ["closed", "Closed"] else p.status
+            
             periods_data.append({
                 "id": p.id,
                 "name": p.name,
@@ -570,7 +661,7 @@ async def get_evaluation_periods(
                 "academicYear": p.academic_year,  # camelCase for frontend
                 "startDate": p.start_date.isoformat(),
                 "endDate": p.end_date.isoformat(),
-                "status": p.status,
+                "status": display_status,
                 "totalEvaluations": total_evaluations,
                 "completedEvaluations": completed_evaluations,
                 "participationRate": participation_rate,
@@ -590,7 +681,7 @@ async def get_evaluation_periods(
 @router.post("/evaluation-periods")
 async def create_evaluation_period(
     period_data: EvaluationPeriodCreate,
-    current_user_id: int = Query(...),
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Create a new evaluation period"""
@@ -633,11 +724,79 @@ async def create_evaluation_period(
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.patch("/evaluation-periods/{period_id}")
+async def update_evaluation_period(
+    period_id: int,
+    end_date: Optional[str] = Body(None),
+    start_date: Optional[str] = Body(None),
+    name: Optional[str] = Body(None),
+    semester: Optional[str] = Body(None),
+    academic_year: Optional[str] = Body(None),
+    current_user: dict = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Update evaluation period details (extend dates, rename, etc.)"""
+    try:
+        period = db.query(EvaluationPeriod).filter(EvaluationPeriod.id == period_id).first()
+        if not period:
+            raise HTTPException(status_code=404, detail="Evaluation period not found")
+        
+        from datetime import datetime
+        
+        # Update fields if provided
+        if end_date:
+            period.end_date = datetime.strptime(end_date, "%Y-%m-%d")
+        if start_date:
+            period.start_date = datetime.strptime(start_date, "%Y-%m-%d")
+        if name:
+            period.name = name
+        if semester:
+            period.semester = semester
+        if academic_year:
+            period.academic_year = academic_year
+            
+        period.updated_at = now_local()
+        db.commit()
+        db.refresh(period)
+        
+        logger.info(f"[PERIOD-UPDATE] Period {period_id} updated successfully")
+        
+        # Log audit event
+        await create_audit_log(
+            db, current_user_id, "PERIOD_UPDATED", "Evaluation Management",
+            severity="Info",
+            details={
+                "period_id": period_id,
+                "period_name": period.name,
+                "end_date": period.end_date.strftime("%Y-%m-%d"),
+                "start_date": period.start_date.strftime("%Y-%m-%d")
+            }
+        )
+        
+        return {
+            "success": True,
+            "message": "Evaluation period updated successfully",
+            "data": {
+                "id": period.id,
+                "name": period.name,
+                "start_date": period.start_date.strftime("%Y-%m-%d"),
+                "end_date": period.end_date.strftime("%Y-%m-%d"),
+                "status": period.status
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating period: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.put("/evaluation-periods/{period_id}/status")
 async def update_period_status(
     period_id: int,
     status: str = Body(..., embed=True),
-    current_user_id: int = Query(...),
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Update evaluation period status (draft -> active -> closed)"""
@@ -646,32 +805,75 @@ async def update_period_status(
         if not period:
             raise HTTPException(status_code=404, detail="Evaluation period not found")
         
-        # Validate status values
-        valid_statuses = ["Open", "Closed"]
-        if status not in valid_statuses:
-            raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
+        # Map frontend status values to database values
+        status_mapping = {
+            "Open": "active",
+            "Active": "active",
+            "active": "active",
+            "Closed": "closed",
+            "closed": "closed",
+            "Draft": "draft",
+            "draft": "draft"
+        }
         
-        # Close any other open periods if opening this one
-        if status == "Open":
+        if status not in status_mapping:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid status. Must be one of: Open/Active, Closed, or Draft"
+            )
+        
+        db_status = status_mapping[status]
+        
+        # Close any other active periods if activating this one
+        if db_status == "active":
+            # Verify the period dates are valid
+            from datetime import date
+            today = date.today()
+            if period.start_date.date() > today:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Cannot activate period. Start date ({period.start_date.strftime('%Y-%m-%d')}) is in the future."
+                )
+            
+            # Close other active periods
             db.query(EvaluationPeriod).filter(
-                EvaluationPeriod.status == "Open",
+                EvaluationPeriod.status == "active",
                 EvaluationPeriod.id != period_id
-            ).update({"status": "Closed"})
+            ).update({"status": "closed", "updated_at": now_local()})
+            
+            logger.info(f"[PERIOD-STATUS] Closing other active periods, activating period {period_id}")
         
-        period.status = status
+        old_status = period.status
+        period.status = db_status
         period.updated_at = now_local()
         db.commit()
         
+        logger.info(f"[PERIOD-STATUS] Period {period_id} status changed from '{old_status}' to '{db_status}'")
+        
         # Log audit event
         await create_audit_log(
-            db, current_user_id, f"PERIOD_{status.upper()}", "Evaluation Management",
-            severity="Warning" if status == "closed" else "Info",
-            details={"period_id": period_id, "period_name": period.name}
+            db, current_user_id, f"PERIOD_{db_status.upper()}", "Evaluation Management",
+            severity="Warning" if db_status == "closed" else "Info",
+            details={
+                "period_id": period_id, 
+                "period_name": period.name,
+                "old_status": old_status,
+                "new_status": db_status,
+                "start_date": period.start_date.strftime("%Y-%m-%d"),
+                "end_date": period.end_date.strftime("%Y-%m-%d")
+            }
         )
         
         return {
             "success": True,
-            "message": f"Evaluation period {status} successfully"
+            "message": f"Evaluation period {db_status} successfully",
+            "data": {
+                "period_id": period_id,
+                "period_name": period.name,
+                "status": db_status,
+                "start_date": period.start_date.strftime("%Y-%m-%d"),
+                "end_date": period.end_date.strftime("%Y-%m-%d")
+            }
         }
         
     except HTTPException:
@@ -681,8 +883,93 @@ async def update_period_status(
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.delete("/evaluation-periods/{period_id}")
+async def delete_evaluation_period(
+    period_id: int,
+    current_user: dict = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete an evaluation period (only if no evaluations exist)
+    """
+    try:
+        # Get the period
+        period = db.query(EvaluationPeriod).filter(EvaluationPeriod.id == period_id).first()
+        
+        if not period:
+            raise HTTPException(status_code=404, detail="Evaluation period not found")
+        
+        # Check if there are any evaluations for this period (via enrollments)
+        evaluation_count = db.execute(text("""
+            SELECT COUNT(DISTINCT e.id)
+            FROM evaluations e
+            JOIN enrollments en ON e.student_id = en.student_id 
+                AND e.class_section_id = en.class_section_id
+            WHERE en.evaluation_period_id = :period_id
+        """), {"period_id": period_id}).scalar() or 0
+        
+        if evaluation_count > 0:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Cannot delete period with {evaluation_count} existing evaluations. Close the period instead."
+            )
+        
+        # Check if there are any enrollments for this period
+        enrollment_count = db.query(func.count(Enrollment.id)).filter(
+            Enrollment.evaluation_period_id == period_id
+        ).scalar() or 0
+        
+        if enrollment_count > 0:
+            logger.warning(f"Deleting period {period_id} with {enrollment_count} enrollments")
+        
+        period_name = period.name
+        
+        # Delete period enrollments tracking records
+        db.execute(text("""
+            DELETE FROM period_enrollments 
+            WHERE evaluation_period_id = :period_id
+        """), {"period_id": period_id})
+        
+        # Delete enrollments
+        db.execute(text("""
+            DELETE FROM enrollments 
+            WHERE evaluation_period_id = :period_id
+        """), {"period_id": period_id})
+        
+        # Delete the period
+        db.delete(period)
+        db.commit()
+        
+        logger.info(f"[PERIOD-DELETE] Period {period_id} '{period_name}' deleted by user {current_user_id}")
+        
+        # Log audit event
+        await create_audit_log(
+            db, current_user_id, "PERIOD_DELETED", "Evaluation Management",
+            severity="Warning",
+            details={
+                "period_id": period_id, 
+                "period_name": period_name,
+                "enrollment_count": enrollment_count
+            }
+        )
+        
+        return {
+            "success": True,
+            "message": f"Evaluation period '{period_name}' deleted successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting period: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/evaluation-periods/active")
-async def get_active_period(db: Session = Depends(get_db)):
+async def get_active_period(
+    current_user: dict = Depends(require_staff),
+    db: Session = Depends(get_db)
+):
     """Get the currently active evaluation period"""
     try:
         period = db.query(EvaluationPeriod).filter(
@@ -729,7 +1016,7 @@ async def get_active_period(db: Session = Depends(get_db)):
 async def enroll_section_in_period(
     period_id: int,
     section_id: int = Body(..., embed=True),
-    current_user_id: int = Query(...),
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """
@@ -919,7 +1206,7 @@ async def get_period_enrolled_sections(
 async def remove_period_enrollment(
     period_id: int,
     enrollment_id: int,
-    current_user_id: int = Query(...),
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Remove a class section enrollment from an evaluation period"""
@@ -1011,6 +1298,19 @@ async def get_period_enrolled_program_sections(
         enrolled_sections = []
         
         for row in result:
+            # Count evaluations created for this program section in this period
+            evaluations_count = db.execute(text("""
+                SELECT COUNT(*)
+                FROM evaluations ev
+                JOIN students s ON ev.student_id = s.id
+                JOIN section_students ss ON ss.student_id = s.user_id
+                WHERE ss.section_id = :program_section_id
+                AND ev.evaluation_period_id = :period_id
+            """), {
+                "program_section_id": row[1],
+                "period_id": period_id
+            }).scalar() or 0
+            
             enrolled_sections.append({
                 "id": row[0],
                 "program_section_id": row[1],
@@ -1021,6 +1321,7 @@ async def get_period_enrolled_program_sections(
                 "program_code": row[6],
                 "program_name": row[7],
                 "enrolled_count": row[8],
+                "evaluations_created": evaluations_count,
                 "created_at": row[9].isoformat() if row[9] else None,
                 "created_by_name": row[10]
             })
@@ -1035,11 +1336,110 @@ async def get_period_enrolled_program_sections(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.delete("/evaluation-periods/{period_id}/enrolled-program-sections/{enrollment_id}")
+async def remove_program_section_enrollment(
+    period_id: int,
+    enrollment_id: int,
+    current_user: dict = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Remove a program section enrollment from an evaluation period"""
+    try:
+        # Get enrollment details before deleting
+        enrollment_info = db.execute(text("""
+            SELECT pps.program_section_id, ps.section_name, p.program_name
+            FROM period_program_sections pps
+            JOIN program_sections ps ON pps.program_section_id = ps.id
+            JOIN programs p ON ps.program_id = p.id
+            WHERE pps.id = :enrollment_id
+            AND pps.evaluation_period_id = :period_id
+        """), {
+            "enrollment_id": enrollment_id,
+            "period_id": period_id
+        }).fetchone()
+        
+        if not enrollment_info:
+            raise HTTPException(status_code=404, detail="Program section enrollment not found")
+        
+        program_section_id = enrollment_info[0]
+        section_name = enrollment_info[1]
+        program_name = enrollment_info[2]
+        
+        # Delete evaluation records for this program section in this period
+        delete_evals_result = db.execute(text("""
+            DELETE FROM evaluations
+            WHERE evaluation_period_id = :period_id
+            AND student_id IN (
+                SELECT s.id 
+                FROM students s
+                JOIN section_students ss ON ss.student_id = s.user_id
+                WHERE ss.section_id = :program_section_id
+            )
+        """), {
+            "period_id": period_id,
+            "program_section_id": program_section_id
+        })
+        evaluations_deleted = delete_evals_result.rowcount
+        
+        # Clear evaluation_period_id from enrollments
+        db.execute(text("""
+            UPDATE enrollments
+            SET evaluation_period_id = NULL
+            WHERE evaluation_period_id = :period_id
+            AND student_id IN (
+                SELECT s.id 
+                FROM students s
+                JOIN section_students ss ON ss.student_id = s.user_id
+                WHERE ss.section_id = :program_section_id
+            )
+        """), {
+            "period_id": period_id,
+            "program_section_id": program_section_id
+        })
+        
+        # Delete the program section enrollment record
+        db.execute(text("""
+            DELETE FROM period_program_sections
+            WHERE id = :enrollment_id
+            AND evaluation_period_id = :period_id
+        """), {
+            "enrollment_id": enrollment_id,
+            "period_id": period_id
+        })
+        
+        db.commit()
+        
+        # Log audit event
+        await create_audit_log(
+            db, current_user_id, "PROGRAM_SECTION_REMOVED_FROM_PERIOD", "Evaluation Management",
+            details={
+                "period_id": period_id,
+                "program_section_id": program_section_id,
+                "section_name": section_name,
+                "program_name": program_name,
+                "evaluations_deleted": evaluations_deleted
+            }
+        )
+        
+        return {
+            "success": True,
+            "message": f"Program section '{section_name}' removed from evaluation period",
+            "evaluations_deleted": evaluations_deleted
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error removing program section enrollment: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/evaluation-periods/{period_id}/enroll-program-section")
 async def enroll_program_section_in_period(
     period_id: int,
     program_section_id: int = Body(..., embed=True),
-    current_user_id: int = Query(...),
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """
@@ -1084,9 +1484,10 @@ async def enroll_program_section_in_period(
         
         # Get all students in this program section
         students = db.execute(text("""
-            SELECT DISTINCT ss.student_id
+            SELECT DISTINCT s.id, u.email, u.first_name, u.last_name
             FROM section_students ss
             JOIN users u ON ss.student_id = u.id
+            JOIN students s ON s.user_id = u.id
             WHERE ss.section_id = :program_section_id
             AND u.is_active = true
             AND u.role = 'student'
@@ -1095,10 +1496,21 @@ async def enroll_program_section_in_period(
         student_ids = [row[0] for row in students]
         
         if not student_ids:
-            return {
-                "success": False,
-                "message": "No active students found in this program section"
-            }
+            # Check if there are ANY students (active or not) in the section
+            total_students = db.execute(text("""
+                SELECT COUNT(*) FROM section_students WHERE section_id = :program_section_id
+            """), {"program_section_id": program_section_id}).scalar()
+            
+            if total_students == 0:
+                return {
+                    "success": False,
+                    "message": f"⚠️ No students are assigned to program section '{section_info[1]}'. Please add students to this section first."
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": f"⚠️ No active students found in program section '{section_info[1]}'. Found {total_students} inactive/non-student users. Please check user statuses."
+                }
         
         # Get all class sections these students are enrolled in
         class_sections = db.execute(text("""
@@ -1111,10 +1523,24 @@ async def enroll_program_section_in_period(
         class_section_ids = [row[0] for row in class_sections]
         
         if not class_section_ids:
-            return {
-                "success": False,
-                "message": "No course enrollments found for students in this program section"
-            }
+            # Check if students have ANY enrollments (active or not)
+            total_enrollments = db.execute(text("""
+                SELECT COUNT(*) FROM enrollments WHERE student_id = ANY(:student_ids)
+            """), {"student_ids": student_ids}).scalar()
+            
+            student_names = [f"{row[2]} {row[3]} ({row[1]})" for row in students[:5]]  # Show first 5
+            student_list = ", ".join(student_names)
+            
+            if total_enrollments == 0:
+                return {
+                    "success": False,
+                    "message": f"⚠️ No course enrollments found for the {len(student_ids)} students in '{section_info[1]}'.\n\nStudents found: {student_list}{'...' if len(students) > 5 else ''}\n\nPlease ensure these students are enrolled in courses (class sections) first."
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": f"⚠️ Found {total_enrollments} enrollments but none are 'active' status for students in '{section_info[1]}'.\n\nPlease check enrollment statuses in the database."
+                }
         
         # Update enrollments to link to this period
         db.execute(text("""
@@ -1132,14 +1558,15 @@ async def enroll_program_section_in_period(
         # Create evaluation records for all student-course combinations
         result = db.execute(text("""
             INSERT INTO evaluations (
-                student_id, class_section_id, evaluation_period_id, status, created_at
+                student_id, class_section_id, evaluation_period_id, status, created_at, submission_date
             )
             SELECT 
                 e.student_id, 
                 e.class_section_id, 
                 :period_id,
                 'pending',
-                NOW()
+                NOW(),
+                NULL
             FROM enrollments e
             WHERE e.student_id = ANY(:student_ids)
             AND e.class_section_id = ANY(:class_section_ids)
@@ -1158,7 +1585,8 @@ async def enroll_program_section_in_period(
             "class_section_ids": class_section_ids
         })
         
-        evaluations_created = len(result.fetchall())
+        evaluation_ids = result.fetchall()
+        evaluations_created = len(evaluation_ids)
         
         # Record this program section enrollment for tracking
         db.execute(text("""
@@ -1256,13 +1684,36 @@ async def get_all_courses(
     year_level: Optional[int] = None,
     semester: Optional[int] = None,
     status: Optional[str] = None,  # Add status filter (Active, Archived)
+    period_id: Optional[int] = Query(None, description="Filter by evaluation period (default: active period)"),
+    show_all_periods: bool = Query(False, description="Show courses from all periods"),
+    current_user: dict = Depends(require_staff),
     db: Session = Depends(get_db)
 ):
-    """Get paginated list of all courses"""
+    """
+    Get paginated list of courses with enrollment data
+    
+    By default, shows courses from the active evaluation period.
+    Use show_all_periods=true to see all historical courses.
+    Use period_id to filter by specific period.
+    """
     try:
-        # Simplified query for faster loading of large course lists
+        # Determine which period to filter by
+        filter_period_id = None
+        if not show_all_periods:
+            if period_id:
+                filter_period_id = period_id
+            else:
+                # Default to active period
+                active_period = db.execute(text("""
+                    SELECT id FROM evaluation_periods 
+                    WHERE status = 'Open' 
+                    ORDER BY created_at DESC LIMIT 1
+                """)).fetchone()
+                filter_period_id = active_period[0] if active_period else None
+        
+        # Query courses with enrollment data from period_enrollments
         query_str = """
-            SELECT 
+            SELECT DISTINCT
                 c.id,
                 c.subject_code,
                 c.subject_name,
@@ -1272,13 +1723,33 @@ async def get_all_courses(
                 c.units,
                 c.created_at,
                 p.program_code as program_code,
-                c.is_active
+                c.is_active,
+                COALESCE(enr_counts.total_enrolled, 0) as total_enrolled,
+                COALESCE(enr_counts.sections_count, 0) as sections_count
             FROM courses c
             LEFT JOIN programs p ON c.program_id = p.id
+            LEFT JOIN LATERAL (
+                SELECT 
+                    COUNT(DISTINCT e.student_id) as total_enrolled,
+                    COUNT(DISTINCT cs.id) as sections_count
+                FROM class_sections cs
+                LEFT JOIN enrollments e ON cs.id = e.class_section_id 
+                    AND e.status = 'active'
+        """
+        
+        # Add period filter to subquery if specified
+        if filter_period_id:
+            query_str += " AND e.evaluation_period_id = :period_id"
+        
+        query_str += """
+                WHERE cs.course_id = c.id
+            ) enr_counts ON true
             WHERE 1=1
         """
         
         params = {}
+        if filter_period_id:
+            params['period_id'] = filter_period_id
         
         if search:
             query_str += " AND (c.subject_code ILIKE :search OR c.subject_name ILIKE :search)"
@@ -1316,8 +1787,10 @@ async def get_all_courses(
         courses = []
         
         for row in result:
-            # Use default values for expensive calculations
             is_active = row[9]  # is_active field from query
+            total_enrolled = row[10]  # enrolled students count
+            sections_count = row[11]  # sections count
+            
             courses.append({
                 "id": row[0],
                 "course_code": row[1] or "",
@@ -1333,12 +1806,28 @@ async def get_all_courses(
                 "semester": row[5],
                 "units": row[6],
                 "created_at": row[7].isoformat() if row[7] else None,
-                # Instructor removed - course evaluation only
-                "sectionCount": 0,  # Simplified for performance
-                "enrolledStudents": 0,  # Simplified for performance
-                "enrolled_students": 0,  # Alternative field name
+                # Real enrollment data from the filtered period
+                "sectionCount": sections_count,
+                "enrolledStudents": total_enrolled,
+                "enrolled_students": total_enrolled,  # Alternative field name
                 "status": "Active" if is_active else "Archived"
             })
+        
+        # Get period info for response
+        period_info = None
+        if filter_period_id:
+            period_data = db.execute(text("""
+                SELECT id, name, semester, academic_year, status
+                FROM evaluation_periods WHERE id = :period_id
+            """), {"period_id": filter_period_id}).fetchone()
+            if period_data:
+                period_info = {
+                    "id": period_data[0],
+                    "name": period_data[1],
+                    "semester": period_data[2],
+                    "academic_year": period_data[3],
+                    "status": period_data[4]
+                }
         
         return {
             "success": True,
@@ -1348,6 +1837,13 @@ async def get_all_courses(
                 "page_size": page_size,
                 "total": total,
                 "total_pages": (total + page_size - 1) // page_size
+            },
+            "filter_info": {
+                "period_id": filter_period_id,
+                "period": period_info,
+                "show_all_periods": show_all_periods,
+                "message": "Showing all historical courses" if show_all_periods 
+                          else f"Showing courses from {period_info['name'] if period_info else 'active period'}"
             }
         }
         
@@ -1368,7 +1864,7 @@ class CourseCreate(BaseModel):
 @router.post("/courses")
 async def create_course(
     course_data: CourseCreate,
-    current_user_id: int = Query(...),
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Create a new course"""
@@ -1429,7 +1925,7 @@ async def create_course(
 async def update_course(
     course_id: int,
     course_data: dict = Body(...),
-    current_user_id: int = Query(...),
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Update an existing course"""
@@ -1490,7 +1986,7 @@ async def update_course(
 @router.delete("/courses/{course_id}")
 async def delete_course(
     course_id: int,
-    current_user_id: int = Query(...),
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Delete a course"""
@@ -1523,7 +2019,10 @@ async def delete_course(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/programs")
-async def get_programs(db: Session = Depends(get_db)):
+async def get_programs(
+    current_user: dict = Depends(require_staff),
+    db: Session = Depends(get_db)
+):
     """Get all programs"""
     try:
         programs = db.query(Program).all()
@@ -1553,14 +2052,27 @@ async def get_sections(
     search: Optional[str] = None,
     program_id: Optional[int] = None,
     program_code: Optional[str] = None,
+    program_section_id: Optional[int] = None,
     year_level: Optional[int] = None,
     semester: Optional[int] = None,
+    current_user: dict = Depends(require_staff),
+    period_id: Optional[int] = None,
     db: Session = Depends(get_db)
 ):
-    """Get all class sections with enrollment counts"""
+    """
+    Get all class sections with enrollment counts
+    
+    Filters:
+    - search: Search in course code, name, or section code
+    - program_code: Filter by program code (e.g., 'BSIT', 'BSCS-DS')
+    - program_section_id: Filter by program section (e.g., 'BSIT 3-1')
+    - year_level: Filter by year level (1-4)
+    - semester: Filter by semester (1, 2, 3)
+    - period_id: Filter by evaluation period (shows only sections enrolled in that period)
+    """
     try:
-        # Query class sections with course and enrollment details (instructor removed)
-        query = text("""
+        # Build query string dynamically to properly handle filters
+        query_str = """
             SELECT 
                 cs.id,
                 cs.course_id,
@@ -1578,45 +2090,99 @@ async def get_sections(
             LEFT JOIN courses c ON cs.course_id = c.id
             LEFT JOIN programs p ON c.program_id = p.id
             LEFT JOIN enrollments e ON cs.id = e.class_section_id
-            WHERE 1=1
-        """)
+        """
         
+        # Build WHERE clause
+        where_conditions = ["c.id IS NOT NULL"]  # Only show sections with valid courses
         params = {}
         
         # Add filters
         if search:
-            query = text(str(query) + " AND (c.subject_code ILIKE :search OR c.subject_name ILIKE :search OR cs.class_code ILIKE :search)")
+            where_conditions.append("(c.subject_code ILIKE :search OR c.subject_name ILIKE :search OR cs.class_code ILIKE :search)")
             params['search'] = f"%{search}%"
         
         if program_id:
-            query = text(str(query) + " AND c.program_id = :program_id")
+            where_conditions.append("c.program_id = :program_id")
             params['program_id'] = program_id
         
         if program_code:
-            query = text(str(query) + " AND p.program_code = :program_code")
+            where_conditions.append("p.program_code = :program_code")
             params['program_code'] = program_code
         
         if year_level:
-            query = text(str(query) + " AND c.year_level = :year_level")
+            where_conditions.append("c.year_level = :year_level")
             params['year_level'] = year_level
         
         if semester:
-            query = text(str(query) + " AND cs.semester = :semester")
+            where_conditions.append("cs.semester = CAST(:semester AS VARCHAR)")
             params['semester'] = semester
         
-        query = text(str(query) + """
+        # Program section filter - use subquery to check if section has students from that program section
+        if program_section_id:
+            where_conditions.append("""
+                cs.id IN (
+                    SELECT DISTINCT e2.class_section_id 
+                    FROM enrollments e2
+                    JOIN section_students ss ON e2.student_id = ss.student_id
+                    WHERE ss.section_id = :program_section_id
+                )
+            """)
+            params['program_section_id'] = program_section_id
+        
+        # Period filter - only show sections with enrollments in that period
+        if period_id:
+            where_conditions.append("""
+                cs.id IN (
+                    SELECT DISTINCT class_section_id 
+                    FROM enrollments 
+                    WHERE evaluation_period_id = :period_id
+                )
+            """)
+            params['period_id'] = period_id
+        
+        # Combine WHERE conditions
+        query_str += " WHERE " + " AND ".join(where_conditions)
+        
+        query_str += """
             GROUP BY cs.id, cs.course_id, c.subject_code, c.subject_name, 
                      cs.class_code, c.program_id, p.program_code, c.year_level, cs.semester, 
                      cs.academic_year, cs.max_students
-            ORDER BY c.subject_code, cs.class_code
-        """)
+            ORDER BY p.program_code, c.year_level, cs.semester, c.subject_code, cs.class_code
+        """
         
-        result = db.execute(query, params)
+        result = db.execute(text(query_str), params)
         sections = [dict(row._mapping) for row in result]
+        
+        # Get period info if filtering by period
+        period_info = None
+        if period_id:
+            period_data = db.execute(text("""
+                SELECT id, name, semester, academic_year, status
+                FROM evaluation_periods WHERE id = :period_id
+            """), {"period_id": period_id}).fetchone()
+            if period_data:
+                period_info = {
+                    "id": period_data[0],
+                    "name": period_data[1],
+                    "semester": period_data[2],
+                    "academic_year": period_data[3],
+                    "status": period_data[4]
+                }
         
         return {
             "success": True,
-            "data": sections
+            "data": sections,
+            "total": len(sections),
+            "filter_info": {
+                "search": search,
+                "program_id": program_id,
+                "program_code": program_code,
+                "program_section_id": program_section_id,
+                "year_level": year_level,
+                "semester": semester,
+                "period_id": period_id,
+                "period": period_info
+            }
         }
         
     except Exception as e:
@@ -1630,6 +2196,7 @@ class SectionCreate(BaseModel):
     semester: int
     academic_year: str
     max_students: int = 40
+    program_section_id: int = None  # Optional: for auto-enrolling specific program section students
 
 @router.post("/sections")
 async def create_section(
@@ -1639,6 +2206,8 @@ async def create_section(
 ):
     """Create a new class section with optional auto-enrollment"""
     try:
+        logger.info(f"[CREATE_SECTION] Creating section: {section_data.class_code}, auto_enroll={auto_enroll}, program_section_id={section_data.program_section_id}")
+        
         # Verify course exists
         course = db.query(Course).filter(Course.id == section_data.course_id).first()
         if not course:
@@ -1660,7 +2229,6 @@ async def create_section(
         # Create section
         new_section = ClassSection(
             course_id=section_data.course_id,
-            instructor_id=None,  # No instructor assignment needed
             class_code=section_data.class_code,
             semester=section_data.semester,
             academic_year=section_data.academic_year,
@@ -1674,34 +2242,76 @@ async def create_section(
         
         # Auto-enroll students if requested
         if auto_enroll:
+            logger.info(f"[AUTO_ENROLL] Starting auto-enrollment for section {new_section.id}")
             try:
-                # Find all students matching the course's program and year level
-                matching_students = db.query(Student).filter(
-                    Student.program_id == course.program_id,
-                    Student.year_level == course.year_level
-                ).all()
-                
-                for student in matching_students:
-                    # Check if not already enrolled
-                    existing_enrollment = db.query(Enrollment).filter(
-                        Enrollment.class_section_id == new_section.id,
-                        Enrollment.student_id == student.id
-                    ).first()
+                # If program_section_id is provided, enroll students from that specific section
+                if section_data.program_section_id:
+                    logger.info(f"[AUTO_ENROLL] Using program_section_id: {section_data.program_section_id}")
+                    # Query students linked to this program section via section_students
+                    from sqlalchemy import text
+                    result = db.execute(
+                        text("""
+                            SELECT DISTINCT u.id, s.id as student_id
+                            FROM section_students ss
+                            JOIN users u ON ss.student_id = u.id
+                            JOIN students s ON s.user_id = u.id
+                            WHERE ss.section_id = :section_id
+                            AND s.is_active = true
+                        """),
+                        {"section_id": section_data.program_section_id}
+                    )
+                    student_rows = result.fetchall()
                     
-                    if not existing_enrollment:
-                        new_enrollment = Enrollment(
-                            student_id=student.id,
-                            class_section_id=new_section.id,
-                            enrolled_at=now_local(),
-                            status='active'
-                        )
-                        db.add(new_enrollment)
-                        enrolled_count += 1
+                    logger.info(f"[AUTO_ENROLL] Found {len(student_rows)} students in program section {section_data.program_section_id}")
+                    
+                    for row in student_rows:
+                        student_id = row.student_id
+                        # Check if not already enrolled
+                        existing_enrollment = db.query(Enrollment).filter(
+                            Enrollment.class_section_id == new_section.id,
+                            Enrollment.student_id == student_id
+                        ).first()
+                        
+                        if not existing_enrollment:
+                            new_enrollment = Enrollment(
+                                student_id=student_id,
+                                class_section_id=new_section.id,
+                                enrolled_at=now_local(),
+                                status='active'
+                            )
+                            db.add(new_enrollment)
+                            enrolled_count += 1
+                else:
+                    # Fallback: Find all students matching the course's program and year level
+                    matching_students = db.query(Student).filter(
+                        Student.program_id == course.program_id,
+                        Student.year_level == course.year_level,
+                        Student.is_active == True
+                    ).all()
+                    
+                    logger.info(f"[AUTO_ENROLL] Found {len(matching_students)} students matching program/year (fallback mode)")
+                    
+                    for student in matching_students:
+                        # Check if not already enrolled
+                        existing_enrollment = db.query(Enrollment).filter(
+                            Enrollment.class_section_id == new_section.id,
+                            Enrollment.student_id == student.id
+                        ).first()
+                        
+                        if not existing_enrollment:
+                            new_enrollment = Enrollment(
+                                student_id=student.id,
+                                class_section_id=new_section.id,
+                                enrolled_at=now_local(),
+                                status='active'
+                            )
+                            db.add(new_enrollment)
+                            enrolled_count += 1
                 
                 db.commit()
-                logger.info(f"Auto-enrolled {enrolled_count} students into section {new_section.id}")
+                logger.info(f"[AUTO_ENROLL] Successfully enrolled {enrolled_count} students into section {new_section.id}")
             except Exception as enroll_error:
-                logger.error(f"Error during auto-enrollment: {enroll_error}")
+                logger.error(f"[AUTO_ENROLL] Error during auto-enrollment: {enroll_error}")
                 # Don't fail the section creation if auto-enrollment fails
         
         return {
@@ -1730,7 +2340,7 @@ async def create_section(
 async def update_section(
     section_id: int,
     section_data: dict = Body(...),
-    current_user_id: int = Query(...),
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Update an existing class section"""
@@ -1794,36 +2404,54 @@ async def update_section(
 @router.delete("/sections/{section_id}")
 async def delete_section(
     section_id: int,
-    current_user_id: int = Query(...),
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Delete a class section and all its enrollments"""
     try:
-        section = db.query(ClassSection).filter(ClassSection.id == section_id).first()
-        if not section:
+        logger.info(f"[DELETE_SECTION] Starting deletion for section_id={section_id}")
+        
+        # Get class_code directly from database using raw SQL (avoid ORM issues)
+        result = db.execute(text("SELECT class_code FROM class_sections WHERE id = :section_id"), {"section_id": section_id}).fetchone()
+        
+        if not result:
+            logger.warning(f"[DELETE_SECTION] Section {section_id} not found in database")
             raise HTTPException(status_code=404, detail="Section not found")
         
+        class_code = result[0]
+        
         # Delete related records in order (to avoid foreign key constraint errors)
+        # Use raw SQL to avoid ORM model issues with missing columns
+        
         # 1. Delete evaluations for this section
         db.execute(text("DELETE FROM evaluations WHERE class_section_id = :section_id"), {"section_id": section_id})
         
-        # 2. Delete analysis results
-        db.execute(text("DELETE FROM analysis_results WHERE class_section_id = :section_id"), {"section_id": section_id})
+        # 2. Delete analysis results (if table exists and has records)
+        try:
+            db.execute(text("DELETE FROM analysis_results WHERE class_section_id = :section_id"), {"section_id": section_id})
+        except Exception as e:
+            # Ignore if table doesn't exist or has schema issues
+            logger.warning(f"Could not delete analysis_results for section {section_id}: {e}")
         
-        # 3. Delete period section enrollments if they exist
-        db.execute(text("DELETE FROM period_section_enrollments WHERE class_section_id = :section_id"), {"section_id": section_id})
+        # 3. Delete period enrollments (tracks which sections are enrolled in evaluation periods)
+        db.execute(text("DELETE FROM period_enrollments WHERE class_section_id = :section_id"), {"section_id": section_id})
         
         # 4. Delete all enrollments
-        db.query(Enrollment).filter(Enrollment.class_section_id == section_id).delete()
+        db.execute(text("DELETE FROM enrollments WHERE class_section_id = :section_id"), {"section_id": section_id})
         
-        # 5. Finally delete the section
-        db.delete(section)
+        # 5. Finally delete the section itself
+        result = db.execute(text("DELETE FROM class_sections WHERE id = :section_id"), {"section_id": section_id})
+        logger.info(f"[DELETE_SECTION] Deleted section {section_id}, rows affected: {result.rowcount}")
+        
         db.commit()
+        db.expunge_all()  # Clear session to avoid stale object references
+        
+        logger.info(f"[DELETE_SECTION] Successfully deleted section {section_id} ({class_code})")
         
         # Log audit event
         await create_audit_log(
             db, current_user_id, "SECTION_DELETED", "Section Management",
-            details={"section_id": section_id, "class_code": section.class_code}
+            details={"section_id": section_id, "class_code": class_code}
         )
         
         return {
@@ -1839,7 +2467,11 @@ async def delete_section(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/sections/{section_id}/students")
-async def get_section_students(section_id: int, db: Session = Depends(get_db)):
+async def get_section_students(
+    section_id: int,
+    current_user: dict = Depends(require_staff),
+    db: Session = Depends(get_db)
+):
     """Get all enrolled students for a specific section"""
     try:
         # Query enrolled students with their details
@@ -1877,6 +2509,7 @@ async def get_section_students(section_id: int, db: Session = Depends(get_db)):
 async def get_available_students(
     section_id: int,
     search: Optional[str] = None,
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Get students with accounts who are NOT enrolled in this section"""
@@ -1950,7 +2583,7 @@ async def get_available_students(
 async def enroll_students(
     section_id: int,
     student_ids: List[int] = Body(..., embed=True),
-    current_user_id: int = Query(...),
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Enroll multiple students in a section"""
@@ -2015,7 +2648,7 @@ class BulkEnrollmentRequest(BaseModel):
 @router.post("/sections/bulk-enroll")
 async def bulk_enroll_student(
     enrollment: BulkEnrollmentRequest,
-    current_user_id: int = Query(...),
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """
@@ -2130,7 +2763,7 @@ async def bulk_enroll_student(
 async def remove_student_from_section(
     section_id: int,
     student_id: int,
-    current_user_id: int = Query(...),
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Remove a student from a section"""
@@ -2170,173 +2803,22 @@ async def remove_student_from_section(
         raise HTTPException(status_code=500, detail=str(e))
 
 # ===========================
-# SYSTEM SETTINGS
+# SYSTEM SETTINGS (REMOVED)
 # ===========================
 
-@router.get("/settings/{category}")
-async def get_system_settings(category: str, db: Session = Depends(get_db)):
-    """Get system settings for a specific category"""
-    try:
-        # Query all settings for this category from the new structure
-        settings_query = text("""
-            SELECT key, value, data_type, description
-            FROM system_settings
-            WHERE category = :category
-            ORDER BY key
-        """)
-        
-        result = db.execute(settings_query, {"category": category})
-        settings_dict = {}
-        
-        for row in result:
-            key = row[0]
-            value = row[1]
-            data_type = row[2]
-            
-            # Convert value based on data_type
-            if data_type == 'boolean':
-                settings_dict[key] = value.lower() == 'true'
-            elif data_type == 'number':
-                try:
-                    settings_dict[key] = int(value) if '.' not in value else float(value)
-                except:
-                    settings_dict[key] = value
-            elif data_type == 'json':
-                try:
-                    settings_dict[key] = json.loads(value) if value else {}
-                except:
-                    settings_dict[key] = value
-            else:
-                settings_dict[key] = value
-        
-        # If no settings found, return defaults
-        if not settings_dict:
-            default_settings = {
-                "general": {
-                    "institution_name": "Lyceum of the Philippines University - Batangas",
-                    "institution_short_name": "LPU Batangas",
-                    "academic_year": "2024-2025",
-                    "current_semester": "First Semester",
-                    "rating_scale": 4,
-                    "timezone": "Asia/Manila",
-                    "date_format": "MM/DD/YYYY",
-                    "language": "English"
-                },
-                "email": {
-                    "smtp_host": "smtp.gmail.com",
-                    "smtp_port": 587,
-                    "smtp_username": "noreply@lpubatangas.edu.ph",
-                    "smtp_password": "",
-                    "from_email": "noreply@lpubatangas.edu.ph",
-                    "from_name": "LPU Evaluation System",
-                    "enable_notifications": True,
-                    "reminder_frequency": 3
-                },
-                "security": {
-                    "password_min_length": 8,
-                    "password_require_uppercase": True,
-                    "password_require_lowercase": True,
-                    "password_require_numbers": True,
-                    "password_require_special_chars": True,
-                    "session_timeout": 60,
-                    "max_login_attempts": 5,
-                    "lockout_duration": 30,
-                    "two_factor_auth": False,
-                    "allowed_domains": "@lpubatangas.edu.ph"
-                },
-                "backup": {
-                    "auto_backup": True,
-                    "backup_frequency": "daily",
-                    "backup_time": "02:00",
-                    "retention_days": 30,
-                    "include_evaluations": True,
-                    "include_users": True,
-                    "include_courses": True,
-                    "backup_location": "cloud"
-                }
-            }
-            settings_dict = default_settings.get(category, {})
-        
-        return {
-            "success": True,
-            "data": {
-                "category": category,
-                "settings": settings_dict
-            }
-        }
-        
-    except Exception as e:
-        logger.error(f"Error fetching system settings: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+# @router.get("/settings/{category}")
+# async def get_system_settings(category: str, db: Session = Depends(get_db)):
+#     """Get system settings for a specific category"""
+#     pass
 
-@router.put("/settings")
-async def update_system_settings(
-    settings_data: SystemSettingsUpdate,
-    current_user_id: int = Query(...),
-    db: Session = Depends(get_db)
-):
-    """Update system settings"""
-    try:
-        category = settings_data.category
-        settings = settings_data.settings
-        
-        # Update each setting individually
-        for key, value in settings.items():
-            # Determine data type
-            if isinstance(value, bool):
-                data_type = 'boolean'
-                str_value = 'true' if value else 'false'
-            elif isinstance(value, (int, float)):
-                data_type = 'number'
-                str_value = str(value)
-            elif isinstance(value, dict) or isinstance(value, list):
-                data_type = 'json'
-                str_value = json.dumps(value)
-            else:
-                data_type = 'string'
-                str_value = str(value)
-            
-            # Upsert setting
-            upsert_query = text("""
-                INSERT INTO system_settings (category, key, value, data_type, updated_by, updated_at)
-                VALUES (:category, :key, :value, :data_type, :user_id, CURRENT_TIMESTAMP)
-                ON CONFLICT (category, key) 
-                DO UPDATE SET 
-                    value = :value,
-                    data_type = :data_type,
-                    updated_by = :user_id,
-                    updated_at = CURRENT_TIMESTAMP
-            """)
-            
-            db.execute(upsert_query, {
-                "category": category,
-                "key": key,
-                "value": str_value,
-                "data_type": data_type,
-                "user_id": current_user_id
-            })
-        
-        db.commit()
-        
-        # Log audit event
-        await create_audit_log(
-            db, current_user_id, "SETTINGS_UPDATED", "System Settings",
-            severity="Warning",
-            details={"category": category, "keys_updated": list(settings.keys())}
-        )
-        
-        return {
-            "success": True,
-            "message": f"{category.title()} settings updated successfully"
-        }
-        
-        
-    except Exception as e:
-        logger.error(f"Error updating system settings: {e}")
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+# @router.put("/settings")
+# async def update_system_settings(
+#     settings_data: SystemSettingsUpdate,
+#     current_user: dict = Depends(require_admin),
+#     db: Session = Depends(get_db)
+# ):
+#     """Update system settings"""
+#     pass
 
 # ===========================
 # AUDIT LOGS
@@ -2348,6 +2830,7 @@ async def get_audit_logs(
     page_size: int = Query(15, ge=1, le=100),
     action: Optional[str] = None,
     severity: Optional[str] = None,
+    current_user: dict = Depends(require_staff),
     user_id: Optional[int] = None,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
@@ -2360,30 +2843,30 @@ async def get_audit_logs(
         params = {}
         
         if action:
-            conditions.append("action = :action")
+            conditions.append("al.action = :action")
             params["action"] = action
         
         if severity:
-            conditions.append("severity = :severity")
+            conditions.append("al.severity = :severity")
             params["severity"] = severity
         
         if user_id:
-            conditions.append("user_id = :user_id")
+            conditions.append("al.user_id = :user_id")
             params["user_id"] = user_id
         
         if start_date:
-            conditions.append("created_at >= :start_date")
+            conditions.append("al.created_at >= :start_date")
             params["start_date"] = start_date
         
         if end_date:
-            conditions.append("created_at <= :end_date")
+            conditions.append("al.created_at <= :end_date")
             params["end_date"] = end_date
         
         where_clause = " AND ".join(conditions)
         
         # Get total count
         count_query = text(f"""
-            SELECT COUNT(*) FROM audit_logs
+            SELECT COUNT(*) FROM audit_logs al
             WHERE {where_clause}
         """)
         total = db.execute(count_query, params).scalar()
@@ -2446,7 +2929,10 @@ async def get_audit_logs(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/audit-logs/stats")
-async def get_audit_log_stats(db: Session = Depends(get_db)):
+async def get_audit_log_stats(
+    current_user: dict = Depends(require_staff),
+    db: Session = Depends(get_db)
+):
     """Get audit log statistics"""
     try:
         # Use raw SQL for better performance
@@ -2519,6 +3005,7 @@ def log_export(db: Session, user_id: int, export_type: str, format: str, record_
 async def get_export_history(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    current_user: dict = Depends(require_staff),
     db: Session = Depends(get_db)
 ):
     """Get export history"""
@@ -2585,175 +3072,6 @@ async def get_export_history(
             }
         }
 
-
-class ScheduleExportRequest(BaseModel):
-    frequency: str  # daily, weekly, monthly
-    time: str  # HH:MM format
-    format: str  # csv, json, excel
-    recipients: str  # comma-separated emails
-    day_of_week: Optional[str] = None  # For weekly schedules
-    day_of_month: Optional[int] = None  # For monthly schedules
-    is_active: bool = True
-
-
-@router.post("/export/schedule")
-async def schedule_export(
-    schedule: ScheduleExportRequest,
-    user_id: Optional[int] = Query(None),
-    db: Session = Depends(get_db)
-):
-    """Schedule automatic exports"""
-    try:
-        # Create scheduled export entry
-        insert_query = text("""
-            INSERT INTO scheduled_exports 
-            (user_id, frequency, time, format, recipients, day_of_week, day_of_month, is_active, created_at, updated_at)
-            VALUES (:user_id, :frequency, :time, :format, :recipients, :day_of_week, :day_of_month, :is_active, :created_at, :updated_at)
-            RETURNING id
-        """)
-        
-        result = db.execute(insert_query, {
-            "user_id": user_id,
-            "frequency": schedule.frequency,
-            "time": schedule.time,
-            "format": schedule.format,
-            "recipients": schedule.recipients,
-            "day_of_week": schedule.day_of_week,
-            "day_of_month": schedule.day_of_month,
-            "is_active": schedule.is_active,
-            "created_at": now_local(),
-            "updated_at": now_local()
-        })
-        
-        schedule_id = result.fetchone()[0]
-        db.commit()
-        
-        # Log audit
-        await create_audit_log(
-            db, user_id, "SCHEDULE_EXPORT", "Data Export", severity="Info",
-            details={
-                "schedule_id": schedule_id,
-                "frequency": schedule.frequency,
-                "format": schedule.format,
-                "recipients": schedule.recipients
-            }
-        )
-        
-        logger.info(f"✅ Export scheduled: {schedule.frequency} at {schedule.time} to {schedule.recipients}")
-        
-        return {
-            "success": True,
-            "message": f"Export scheduled successfully: {schedule.frequency} at {schedule.time}",
-            "data": {
-                "schedule_id": schedule_id,
-                "frequency": schedule.frequency,
-                "time": schedule.time,
-                "format": schedule.format,
-                "recipients": schedule.recipients
-            }
-        }
-        
-    except Exception as e:
-        logger.error(f"❌ Error scheduling export: {e}")
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to schedule export: {str(e)}")
-
-
-@router.get("/export/schedules")
-async def get_scheduled_exports(
-    user_id: Optional[int] = Query(None),
-    db: Session = Depends(get_db)
-):
-    """Get all scheduled exports"""
-    try:
-        query = text("""
-            SELECT 
-                se.id,
-                se.user_id,
-                COALESCE(u.first_name || ' ' || u.last_name, 'Unknown') as user_name,
-                se.frequency,
-                se.time,
-                se.format,
-                se.recipients,
-                se.day_of_week,
-                se.day_of_month,
-                se.is_active,
-                se.last_run,
-                se.next_run,
-                se.created_at
-            FROM scheduled_exports se
-            LEFT JOIN users u ON se.user_id = u.id
-            ORDER BY se.created_at DESC
-        """)
-        
-        result = db.execute(query)
-        
-        schedules = []
-        for row in result:
-            schedules.append({
-                "id": row[0],
-                "userId": row[1],
-                "userName": row[2],
-                "frequency": row[3],
-                "time": row[4],
-                "format": row[5],
-                "recipients": row[6],
-                "dayOfWeek": row[7],
-                "dayOfMonth": row[8],
-                "isActive": row[9],
-                "lastRun": row[10].isoformat() if row[10] else None,
-                "nextRun": row[11].isoformat() if row[11] else None,
-                "createdAt": row[12].isoformat() if row[12] else None
-            })
-        
-        return {
-            "success": True,
-            "data": schedules
-        }
-        
-    except Exception as e:
-        logger.error(f"Error fetching scheduled exports: {e}")
-        # Return empty list if table doesn't exist yet
-        return {
-            "success": True,
-            "data": []
-        }
-
-
-@router.delete("/export/schedule/{schedule_id}")
-async def delete_scheduled_export(
-    schedule_id: int,
-    user_id: Optional[int] = Query(None),
-    db: Session = Depends(get_db)
-):
-    """Delete a scheduled export"""
-    try:
-        delete_query = text("""
-            DELETE FROM scheduled_exports
-            WHERE id = :schedule_id
-        """)
-        
-        db.execute(delete_query, {"schedule_id": schedule_id})
-        db.commit()
-        
-        # Log audit
-        await create_audit_log(
-            db, user_id, "DELETE_SCHEDULE_EXPORT", "Data Export", severity="Warning",
-            details={"schedule_id": schedule_id}
-        )
-        
-        logger.info(f"✅ Scheduled export {schedule_id} deleted")
-        
-        return {
-            "success": True,
-            "message": "Scheduled export deleted successfully"
-        }
-        
-    except Exception as e:
-        logger.error(f"❌ Error deleting scheduled export: {e}")
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to delete schedule: {str(e)}")
-
 @router.get("/export/users")
 async def export_users(
     format: str = Query("csv", regex="^(csv|json)$"),
@@ -2761,14 +3079,22 @@ async def export_users(
     program: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     user_id: Optional[int] = Query(None),
+    current_user: dict = Depends(require_staff),
     db: Session = Depends(get_db)
 ):
     """Export users data with filters"""
     try:
+        # Validate inputs
+        format = InputValidator.validate_format(format)
+        role = InputValidator.validate_role(role)
+        program = InputValidator.validate_program_code(program)
+        status = InputValidator.validate_status(status)
+        user_id = InputValidator.validate_id(user_id, "user_id")
+        
         query = db.query(User)
         
         # Apply filters
-        if role and role != 'all':
+        if role:
             query = query.filter(User.role == role)
         
         if status and status != 'all':
@@ -2787,27 +3113,54 @@ async def export_users(
         users_data = []
         for u in users:
             user_dict = {
-                "id": u.id,
+                "user_id": u.id,
                 "email": u.email,
                 "first_name": u.first_name,
                 "last_name": u.last_name,
+                "full_name": f"{u.first_name} {u.last_name}",
                 "school_id": u.school_id,
                 "role": u.role,
                 "department": u.department,
                 "is_active": u.is_active,
+                "last_login": u.last_login.isoformat() if u.last_login else None,
                 "created_at": u.created_at.isoformat() if u.created_at else None
             }
             
             # Add student-specific data
             if u.role == "student":
                 student = db.query(Student).filter(Student.user_id == u.id).first()
-                if student and student.program_id:
-                    program_obj = db.query(Program).filter(Program.id == student.program_id).first()
-                    if program_obj:
-                        user_dict["program"] = program_obj.program_code
-                        user_dict["program_name"] = program_obj.program_name
-                        user_dict["year_level"] = student.year_level
-                        user_dict["student_number"] = student.student_number
+                if student:
+                    if student.program_id:
+                        program_obj = db.query(Program).filter(Program.id == student.program_id).first()
+                        if program_obj:
+                            user_dict["program_code"] = program_obj.program_code
+                            user_dict["program_name"] = program_obj.program_name
+                    user_dict["year_level"] = student.year_level
+                    user_dict["student_number"] = student.student_number
+                else:
+                    user_dict["program_code"] = None
+                    user_dict["program_name"] = None
+                    user_dict["year_level"] = None
+                    user_dict["student_number"] = None
+            
+            # Add secretary/dept head specific data
+            elif u.role == "secretary":
+                secretary = db.query(Secretary).filter(Secretary.user_id == u.id).first()
+                if secretary and secretary.programs:
+                    # programs is an ARRAY field containing program IDs
+                    programs = db.query(Program).filter(Program.id.in_(secretary.programs)).all()
+                    user_dict["assigned_programs"] = ", ".join([p.program_code for p in programs])
+                else:
+                    user_dict["assigned_programs"] = None
+            
+            elif u.role == "department_head":
+                dept_head = db.query(DepartmentHead).filter(DepartmentHead.user_id == u.id).first()
+                if dept_head and dept_head.programs:
+                    # programs is an ARRAY field containing program IDs
+                    programs = db.query(Program).filter(Program.id.in_(dept_head.programs)).all()
+                    user_dict["assigned_programs"] = ", ".join([p.program_code for p in programs])
+                else:
+                    user_dict["assigned_programs"] = None
             
             users_data.append(user_dict)
         
@@ -2820,6 +3173,9 @@ async def export_users(
         
         return {"success": True, "data": users_data}
         
+    except ValidationError as e:
+        logger.warning(f"Validation error in export_users: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Error exporting users: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -2827,34 +3183,153 @@ async def export_users(
 @router.get("/export/evaluations")
 async def export_evaluations(
     format: str = Query("csv", regex="^(csv|json)$"),
+    program: Optional[str] = Query(None),
+    semester: Optional[str] = Query(None),
+    academic_year: Optional[str] = Query(None),
+    period_id: Optional[int] = Query(None),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    class_section_id: Optional[int] = Query(None),
     user_id: Optional[int] = Query(None),
+    limit: int = Query(5000, ge=1, le=20000, description="Maximum records to export"),
+    current_user: dict = Depends(require_staff),
     db: Session = Depends(get_db)
 ):
-    """Export all evaluations data"""
+    """Export evaluations data with comprehensive filters - optimized with efficient joins"""
     try:
-        evaluations = db.query(Evaluation).all()
+        # Validate inputs
+        format = InputValidator.validate_format(format)
+        program = InputValidator.validate_program_code(program)
+        semester = InputValidator.validate_semester(semester)
+        academic_year = InputValidator.validate_academic_year(academic_year)
+        class_section_id = InputValidator.validate_id(class_section_id, "class_section_id")
+        user_id = InputValidator.validate_id(user_id, "user_id")
         
-        eval_data = [{
-            "id": e.id,
-            "student_id": e.student_id,
-            "class_section_id": e.class_section_id,
-            "rating_teaching": e.rating_teaching,
-            "rating_content": e.rating_content,
-            "rating_engagement": e.rating_engagement,
-            "rating_overall": e.rating_overall,
-            "text_feedback": e.text_feedback,
-            "suggestions": e.suggestions,
-            "sentiment": e.sentiment,
-            "sentiment_score": e.sentiment_score,
-            "is_anomaly": e.is_anomaly,
-            "anomaly_score": e.anomaly_score,
-            "submission_date": e.submission_date.isoformat() if e.submission_date else None
-        } for e in evaluations]
+        # Validate date range
+        start_dt, end_dt = InputValidator.validate_date_range(start_date, end_date)
         
-        # Log export
-        log_export(db, user_id, 'evaluations', format, len(eval_data), {})
+        # Build WHERE conditions
+        conditions = ["e.status = 'completed'"]
+        params = {"limit": limit}
         
-        return {"success": True, "data": eval_data}
+        # Date range filtering
+        if start_dt:
+            conditions.append("e.submission_date >= :start_date")
+            params["start_date"] = start_dt
+        
+        if end_dt:
+            conditions.append("e.submission_date <= :end_date")
+            params["end_date"] = end_dt
+        
+        # Filter by specific class section
+        if class_section_id:
+            conditions.append("e.class_section_id = :class_section_id")
+            params["class_section_id"] = class_section_id
+        
+        # Filter by program
+        if program:
+            conditions.append("p.program_code = :program")
+            params["program"] = program
+        
+        # Filter by semester
+        if semester:
+            conditions.append("cs.semester = :semester")
+            params["semester"] = semester
+        
+        # Filter by academic year
+        if academic_year:
+            conditions.append("cs.academic_year = :academic_year")
+            params["academic_year"] = academic_year
+        
+        # Filter by evaluation period
+        if period_id:
+            conditions.append("enr.evaluation_period_id = :period_id")
+            params["period_id"] = period_id
+        
+        where_clause = " AND ".join(conditions)
+        
+        # Use efficient SQL query with all necessary JOINs to avoid N+1 problem
+        query = text(f"""
+            SELECT 
+                e.id as evaluation_id,
+                e.submission_date,
+                u.school_id as student_id,
+                u.first_name || ' ' || u.last_name as student_name,
+                u.email as student_email,
+                p.program_code as student_program,
+                p.program_name as student_program_name,
+                s.year_level as student_year_level,
+                c.subject_code as course_code,
+                c.subject_name as course_name,
+                cs.class_code,
+                cs.semester,
+                cs.academic_year,
+                e.rating_teaching,
+                e.rating_content,
+                e.rating_engagement,
+                e.rating_overall,
+                e.sentiment_label,
+                e.sentiment_score,
+                e.anomaly_score,
+                e.is_anomaly
+            FROM evaluations e
+            INNER JOIN users u ON e.student_id = u.id
+            LEFT JOIN students s ON s.user_id = u.id
+            LEFT JOIN programs p ON s.program_id = p.id
+            INNER JOIN class_sections cs ON e.class_section_id = cs.id
+            LEFT JOIN courses c ON cs.course_id = c.id
+            LEFT JOIN enrollments enr ON enr.student_id = e.student_id 
+                AND enr.class_section_id = e.class_section_id
+            WHERE {where_clause}
+            ORDER BY e.submission_date DESC
+            LIMIT :limit
+        """)
+        
+        result = db.execute(query, params)
+        
+        eval_data = []
+        for row in result:
+            eval_data.append({
+                "evaluation_id": row[0],
+                "submission_date": row[1].isoformat() if row[1] else None,
+                # Student info
+                "student_id": row[2],
+                "student_name": row[3],
+                "student_email": row[4],
+                "student_program": row[5],
+                "student_program_name": row[6],
+                "student_year_level": row[7],
+                # Course info
+                "course_code": row[8],
+                "course_name": row[9],
+                "class_code": row[10],
+                "semester": row[11],
+                "academic_year": row[12],
+                # Aggregated ratings
+                "rating_teaching": row[13],
+                "rating_content": row[14],
+                "rating_engagement": row[15],
+                "rating_overall": row[16],
+                # ML analysis
+                "sentiment_label": row[17],
+                "sentiment_score": float(row[18]) if row[18] else None,
+                "anomaly_score": float(row[19]) if row[19] else None,
+                "is_anomaly": row[20]
+            })
+        
+        # Log this export
+        filters = {}
+        if program: filters['program'] = program
+        if semester: filters['semester'] = semester
+        if academic_year: filters['academic_year'] = academic_year
+        if period_id: filters['period_id'] = period_id
+        if start_date: filters['start_date'] = start_date
+        if end_date: filters['end_date'] = end_date
+        if class_section_id: filters['class_section_id'] = class_section_id
+        log_export(db, user_id, 'evaluations', format, len(eval_data), filters)
+        
+        logger.info(f"[EXPORT] Exported {len(eval_data)} evaluation records (limit: {limit})")
+        return {"success": True, "data": eval_data, "count": len(eval_data), "limit_reached": len(eval_data) >= limit}
         
     except Exception as e:
         logger.error(f"Error exporting evaluations: {e}")
@@ -2867,23 +3342,31 @@ async def export_courses(
     status: Optional[str] = Query(None),
     year_level: Optional[int] = Query(None),
     user_id: Optional[int] = Query(None),
+    current_user: dict = Depends(require_staff),
     db: Session = Depends(get_db)
 ):
     """Export courses data with filters"""
     try:
+        # Validate inputs
+        format = InputValidator.validate_format(format)
+        program = InputValidator.validate_program_code(program)
+        status = InputValidator.validate_status(status)
+        year_level = InputValidator.validate_year_level(year_level)
+        user_id = InputValidator.validate_id(user_id, "user_id")
+        
         query = db.query(Course)
         
         # Apply filters
-        if program and program != 'all':
+        if program:
             program_obj = db.query(Program).filter(Program.program_code == program).first()
             if program_obj:
                 query = query.filter(Course.program_id == program_obj.id)
         
-        if status and status != 'all':
+        if status:
             is_active = status.lower() == 'active'
             query = query.filter(Course.is_active == is_active)
         
-        if year_level and year_level != 0:
+        if year_level:
             query = query.filter(Course.year_level == year_level)
         
         courses = query.all()
@@ -2913,6 +3396,9 @@ async def export_courses(
         
         return {"success": True, "data": courses_data}
         
+    except ValidationError as e:
+        logger.warning(f"Validation error in export_courses: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Error exporting courses: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -2923,6 +3409,7 @@ async def export_analytics(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     user_id: Optional[int] = Query(None),
+    current_user: dict = Depends(require_staff),
     db: Session = Depends(get_db)
 ):
     """Export analytics data"""
@@ -2992,61 +3479,86 @@ async def export_audit_logs(
     end_date: Optional[str] = Query(None),
     severity: Optional[str] = Query(None),
     user_id: Optional[int] = Query(None),
+    limit: int = Query(10000, ge=1, le=50000, description="Maximum records to export"),
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """Export audit logs with filters"""
+    """Export audit logs with filters - optimized with LIMIT and efficient joins"""
     try:
-        query = db.query(AuditLog)
+        # Build WHERE conditions
+        conditions = ["1=1"]
+        params = {"limit": limit}
         
-        # Apply filters
         if action and action != 'all':
-            query = query.filter(AuditLog.action == action)
+            conditions.append("al.action = :action")
+            params["action"] = action
         
         if category and category != 'all':
-            query = query.filter(AuditLog.category == category)
+            conditions.append("al.category = :category")
+            params["category"] = category
         
         if severity and severity != 'all':
-            query = query.filter(AuditLog.severity == severity)
+            conditions.append("al.severity = :severity")
+            params["severity"] = severity
         
         if user and user != 'all':
-            query = query.filter(AuditLog.user_id == int(user))
+            conditions.append("al.user_id = :user_id")
+            params["user_id"] = int(user)
         
         # Date range filtering
         if start_date:
             try:
                 start = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-                query = query.filter(AuditLog.timestamp >= start)
+                conditions.append("al.created_at >= :start_date")
+                params["start_date"] = start
             except:
                 pass
         
         if end_date:
             try:
                 end = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
-                query = query.filter(AuditLog.timestamp <= end)
+                conditions.append("al.created_at <= :end_date")
+                params["end_date"] = end
             except:
                 pass
         
-        # Order by most recent first
-        query = query.order_by(AuditLog.timestamp.desc())
+        where_clause = " AND ".join(conditions)
         
-        audit_logs = query.all()
+        # Use efficient SQL query with JOIN to avoid N+1 problem
+        query = text(f"""
+            SELECT 
+                al.id,
+                al.user_id,
+                COALESCE(u.email, 'System') as user_email,
+                COALESCE(u.first_name || ' ' || u.last_name, 'System') as user_name,
+                al.action,
+                al.category,
+                al.details,
+                al.severity,
+                al.ip_address,
+                al.created_at
+            FROM audit_logs al
+            LEFT JOIN users u ON al.user_id = u.id
+            WHERE {where_clause}
+            ORDER BY al.created_at DESC
+            LIMIT :limit
+        """)
+        
+        result = db.execute(query, params)
         
         logs_data = []
-        for log in audit_logs:
-            # Get user info
-            log_user = db.query(User).filter(User.id == log.user_id).first() if log.user_id else None
-            
+        for row in result:
             logs_data.append({
-                "id": log.id,
-                "user_id": log.user_id,
-                "user_email": log_user.email if log_user else None,
-                "user_name": f"{log_user.first_name} {log_user.last_name}" if log_user else "System",
-                "action": log.action,
-                "category": log.category,
-                "details": log.details,
-                "severity": log.severity,
-                "ip_address": log.ip_address,
-                "timestamp": log.timestamp.isoformat() if log.timestamp else None
+                "id": row[0],
+                "user_id": row[1],
+                "user_email": row[2],
+                "user_name": row[3],
+                "action": row[4],
+                "category": row[5],
+                "details": row[6] if isinstance(row[6], dict) else {},
+                "severity": row[7],
+                "ip_address": row[8],
+                "timestamp": row[9].isoformat() if row[9] else None
             })
         
         # Log this export
@@ -3059,7 +3571,8 @@ async def export_audit_logs(
         if severity: filters['severity'] = severity
         log_export(db, user_id, 'audit_logs', format, len(logs_data), filters)
         
-        return {"success": True, "data": logs_data}
+        logger.info(f"[EXPORT] Exported {len(logs_data)} audit log records (limit: {limit})")
+        return {"success": True, "data": logs_data, "count": len(logs_data), "limit_reached": len(logs_data) >= limit}
         
     except Exception as e:
         logger.error(f"Error exporting audit logs: {e}")
@@ -3069,6 +3582,7 @@ async def export_audit_logs(
 async def export_custom(
     export_params: dict = Body(...),
     user_id: Optional[int] = Query(None),
+    current_user: dict = Depends(require_staff),
     db: Session = Depends(get_db)
 ):
     """Export custom query data"""
@@ -3120,7 +3634,10 @@ async def export_custom(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/dashboard-stats")
-async def get_dashboard_stats(db: Session = Depends(get_db)):
+async def get_dashboard_stats(
+    current_user: dict = Depends(require_staff),
+    db: Session = Depends(get_db)
+):
     """Get overall dashboard statistics for system admin"""
     try:
         # User stats
@@ -3218,7 +3735,7 @@ class EmailNotificationRequest(BaseModel):
 @router.post("/send-notification")
 async def send_email_notification(
     request: EmailNotificationRequest,
-    current_user_id: int = Query(...),
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Send email notifications to students"""
@@ -3312,65 +3829,6 @@ async def send_email_notification(
                 else:
                     failed_count += 1
         
-        elif request.notification_type == "reminder":
-            # Send reminder to students with pending evaluations
-            for email in recipient_emails:
-                # Get student
-                user = db.query(User).filter(User.email == email).first()
-                if not user:
-                    continue
-                
-                student = db.query(Student).filter(Student.user_id == user.id).first()
-                if not student:
-                    continue
-                
-                # Get pending courses (enrolled but not evaluated)
-                enrolled_sections = db.query(ClassSection).filter(
-                    ClassSection.semester == period.semester,
-                    ClassSection.academic_year == period.academic_year
-                ).all()
-                
-                evaluated_courses = db.query(Evaluation.class_section_id).filter(
-                    Evaluation.student_id == student.id,
-                    Evaluation.evaluation_period_id == period.id
-                ).all()
-                evaluated_ids = [e[0] for e in evaluated_courses]
-                
-                pending_courses = [
-                    section.course.name for section in enrolled_sections 
-                    if section.id not in evaluated_ids
-                ]
-                
-                if pending_courses:
-                    days_remaining = (period.end_date - datetime.now()).days
-                    success = email_service.send_evaluation_reminder(
-                        to_emails=[email],
-                        period_name=period.name,
-                        end_date=period.end_date.strftime("%B %d, %Y"),
-                        pending_courses=pending_courses,
-                        days_remaining=max(0, days_remaining)
-                    )
-                    if success:
-                        sent_count += 1
-                    else:
-                        failed_count += 1
-        
-        elif request.notification_type == "period_ending":
-            hours_remaining = int((period.end_date - datetime.now()).total_seconds() / 3600)
-            hours_remaining = max(0, hours_remaining)
-            
-            for email in recipient_emails:
-                success = email_service.send_evaluation_period_ending(
-                    to_emails=[email],
-                    period_name=period.name,
-                    end_date=period.end_date.strftime("%B %d, %Y %I:%M %p"),
-                    hours_remaining=hours_remaining
-                )
-                if success:
-                    sent_count += 1
-                else:
-                    failed_count += 1
-        
         else:
             raise HTTPException(status_code=400, detail="Invalid notification type")
         
@@ -3387,7 +3845,7 @@ async def send_email_notification(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/email-config-status")
-async def get_email_config_status(current_user_id: int = Query(...)):
+async def get_email_config_status(current_user: dict = Depends(require_admin)):
     """Check if email service is configured"""
     try:
         from services.email_service import email_service
@@ -3614,6 +4072,7 @@ async def restore_backup(
 @router.get("/backup/history")
 async def get_backup_history(
     user_id: Optional[int] = Query(None),
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Get list of available backups"""
@@ -3772,7 +4231,7 @@ async def get_program_sections(
 @router.post("/program-sections")
 async def create_program_section(
     section_data: ProgramSectionCreate,
-    current_user_id: int = Query(...),
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Create a new program section"""
@@ -3854,7 +4313,7 @@ async def create_program_section(
 async def update_program_section(
     section_id: int,
     section_data: ProgramSectionUpdate,
-    current_user_id: int = Query(...),
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Update a program section"""
@@ -3937,7 +4396,7 @@ async def update_program_section(
 @router.delete("/program-sections/{section_id}")
 async def delete_program_section(
     section_id: int,
-    current_user_id: int = Query(...),
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Delete a program section"""
@@ -3985,6 +4444,7 @@ async def delete_program_section(
 @router.get("/program-sections/{section_id}/students")
 async def get_section_students(
     section_id: int,
+    current_user: dict = Depends(require_staff),
     db: Session = Depends(get_db)
 ):
     """Get all students assigned to a program section"""
@@ -4040,6 +4500,7 @@ async def get_students_for_assignment(
     year_level: Optional[int] = Query(None),
     search: Optional[str] = Query(None),
     exclude_section_id: Optional[int] = Query(None),
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Get students available for assignment with filters"""
@@ -4124,7 +4585,7 @@ class StudentAssignment(BaseModel):
 async def assign_students_to_section(
     section_id: int,
     assignment: StudentAssignment,
-    current_user_id: int = Query(...),
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Assign multiple students to a program section"""
@@ -4207,7 +4668,7 @@ async def assign_students_to_section(
 async def remove_student_from_section(
     section_id: int,
     student_id: int,
-    current_user_id: int = Query(...),
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Remove a student from a program section"""
@@ -4268,7 +4729,7 @@ async def remove_student_from_section(
 async def enroll_program_section_to_class(
     class_section_id: int,
     program_section_id: int = Body(..., embed=True),
-    current_user_id: int = Query(...),
+    current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """Bulk enroll all students from a program section into a class section"""
@@ -4382,4 +4843,172 @@ async def enroll_program_section_to_class(
         db.rollback()
         logger.error(f"Error enrolling program section: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to enroll program section: {str(e)}")
+
+
+@router.get("/non-respondents")
+async def get_non_respondents(
+    evaluation_period_id: Optional[int] = Query(None),
+    program_id: Optional[int] = Query(None),
+    year_level: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_admin)
+):
+    """
+    Get list of students who haven't completed evaluations for active period
+    Admin can see all non-respondents across all programs
+    """
+    try:
+        # Get active period if not specified
+        if not evaluation_period_id:
+            active_period = db.query(EvaluationPeriod).filter(
+                EvaluationPeriod.status == 'active'
+            ).first()
+            
+            if not active_period:
+                return {
+                    "total_students": 0,
+                    "responded": 0,
+                    "non_responded": 0,
+                    "response_rate": "0%",
+                    "non_respondents": []
+                }
+            
+            evaluation_period_id = active_period.id
+        
+        # Build query for non-respondents
+        query = text("""
+            WITH enrolled_students AS (
+                SELECT DISTINCT
+                    s.id as student_id,
+                    s.student_number,
+                    u.first_name,
+                    u.last_name,
+                    s.year_level,
+                    p.program_code,
+                    ps.section_name,
+                    ps.id as program_section_id,
+                    COUNT(DISTINCT e.class_section_id) as total_courses
+                FROM students s
+                JOIN users u ON s.user_id = u.id
+                LEFT JOIN program_sections ps ON s.section_id = ps.id
+                LEFT JOIN programs p ON ps.program_id = p.id
+                JOIN enrollments e ON s.id = e.student_id
+                WHERE u.is_active = true
+                    AND (:program_id IS NULL OR ps.program_id = :program_id)
+                    AND (:year_level IS NULL OR s.year_level = :year_level)
+                GROUP BY s.id, s.student_number, u.first_name, u.last_name, 
+                         s.year_level, p.program_code, ps.section_name, ps.id
+            ),
+            completed_evaluations AS (
+                SELECT 
+                    e.student_id,
+                    COUNT(DISTINCT e.class_section_id) as completed_courses
+                FROM evaluations e
+                WHERE e.evaluation_period_id = :period_id
+                GROUP BY e.student_id
+            )
+            SELECT 
+                es.student_id,
+                es.student_number,
+                es.first_name,
+                es.last_name,
+                es.year_level,
+                es.program_code,
+                es.section_name,
+                es.total_courses,
+                COALESCE(ce.completed_courses, 0) as completed_courses,
+                (es.total_courses - COALESCE(ce.completed_courses, 0)) as pending_count
+            FROM enrolled_students es
+            LEFT JOIN completed_evaluations ce ON es.student_id = ce.student_id
+            WHERE (es.total_courses - COALESCE(ce.completed_courses, 0)) > 0
+            ORDER BY pending_count DESC, es.student_number ASC
+        """)
+        
+        result = db.execute(query, {
+            "period_id": evaluation_period_id,
+            "program_id": program_id,
+            "year_level": year_level
+        }).fetchall()
+        
+        # Get pending courses for each non-respondent
+        non_respondents = []
+        for row in result:
+            # Get list of courses they haven't evaluated
+            courses_query = text("""
+                SELECT DISTINCT
+                    c.subject_code,
+                    c.subject_name,
+                    cs.id as section_id,
+                    cs.class_code
+                FROM enrollments e
+                JOIN class_sections cs ON e.class_section_id = cs.id
+                JOIN courses c ON cs.course_id = c.id
+                WHERE e.student_id = :student_id
+                    AND NOT EXISTS (
+                        SELECT 1 FROM evaluations ev
+                        WHERE ev.student_id = :student_id
+                            AND ev.class_section_id = cs.id
+                            AND ev.evaluation_period_id = :period_id
+                    )
+                ORDER BY c.subject_code
+            """)
+            
+            courses = db.execute(courses_query, {
+                "student_id": row.student_id,
+                "period_id": evaluation_period_id
+            }).fetchall()
+            
+            non_respondents.append({
+                "student_id": row.student_id,
+                "student_number": row.student_number,
+                "full_name": f"{row.first_name} {row.last_name}",
+                "program": row.program_code or "N/A",
+                "section": row.section_name or "N/A",
+                "year_level": row.year_level,
+                "pending_courses": [
+                    {
+                        "course_code": c.subject_code,
+                        "course_name": c.subject_name,
+                        "section_id": c.section_id,
+                        "class_code": c.class_code
+                    }
+                    for c in courses
+                ],
+                "pending_count": row.pending_count,
+                "completed_count": row.completed_courses,
+                "total_courses": row.total_courses
+            })
+        
+        # Calculate statistics
+        total_query = text("""
+            SELECT COUNT(DISTINCT s.id) as total
+            FROM students s
+            JOIN users u ON s.user_id = u.id
+            LEFT JOIN program_sections ps ON s.section_id = ps.id
+            JOIN enrollments e ON s.id = e.student_id
+            WHERE u.is_active = true
+                AND (:program_id IS NULL OR ps.program_id = :program_id)
+                AND (:year_level IS NULL OR s.year_level = :year_level)
+        """)
+        
+        total_students = db.execute(total_query, {
+            "program_id": program_id,
+            "year_level": year_level
+        }).scalar() or 0
+        
+        non_responded = len(non_respondents)
+        responded = total_students - non_responded
+        response_rate = f"{(responded / total_students * 100):.1f}%" if total_students > 0 else "0%"
+        
+        return {
+            "total_students": total_students,
+            "responded": responded,
+            "non_responded": non_responded,
+            "response_rate": response_rate,
+            "non_respondents": non_respondents
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching non-respondents: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch non-respondents: {str(e)}")
 

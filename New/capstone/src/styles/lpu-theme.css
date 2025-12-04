@@ -84,9 +84,9 @@ body {
 
 /* Academic Card System */
 .lpu-card {
-  @apply bg-white rounded-xl border border-gray-200;
+  @apply bg-white rounded-card border border-gray-200 p-6;
   box-shadow: var(--shadow-medium);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   border-left: 4px solid transparent;
 }
 
@@ -94,6 +94,19 @@ body {
   transform: translateY(-2px);
   box-shadow: var(--shadow-strong);
   border-left-color: var(--lpu-crimson);
+}
+
+/* Card Spacing Variants */
+.lpu-card-compact {
+  @apply lpu-card p-4;
+}
+
+.lpu-card-comfortable {
+  @apply lpu-card p-8;
+}
+
+.lpu-card-spacious {
+  @apply lpu-card p-10;
 }
 
 .lpu-card-crimson {
@@ -108,9 +121,16 @@ body {
 
 /* Statistics Cards */
 .stats-card {
-  @apply lpu-card p-6;
+  @apply bg-white rounded-card border border-gray-200 p-6 md:p-8;
+  box-shadow: var(--shadow-card);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
+}
+
+.stats-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .stats-card::before {

@@ -4,6 +4,7 @@ Handles secretary/admin dashboard data
 """
 
 from fastapi import APIRouter, HTTPException, Depends, Query
+from middleware.auth import require_staff
 from sqlalchemy.orm import Session
 from sqlalchemy import text, func
 from database.connection import get_db
@@ -17,11 +18,26 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.get("/dashboard-stats")
-async def get_dashboard_stats(db: Session = Depends(get_db)):
-    """Get comprehensive dashboard statistics for admin"""
-    print("🔍 DEBUG: /dashboard-stats endpoint hit!")
+async def get_dashboard_stats(
+    period_id: Optional[int] = Query(None),
+    current_user: dict = Depends(require_staff),
+    db: Session = Depends(get_db)):
+    """Get comprehensive dashboard statistics for admin (filtered by evaluation period)"""
     try:
-        # Get overall counts
+        from models.enhanced_models import EvaluationPeriod
+        
+        # Get evaluation period (active by default)
+        if period_id:
+            period = db.query(EvaluationPeriod).filter(EvaluationPeriod.id == period_id).first()
+            if not period:
+                raise HTTPException(status_code=404, detail="Evaluation period not found")
+        else:
+            # Default to active period
+            period = db.query(EvaluationPeriod).filter(EvaluationPeriod.status == 'active').first()
+        
+        period_id = period.id if period else None
+        
+        # Get overall counts (users, courses, programs not period-specific)
         counts_query = text("""
             SELECT 
                 (SELECT COUNT(*) FROM users) as total_users,
@@ -30,14 +46,14 @@ async def get_dashboard_stats(db: Session = Depends(get_db)):
                 (SELECT COUNT(*) FROM users WHERE role = 'secretary') as total_secretaries,
                 (SELECT COUNT(*) FROM users WHERE role = 'admin') as total_admins,
                 (SELECT COUNT(*) FROM courses) as total_courses,
-                (SELECT COUNT(*) FROM evaluations) as total_evaluations,
+                (SELECT COUNT(*) FROM evaluations WHERE evaluation_period_id = :period_id) as total_evaluations,
                 (SELECT COUNT(*) FROM programs) as total_programs,
                 (SELECT COUNT(*) FROM class_sections) as total_class_sections
         """)
         
-        counts_result = db.execute(counts_query).fetchone()
+        counts_result = db.execute(counts_query, {"period_id": period_id}).fetchone()
         
-        # Get program statistics
+        # Get program statistics (filtered by period)
         program_stats_query = text("""
             SELECT 
                 p.program_code,
@@ -48,13 +64,13 @@ async def get_dashboard_stats(db: Session = Depends(get_db)):
             FROM programs p
             LEFT JOIN courses c ON p.id = c.program_id
             LEFT JOIN students s ON p.id = s.program_id
-            LEFT JOIN enrollments en ON s.id = en.student_id
-            LEFT JOIN evaluations e ON en.class_section_id = e.class_section_id AND en.student_id = e.student_id
+            LEFT JOIN enrollments en ON s.id = en.student_id AND (:period_id IS NULL OR en.evaluation_period_id = :period_id)
+            LEFT JOIN evaluations e ON en.class_section_id = e.class_section_id AND en.student_id = e.student_id AND (:period_id IS NULL OR e.evaluation_period_id = :period_id)
             GROUP BY p.id, p.program_code, p.program_name
             ORDER BY p.program_code
         """)
         
-        program_results = db.execute(program_stats_query)
+        program_results = db.execute(program_stats_query, {"period_id": period_id})
         program_stats = {}
         for row in program_results:
             program_stats[row[0]] = {
@@ -64,18 +80,19 @@ async def get_dashboard_stats(db: Session = Depends(get_db)):
                 "evaluations": row[4] or 0
             }
         
-        # Get sentiment statistics (if sentiment field exists)
+        # Get sentiment statistics (filtered by period)
         sentiment_query = text("""
             SELECT 
                 sentiment,
                 COUNT(*) as count
             FROM evaluations
             WHERE sentiment IS NOT NULL
+            AND (:period_id IS NULL OR evaluation_period_id = :period_id)
             GROUP BY sentiment
         """)
         
         try:
-            sentiment_results = db.execute(sentiment_query)
+            sentiment_results = db.execute(sentiment_query, {"period_id": period_id})
             sentiment_stats = {
                 "positive": 0,
                 "neutral": 0,
@@ -89,7 +106,7 @@ async def get_dashboard_stats(db: Session = Depends(get_db)):
             # If sentiment column doesn't exist, return zeros
             sentiment_stats = {"positive": 0, "neutral": 0, "negative": 0}
         
-        # Get recent evaluations
+        # Get recent evaluations (filtered by period)
         recent_query = text("""
             SELECT 
                 e.id,
@@ -102,11 +119,12 @@ async def get_dashboard_stats(db: Session = Depends(get_db)):
             JOIN users u ON s.user_id = u.id
             JOIN class_sections cs ON e.class_section_id = cs.id
             JOIN courses c ON cs.course_id = c.id
+            WHERE (:period_id IS NULL OR e.evaluation_period_id = :period_id)
             ORDER BY e.submitted_at DESC
             LIMIT 10
         """)
         
-        recent_results = db.execute(recent_query)
+        recent_results = db.execute(recent_query, {"period_id": period_id})
         recent_evaluations = [
             {
                 "id": row[0],
@@ -121,6 +139,9 @@ async def get_dashboard_stats(db: Session = Depends(get_db)):
         return {
             "success": True,
             "data": {
+                "period_id": period.id if period else None,
+                "period_name": period.name if period else None,
+                "period_status": period.status if period else None,
                 "totalUsers": counts_result[0] if counts_result else 0,
                 "totalCourses": counts_result[5] if counts_result else 0,
                 "totalEvaluations": counts_result[6] if counts_result else 0,
@@ -144,10 +165,25 @@ async def get_dashboard_stats(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Failed to fetch dashboard statistics: {str(e)}")
 
 @router.get("/department-overview")
-async def get_department_overview(db: Session = Depends(get_db)):
-    """Get overview statistics for all programs (departments)"""
+async def get_department_overview(
+    period_id: Optional[int] = Query(None),
+    current_user: dict = Depends(require_staff),
+    db: Session = Depends(get_db)):
+    """Get overview statistics for all programs (departments) filtered by evaluation period"""
     try:
-        # Get program counts (using programs as departments)
+        from models.enhanced_models import EvaluationPeriod
+        
+        # Get evaluation period (active by default)
+        if period_id:
+            period = db.query(EvaluationPeriod).filter(EvaluationPeriod.id == period_id).first()
+            if not period:
+                raise HTTPException(status_code=404, detail="Evaluation period not found")
+        else:
+            period = db.query(EvaluationPeriod).filter(EvaluationPeriod.status == 'active').first()
+        
+        period_id = period.id if period else None
+        
+        # Get program counts (using programs as departments, filtered by period)
         dept_query = text("""
             SELECT 
                 p.program_name as department_name,
@@ -157,13 +193,13 @@ async def get_department_overview(db: Session = Depends(get_db)):
             FROM programs p
             LEFT JOIN students s ON p.id = s.program_id
             LEFT JOIN courses c ON p.id = c.program_id
-            LEFT JOIN enrollments en ON s.id = en.student_id
-            LEFT JOIN evaluations e ON en.class_section_id = e.class_section_id AND en.student_id = e.student_id
+            LEFT JOIN enrollments en ON s.id = en.student_id AND (:period_id IS NULL OR en.evaluation_period_id = :period_id)
+            LEFT JOIN evaluations e ON en.class_section_id = e.class_section_id AND en.student_id = e.student_id AND (:period_id IS NULL OR e.evaluation_period_id = :period_id)
             GROUP BY p.id, p.program_name
             ORDER BY p.program_name
         """)
         
-        result = db.execute(dept_query)
+        result = db.execute(dept_query, {"period_id": period_id})
         departments = []
         for row in result:
             departments.append({
@@ -173,16 +209,16 @@ async def get_department_overview(db: Session = Depends(get_db)):
                 "total_evaluations": row[3] or 0
             })
         
-        # Get overall statistics
+        # Get overall statistics (filtered by period)
         total_query = text("""
             SELECT 
                 (SELECT COUNT(*) FROM students) as total_students,
                 (SELECT COUNT(*) FROM courses) as total_courses,
-                (SELECT COUNT(*) FROM evaluations) as total_evaluations,
+                (SELECT COUNT(*) FROM evaluations WHERE :period_id IS NULL OR evaluation_period_id = :period_id) as total_evaluations,
                 (SELECT COUNT(*) FROM programs) as total_departments
         """)
         
-        total_result = db.execute(total_query).fetchone()
+        total_result = db.execute(total_query, {"period_id": period_id}).fetchone()
         
         return {
             "success": True,
@@ -217,7 +253,9 @@ async def get_department_overview(db: Session = Depends(get_db)):
         }
 
 @router.get("/departments")
-async def get_all_departments(db: Session = Depends(get_db)):
+async def get_all_departments(
+    current_user: dict = Depends(require_staff),
+    db: Session = Depends(get_db)):
     """Get all departments (programs)"""
     try:
         # Use programs table as departments
@@ -318,14 +356,27 @@ async def get_all_students(
 
 @router.get("/evaluations")
 async def get_all_evaluations(
+    period_id: Optional[int] = Query(None),
     course_id: Optional[int] = Query(None),
     department_id: Optional[int] = Query(None), 
     semester: Optional[str] = Query(None),
     academic_year: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
-    """Get all evaluations with optional filters"""
+    """Get all evaluations with optional filters (defaults to active period)"""
     try:
+        from models.enhanced_models import EvaluationPeriod
+        
+        # Get evaluation period (active by default)
+        if period_id:
+            period = db.query(EvaluationPeriod).filter(EvaluationPeriod.id == period_id).first()
+            if not period:
+                raise HTTPException(status_code=404, detail="Evaluation period not found")
+        else:
+            period = db.query(EvaluationPeriod).filter(EvaluationPeriod.status == 'active').first()
+        
+        period_id = period.id if period else None
+        
         base_query = """
             SELECT 
                 e.id, e.rating_overall, e.comment, e.submitted_at,
@@ -344,6 +395,11 @@ async def get_all_evaluations(
         
         conditions = []
         params = {}
+        
+        # Filter by period (default to active)
+        if period_id:
+            conditions.append("AND e.evaluation_period_id = :period_id")
+            params["period_id"] = period_id
         
         if course_id:
             conditions.append("AND c.id = :course_id")
@@ -700,7 +756,7 @@ async def get_completion_rates(
                 c.subject_code,
                 c.subject_name,
                 c.year_level,
-                COALESCE(CONCAT(u.first_name, ' ', u.last_name), 'No Instructor') as instructor_name,
+                'No Instructor' as instructor_name,
                 cs.semester,
                 cs.academic_year,
                 COUNT(DISTINCT en.student_id) as enrolled_students,
@@ -712,11 +768,10 @@ async def get_completion_rates(
                 END as completion_rate
             FROM class_sections cs
             INNER JOIN courses c ON cs.course_id = c.id
-            LEFT JOIN users u ON cs.instructor_id = u.id
             LEFT JOIN enrollments en ON cs.id = en.class_section_id AND en.status = 'active'
             LEFT JOIN evaluations e ON cs.id = e.class_section_id AND en.student_id = e.student_id
             GROUP BY cs.id, cs.class_code, c.id, c.subject_code, c.subject_name, 
-                     c.year_level, u.first_name, u.last_name, cs.semester, cs.academic_year
+                     c.year_level, cs.semester, cs.academic_year
             ORDER BY completion_rate ASC, c.subject_name
         """)
         

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { isSystemAdmin } from '../../utils/roleUtils'
 import { useAuth } from '../../context/AuthContext'
 import { adminAPI } from '../../services/api'
+import Pagination from '../../components/Pagination'
 
 export default function AuditLogViewer() {
   const navigate = useNavigate()
@@ -12,7 +13,6 @@ export default function AuditLogViewer() {
   const [searchTerm, setSearchTerm] = useState('')
   const [actionFilter, setActionFilter] = useState('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
-  const [severityFilter, setSeverityFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [userFilter, setUserFilter] = useState('all')
   const [dateFilter, setDateFilter] = useState('all')
@@ -26,7 +26,7 @@ export default function AuditLogViewer() {
   
   // API State
   const [auditLogs, setAuditLogs] = useState([])
-  const [stats, setStats] = useState({ last24h: 0, criticalEvents: 0, failedAttempts: 0 })
+  const [stats, setStats] = useState({ totalLogs: 0, last24h: 0, criticalEvents: 0, failedAttempts: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -50,14 +50,25 @@ export default function AuditLogViewer() {
           page_size: logsPerPage
         }
         
-        // Add action filter if set
+        // Add filters if set
         if (actionFilter !== 'all') {
           params.action = actionFilter
         }
         
-        // Add severity filter if set
-        if (severityFilter !== 'all') {
-          params.severity = severityFilter
+        if (categoryFilter !== 'all') {
+          params.category = categoryFilter
+        }
+        
+        if (statusFilter !== 'all') {
+          params.status = statusFilter
+        }
+        
+        if (userFilter !== 'all') {
+          params.user = userFilter
+        }
+        
+        if (searchTerm.trim()) {
+          params.search = searchTerm.trim()
         }
         
         // Date range filtering
@@ -119,12 +130,12 @@ export default function AuditLogViewer() {
       }
     }
     fetchLogs()
-  }, [currentPage, actionFilter, severityFilter, dateFilter, customStartDate, customEndDate])
+  }, [currentPage, actionFilter, categoryFilter, statusFilter, userFilter, searchTerm, dateFilter, customStartDate, customEndDate])
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [actionFilter, categoryFilter, severityFilter, statusFilter, dateFilter, searchTerm, userFilter])
+  }, [actionFilter, categoryFilter, statusFilter, dateFilter, searchTerm, userFilter])
 
   // Get unique users and actions from current page
   const users = useMemo(() => {
@@ -165,25 +176,8 @@ export default function AuditLogViewer() {
     'CREATE_PROGRAM', 'UPDATE_PROGRAM', 'DELETE_PROGRAM'
   ]
 
-  // Client-side filtering for search, user, category, and status (since backend handles action, severity, date)
-  const filteredLogs = useMemo(() => {
-    return auditLogs.filter(log => {
-      const matchesSearch = searchTerm === '' ||
-        log.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (log.details && typeof log.details === 'string' && log.details.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (log.ipAddress && log.ipAddress.includes(searchTerm))
-      
-      const matchesUser = userFilter === 'all' || log.user === userFilter
-      const matchesCategory = categoryFilter === 'all' || log.category === categoryFilter
-      const matchesStatus = statusFilter === 'all' || log.status === statusFilter
-      
-      return matchesSearch && matchesUser && matchesCategory && matchesStatus
-    })
-  }, [auditLogs, searchTerm, userFilter, categoryFilter, statusFilter])
-
-  // Use filtered logs directly (backend handles pagination)
-  const paginatedLogs = filteredLogs
+  // Backend handles all filtering, use response directly
+  const paginatedLogs = auditLogs
 
   // Fetch stats separately
   useEffect(() => {
@@ -192,6 +186,7 @@ export default function AuditLogViewer() {
         const response = await adminAPI.getAuditLogStats()
         if (response?.success) {
           setStats({
+            totalLogs: response.data.total_logs || 0,
             last24h: response.data.last_24h || 0,
             criticalEvents: response.data.critical_events || 0,
             failedAttempts: response.data.failed_blocked || 0
@@ -211,6 +206,7 @@ export default function AuditLogViewer() {
     }
     
     // Fallback to calculating from current page
+    const totalLogs = auditLogs.length
     const last24h = auditLogs.filter(log => {
       const logDate = new Date(log.timestamp)
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
@@ -220,7 +216,7 @@ export default function AuditLogViewer() {
     const criticalEvents = auditLogs.filter(log => log.severity === 'Critical').length
     const failedAttempts = auditLogs.filter(log => log.status === 'Failed' || log.status === 'Blocked').length
 
-    return { last24h, criticalEvents, failedAttempts }
+    return { totalLogs, last24h, criticalEvents, failedAttempts }
   }, [auditLogs, stats])
 
   const handleViewDetails = (log) => {
@@ -303,21 +299,19 @@ export default function AuditLogViewer() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Header */}
-      <header className="bg-gradient-to-r from-red-600 to-red-700 shadow-xl border-b-4 border-red-800">
-        <div className="container mx-auto px-6 py-6">
+      <header className="lpu-header">
+        <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-8 lg:py-10 max-w-screen-2xl">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-4">
-              <button onClick={() => navigate('/admin/dashboard')} className="w-12 h-12 bg-white/20 hover:bg-white/30 rounded-xl flex items-center justify-center transition-all">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
-                </svg>
-              </button>
+              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg">
+                <span className="text-[#7a0000] font-bold text-xl">LPU</span>
+              </div>
               <div>
-                <h1 className="text-3xl font-bold text-white">Audit Log Viewer</h1>
-                <p className="text-red-100 text-sm mt-1">Monitor system activity and security events</p>
+                <h1 className="lpu-header-title text-3xl">Audit Log Viewer</h1>
+                <p className="lpu-header-subtitle text-lg">Monitor system activity and security events</p>
               </div>
             </div>
-            <button onClick={handleExportLogs} className="bg-white hover:bg-red-50 text-red-600 font-semibold px-6 py-3 rounded-xl shadow-lg transition-all flex items-center space-x-2">
+            <button onClick={handleExportLogs} className="bg-white hover:bg-[#ffd700] text-[#7a0000] font-semibold px-6 py-3 rounded-button shadow-card transition-all duration-250 flex items-center space-x-2">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
               </svg>
@@ -327,17 +321,17 @@ export default function AuditLogViewer() {
         </div>
       </header>
 
-      <div className="container mx-auto px-6 py-8">
+      <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-10 lg:py-12 max-w-screen-2xl">
         {/* Stats Cards */}
-        <div className="grid md:grid-cols-4 gap-6 mb-8">
+        <div className="grid md:grid-cols-4 gap-5 lg:gap-6 mb-12">
           <div className="bg-white rounded-xl shadow-md p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Logs</p>
-                <p className="text-3xl font-bold text-gray-900">{auditLogs.length}</p>
+                <p className="text-xs lg:text-sm text-gray-600 uppercase tracking-wide">Total Logs</p>
+                <p className="text-4xl lg:text-5xl font-bold text-gray-900">{displayStats.totalLogs}</p>
               </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                 </svg>
               </div>
@@ -347,11 +341,11 @@ export default function AuditLogViewer() {
           <div className="bg-white rounded-xl shadow-md p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Last 24 Hours</p>
-                <p className="text-3xl font-bold text-green-600">{displayStats.last24h}</p>
+                <p className="text-xs lg:text-sm text-gray-600 uppercase tracking-wide">Last 24 Hours</p>
+                <p className="text-4xl lg:text-5xl font-bold text-yellow-600">{displayStats.last24h}</p>
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
               </div>
@@ -361,8 +355,8 @@ export default function AuditLogViewer() {
           <div className="bg-white rounded-xl shadow-md p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Critical Events</p>
-                <p className="text-3xl font-bold text-red-600">{displayStats.criticalEvents}</p>
+                <p className="text-xs lg:text-sm text-gray-600 uppercase tracking-wide">Critical Events</p>
+                <p className="text-4xl lg:text-5xl font-bold text-red-600">{displayStats.criticalEvents}</p>
               </div>
               <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
                 <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -375,11 +369,11 @@ export default function AuditLogViewer() {
           <div className="bg-white rounded-xl shadow-md p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Failed/Blocked</p>
-                <p className="text-3xl font-bold text-orange-600">{displayStats.failedAttempts}</p>
+                <p className="text-xs lg:text-sm text-gray-600 uppercase tracking-wide">Failed/Blocked</p>
+                <p className="text-4xl lg:text-5xl font-bold text-yellow-600">{displayStats.failedAttempts}</p>
               </div>
-              <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
                 </svg>
               </div>
@@ -388,7 +382,7 @@ export default function AuditLogViewer() {
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+        <div className="bg-white rounded-card shadow-card p-6 lg:p-8 mb-12">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">🔎 Advanced Filters</h3>
           
           {/* Row 1: Search and Action */}
@@ -476,8 +470,8 @@ export default function AuditLogViewer() {
             </div>
           </div>
 
-          {/* Row 2: Category, Severity, Status */}
-          <div className="grid md:grid-cols-3 gap-4 mb-4">
+          {/* Row 2: Category and Status */}
+          <div className="grid md:grid-cols-2 gap-4 mb-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">📂 Category</label>
               <select
@@ -497,19 +491,6 @@ export default function AuditLogViewer() {
                 <option value="Data Export">Data Export</option>
                 <option value="System Configuration">System Configuration</option>
                 <option value="Program Management">Program Management</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">⚠️ Severity</label>
-              <select
-                value={severityFilter}
-                onChange={(e) => setSeverityFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-              >
-                <option value="all">All Severities</option>
-                <option value="Info">ℹ️ Info</option>
-                <option value="Warning">⚠️ Warning</option>
-                <option value="Critical">🚨 Critical</option>
               </select>
             </div>
             <div>
@@ -603,11 +584,10 @@ export default function AuditLogViewer() {
           {/* Filter Summary */}
           <div className="mt-4 flex items-center justify-between pt-4 border-t border-gray-200">
             <div className="text-sm text-gray-600">
-              {(actionFilter !== 'all' || categoryFilter !== 'all' || severityFilter !== 'all' || statusFilter !== 'all' || userFilter !== 'all' || dateFilter !== 'all' || searchTerm) && (
+              {(actionFilter !== 'all' || categoryFilter !== 'all' || statusFilter !== 'all' || userFilter !== 'all' || dateFilter !== 'all' || searchTerm) && (
                 <span>🔍 Active filters: {[
                   actionFilter !== 'all' && 'Action',
                   categoryFilter !== 'all' && 'Category',
-                  severityFilter !== 'all' && 'Severity',
                   statusFilter !== 'all' && 'Status',
                   userFilter !== 'all' && 'User',
                   dateFilter !== 'all' && 'Date',
@@ -620,7 +600,6 @@ export default function AuditLogViewer() {
                 setSearchTerm('')
                 setActionFilter('all')
                 setCategoryFilter('all')
-                setSeverityFilter('all')
                 setStatusFilter('all')
                 setUserFilter('all')
                 setDateFilter('all')
@@ -635,7 +614,7 @@ export default function AuditLogViewer() {
         </div>
 
         {/* Logs Table */}
-        <div className="bg-white rounded-xl shadow-md overflow-hidden">
+        <div className="bg-white rounded-card shadow-card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
@@ -657,7 +636,7 @@ export default function AuditLogViewer() {
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">{log.user}</td>
                     <td className="px-6 py-4">
-                      <span className="inline-flex px-2 py-1 text-xs font-semibold bg-blue-100 text-blue-800 rounded">
+                      <span className="inline-flex px-2 py-1 text-xs font-semibold bg-red-100 text-red-800 rounded">
                         {log.action}
                       </span>
                     </td>
@@ -666,9 +645,9 @@ export default function AuditLogViewer() {
                     <td className="px-6 py-4">
                       <div className="flex items-center space-x-2">
                         <span className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
-                          log.status === 'Success' ? 'bg-green-100 text-green-800' :
+                          log.status === 'Success' ? 'bg-yellow-100 text-yellow-800' :
                           log.status === 'Failed' ? 'bg-red-100 text-red-800' :
-                          'bg-orange-100 text-orange-800'
+                          'bg-yellow-100 text-orange-800'
                         }`}>
                           {log.status}
                         </span>
@@ -683,7 +662,7 @@ export default function AuditLogViewer() {
                       <div className="flex items-center justify-center">
                         <button
                           onClick={() => handleViewDetails(log)}
-                          className="p-2 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg transition-all"
+                          className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-all"
                           title="View Details"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -699,38 +678,14 @@ export default function AuditLogViewer() {
           </div>
 
           {/* Pagination */}
-          <div className="bg-gray-50 px-6 py-4 flex items-center justify-between border-t border-gray-200">
-            <div className="text-sm text-gray-600">
-              Showing {((currentPage - 1) * logsPerPage) + 1} to {Math.min(currentPage * logsPerPage, paginatedLogs.length + (currentPage - 1) * logsPerPage)} of {paginatedLogs.length} logs on this page
-            </div>
-            <div className="flex space-x-2">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className={`px-4 py-2 rounded-lg transition-all ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border border-gray-300 hover:bg-gray-50'}`}
-              >
-                Previous
-              </button>
-              {[...Array(Math.min(totalPages, 5))].map((_, i) => {
-                const page = i + 1
-                return (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`px-4 py-2 rounded-lg transition-all ${currentPage === page ? 'bg-red-600 text-white' : 'bg-white border border-gray-300 hover:bg-gray-50'}`}
-                  >
-                    {page}
-                  </button>
-                )
-              })}
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className={`px-4 py-2 rounded-lg ${currentPage === totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border border-gray-300 hover:bg-gray-50'}`}
-              >
-                Next
-              </button>
-            </div>
+          <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={paginatedLogs.length}
+              onPageChange={setCurrentPage}
+              itemLabel="logs"
+            />
           </div>
         </div>
       </div>
@@ -770,7 +725,7 @@ export default function AuditLogViewer() {
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Action</label>
-                  <span className="inline-flex px-3 py-1 text-sm font-semibold bg-blue-100 text-blue-800 rounded">
+                  <span className="inline-flex px-3 py-1 text-sm font-semibold bg-red-100 text-red-800 rounded">
                     {selectedLog.action}
                   </span>
                 </div>
@@ -801,9 +756,9 @@ export default function AuditLogViewer() {
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Status</label>
                   <span className={`inline-flex px-3 py-1 rounded-full text-sm font-semibold ${
-                    selectedLog.status === 'Success' ? 'bg-green-100 text-green-800' :
+                    selectedLog.status === 'Success' ? 'bg-yellow-100 text-yellow-800' :
                     selectedLog.status === 'Failed' ? 'bg-red-100 text-red-800' :
-                    'bg-orange-100 text-orange-800'
+                    'bg-yellow-100 text-orange-800'
                   }`}>
                     {selectedLog.status}
                   </span>
@@ -814,8 +769,8 @@ export default function AuditLogViewer() {
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Severity</label>
                 <span className={`inline-flex px-3 py-1 rounded-full text-sm font-semibold ${
                   selectedLog.severity === 'Critical' ? 'bg-red-100 text-red-800' :
-                  selectedLog.severity === 'Warning' ? 'bg-orange-100 text-orange-800' :
-                  'bg-blue-100 text-blue-800'
+                  selectedLog.severity === 'Warning' ? 'bg-yellow-100 text-orange-800' :
+                  'bg-red-100 text-red-800'
                 }`}>
                   {selectedLog.severity}
                 </span>
@@ -834,3 +789,7 @@ export default function AuditLogViewer() {
     </div>
   )
 }
+
+
+
+

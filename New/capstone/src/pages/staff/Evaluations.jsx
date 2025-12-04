@@ -3,20 +3,29 @@ import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { isAdmin, isStaffMember } from '../../utils/roleUtils'
 import { useAuth } from '../../context/AuthContext'
-import { adminAPI, deptHeadAPI, secretaryAPI, instructorAPI } from '../../services/api'
+import { adminAPI, deptHeadAPI, secretaryAPI } from '../../services/api'
 import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
+import Pagination from '../../components/Pagination'
 
 export default function Evaluations() {
   const navigate = useNavigate()
   const { user: currentUser } = useAuth()
   const [evaluations, setEvaluations] = useState([])
+  const [allEvaluations, setAllEvaluations] = useState([]) // All evaluations for chart
   const [courses, setCourses] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
   const [programFilter, setProgramFilter] = useState('all')
   const [sentimentFilter, setSentimentFilter] = useState('all')
   const [semesterFilter, setSemesterFilter] = useState('all')
   const [yearLevelFilter, setYearLevelFilter] = useState('all')
+  const [evaluationPeriods, setEvaluationPeriods] = useState([])
+  const [selectedPeriod, setSelectedPeriod] = useState(null)
+  const [activePeriod, setActivePeriod] = useState(null)
   const [chartLimit, setChartLimit] = useState(10) // Top N items to show in chart
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pagination, setPagination] = useState(null)
 
   // Filter options states
   const [programOptions, setProgramOptions] = useState([])
@@ -28,22 +37,25 @@ export default function Evaluations() {
       if (!currentUser) return
       
       try {
-        let programsResponse, yearLevelsResponse
+        let programsResponse, yearLevelsResponse, periodsResponse
         
         if (currentUser.role === 'secretary') {
-          [programsResponse, yearLevelsResponse] = await Promise.all([
+          [programsResponse, yearLevelsResponse, periodsResponse] = await Promise.all([
             secretaryAPI.getPrograms(),
-            secretaryAPI.getYearLevels()
+            secretaryAPI.getYearLevels(),
+            secretaryAPI.getEvaluationPeriods()
           ])
         } else if (currentUser.role === 'department_head') {
-          [programsResponse, yearLevelsResponse] = await Promise.all([
+          [programsResponse, yearLevelsResponse, periodsResponse] = await Promise.all([
             deptHeadAPI.getPrograms(),
-            deptHeadAPI.getYearLevels()
+            deptHeadAPI.getYearLevels(),
+            deptHeadAPI.getEvaluationPeriods()
           ])
-        } else if (currentUser.role === 'instructor') {
-          [programsResponse, yearLevelsResponse] = await Promise.all([
-            instructorAPI.getPrograms(),
-            instructorAPI.getYearLevels()
+        } else if (isAdmin(currentUser)) {
+          [programsResponse, yearLevelsResponse, periodsResponse] = await Promise.all([
+            adminAPI.getPrograms(),
+            adminAPI.getYearLevels(),
+            adminAPI.getEvaluationPeriods()
           ])
         }
         
@@ -52,6 +64,13 @@ export default function Evaluations() {
         }
         if (yearLevelsResponse?.data) {
           setYearLevelOptions(yearLevelsResponse.data)
+        }
+        if (periodsResponse?.data) {
+          setEvaluationPeriods(periodsResponse.data)
+          const active = periodsResponse.data.find(p => p.status === 'active')
+          if (active) {
+            setActivePeriod(active)
+          }
         }
       } catch (err) {
         console.error('Error fetching filter options:', err)
@@ -69,7 +88,7 @@ export default function Evaluations() {
     }
     
     if (currentUser.role === 'student') {
-      navigate('/student-evaluation')
+      navigate('/student/courses')
       return
     }
     
@@ -79,60 +98,90 @@ export default function Evaluations() {
     }
   }, [currentUser?.role, currentUser?.id, navigate])
 
-  // Use timeout hook for API calls
+  // Use timeout hook for API calls - fetch paginated evaluations + all evaluations for chart
   const { data: apiData, loading, error, retry } = useApiWithTimeout(
     async () => {
       if (!currentUser) return null
       
-      const filters = {}
+      // Check if we have a period to query (either selected or active)
+      if (!selectedPeriod && !activePeriod) {
+        // No period selected and no active period - return empty data
+        return { evaluations: [], allEvaluations: [], courses: [], dashboard: null, pagination: null }
+      }
+      
+      const filters = {
+        page: currentPage,
+        page_size: 15
+      }
       if (programFilter !== 'all') filters.program = programFilter
       if (sentimentFilter !== 'all') filters.sentiment = sentimentFilter
       if (semesterFilter !== 'all') filters.semester = semesterFilter
       if (yearLevelFilter !== 'all') filters.yearLevel = yearLevelFilter
+      if (selectedPeriod) filters.period_id = selectedPeriod
       
-      let evaluationsData, coursesData
+      // Fetch all evaluations for chart (1000 max)
+      const allEvaluationsFilters = {
+        page: 1,
+        page_size: 1000
+      }
+      
+      let evaluationsData, allEvaluationsData, coursesData, dashboardData
       
       // Use appropriate API based on user role
       if (isAdmin(currentUser)) {
-        evaluationsData = await adminAPI.getEvaluations(filters)
-        coursesData = await adminAPI.getCourses()
+        [evaluationsData, allEvaluationsData, coursesData] = await Promise.all([
+          adminAPI.getEvaluations(filters),
+          adminAPI.getEvaluations(allEvaluationsFilters),
+          adminAPI.getCourses()
+        ])
+        dashboardData = null // Admin doesn't have dashboard endpoint yet
       } else if (currentUser.role === 'secretary') {
-        evaluationsData = await secretaryAPI.getEvaluations(filters)
-        coursesData = await secretaryAPI.getCourses()
+        [evaluationsData, allEvaluationsData, coursesData, dashboardData] = await Promise.all([
+          secretaryAPI.getEvaluations(filters),
+          secretaryAPI.getEvaluations(allEvaluationsFilters),
+          secretaryAPI.getCourses(),
+          secretaryAPI.getDashboard()
+        ])
       } else if (currentUser.role === 'department_head') {
-        evaluationsData = await deptHeadAPI.getEvaluations(filters)
-        coursesData = await deptHeadAPI.getCourses()
-      } else if (currentUser.role === 'instructor') {
-        evaluationsData = await instructorAPI.getEvaluations(filters)
-        coursesData = await instructorAPI.getCourses()
+        [evaluationsData, allEvaluationsData, coursesData, dashboardData] = await Promise.all([
+          deptHeadAPI.getEvaluations(filters),
+          deptHeadAPI.getEvaluations(allEvaluationsFilters),
+          deptHeadAPI.getCourses(),
+          deptHeadAPI.getDashboard()
+        ])
       } else {
         throw new Error(`Unsupported role: ${currentUser.role}`)
       }
       
-      // Extract data from response
-      console.log('[EVALUATIONS] Raw evaluationsData:', evaluationsData)
-      console.log('[EVALUATIONS] Raw coursesData:', coursesData)
+      // Extract data and pagination from response
       const evaluations = Array.isArray(evaluationsData) ? evaluationsData : (evaluationsData?.data || [])
+      const evalPagination = evaluationsData?.pagination || null
+      const allEvaluations = Array.isArray(allEvaluationsData) ? allEvaluationsData : (allEvaluationsData?.data || [])
       const courses = Array.isArray(coursesData) ? coursesData : (coursesData?.data || [])
-      console.log('[EVALUATIONS] Extracted evaluations:', evaluations)
-      console.log('[EVALUATIONS] Extracted courses:', courses)
+      const dashboard = dashboardData?.data || null
       
-      return { evaluations, courses }
+      return { evaluations, allEvaluations, courses, dashboard, pagination: evalPagination }
     },
-    [currentUser?.id, currentUser?.role, programFilter, sentimentFilter, semesterFilter, yearLevelFilter]
+    [currentUser?.id, currentUser?.role, currentPage, programFilter, sentimentFilter, semesterFilter, yearLevelFilter, selectedPeriod]
   )
 
   // Update state when data changes
   useEffect(() => {
     if (apiData) {
-      console.log('[EVALUATIONS] API Data received:', apiData)
-      console.log('[EVALUATIONS] Evaluations count:', apiData.evaluations?.length)
-      console.log('[EVALUATIONS] Courses count:', apiData.courses?.length)
-      console.log('[EVALUATIONS] First evaluation:', apiData.evaluations?.[0])
       setEvaluations(apiData.evaluations)
+      setAllEvaluations(apiData.allEvaluations || [])
       setCourses(apiData.courses)
+      setPagination(apiData.pagination)
     }
   }, [apiData])
+  
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [programFilter, sentimentFilter, semesterFilter, yearLevelFilter])
+
+  // Extract dashboard statistics
+  const dashboardStats = apiData?.dashboard || null
 
   // Get unique values for filters
   const filterOptions = useMemo(() => {
@@ -149,12 +198,8 @@ export default function Evaluations() {
       // Match by sectionId (primary) or courseId (fallback)
       const course = courses.find(c => c.id === evaluation.sectionId || c.id === evaluation.courseId)
       
-      // Calculate average rating from ratings object
-      const ratings = evaluation.ratings || {}
-      const ratingValues = Object.values(ratings)
-      const avgRating = ratingValues.length > 0 
-        ? (ratingValues.reduce((a, b) => a + b) / ratingValues.length).toFixed(1)
-        : 'N/A'
+      // Use rating_overall from backend (1-4 scale) - matches Courses page calculation
+      const avgRating = evaluation.rating_overall || evaluation.rating || 0
 
       // Use consistent dates based on semester instead of random dates
       let submittedDate = 'N/A'
@@ -205,8 +250,23 @@ export default function Evaluations() {
     })
   }, [enhancedEvaluations, searchTerm, programFilter, sentimentFilter, semesterFilter, yearLevelFilter])
 
-  // Calculate evaluation statistics
+  // Calculate evaluation statistics - use dashboard data if available
   const evaluationStats = useMemo(() => {
+    // If we have dashboard stats, use them for accurate overall statistics
+    if (dashboardStats) {
+      return {
+        total: dashboardStats.total_evaluations || 0,
+        positive: dashboardStats.sentiment?.positive || 0,
+        neutral: dashboardStats.sentiment?.neutral || 0,
+        negative: dashboardStats.sentiment?.negative || 0,
+        anomalies: dashboardStats.anomalies || 0,
+        overallAvgRating: dashboardStats.average_rating?.toFixed(2) || '0.00',
+        totalEnrolledStudents: dashboardStats.total_enrolled_students || 0,
+        participationRate: Math.round(dashboardStats.participation_rate || 0)
+      }
+    }
+
+    // Fallback to calculating from current data (for admin or when dashboard unavailable)
     const total = enhancedEvaluations.length
     const positive = enhancedEvaluations.filter(e => e.sentiment === 'positive').length
     const neutral = enhancedEvaluations.filter(e => e.sentiment === 'neutral').length
@@ -217,14 +277,14 @@ export default function Evaluations() {
     const totalEnrolledStudents = courses.reduce((sum, course) => sum + (course.enrolledStudents || 0), 0)
     const participationRate = totalEnrolledStudents > 0 ? Math.round((total / totalEnrolledStudents) * 100) : 0
 
-    // Calculate average rating across all evaluations
+    // Calculate average rating across all evaluations using rating_overall from backend
     const ratingsData = enhancedEvaluations
-      .filter(e => e.avgRating !== 'N/A')
-      .map(e => parseFloat(e.avgRating))
+      .filter(e => e.avgRating > 0)
+      .map(e => e.avgRating)
     
     const overallAvgRating = ratingsData.length > 0 
-      ? (ratingsData.reduce((a, b) => a + b) / ratingsData.length).toFixed(1)
-      : '0.0'
+      ? (ratingsData.reduce((a, b) => a + b) / ratingsData.length).toFixed(2)
+      : '0.00'
 
     return {
       total,
@@ -236,19 +296,36 @@ export default function Evaluations() {
       totalEnrolledStudents,
       participationRate
     }
-  }, [enhancedEvaluations, courses])
+  }, [dashboardStats, enhancedEvaluations, courses])
 
-  // Sentiment trend data for chart - adapts based on user role
+  // Sentiment trend data for chart - adapts based on user role (uses all evaluations, not just current page)
   const sentimentTrendData = useMemo(() => {
+    console.log('[CHART] Calculating sentiment trend with', allEvaluations.length, 'evaluations')
+    
+    if (allEvaluations.length === 0) {
+      console.log('[CHART] No evaluations available for chart')
+      return []
+    }
+    
     if (isAdmin(currentUser)) {
       // Secretary/Admin: Sentiment by Program
-      const programs = filterOptions.programs
+      const programs = [...new Set(courses.map(c => c.program))].filter(Boolean)
+      console.log('[CHART] Programs found:', programs)
       
       const programData = programs.map(program => {
-        const programEvaluations = enhancedEvaluations.filter(e => e.courseProgram === program)
+        const programCourses = courses.filter(c => c.program === program)
+        const programCourseIds = programCourses.map(c => c.id)
+        
+        // Match evaluations by sectionId or courseId
+        const programEvaluations = allEvaluations.filter(e => 
+          programCourseIds.includes(e.sectionId) || programCourseIds.includes(e.courseId)
+        )
+        
         const positive = programEvaluations.filter(e => e.sentiment === 'positive').length
         const neutral = programEvaluations.filter(e => e.sentiment === 'neutral').length
         const negative = programEvaluations.filter(e => e.sentiment === 'negative').length
+        
+        console.log(`[CHART] Program ${program}: ${positive} pos, ${neutral} neu, ${negative} neg`)
         
         return {
           name: program,
@@ -260,36 +337,45 @@ export default function Evaluations() {
       })
       
       // Sort by total evaluations and apply limit
-      const sortedData = programData.sort((a, b) => b.total - a.total)
-      return chartLimit === 'all' ? sortedData : sortedData.slice(0, parseInt(chartLimit))
+      const sortedData = programData.filter(d => d.total > 0).sort((a, b) => b.total - a.total)
+      const finalData = chartLimit === 'all' ? sortedData : sortedData.slice(0, parseInt(chartLimit))
+      console.log('[CHART] Final chart data:', finalData.length, 'programs')
+      return finalData
     } else {
       // Department Head: Sentiment by Subject/Course
-      // Get unique courses for department head's assigned programs
-      const departmentCourses = courses
-        .filter(course => currentUser?.assignedPrograms?.includes(course.program))
+      const departmentCourses = currentUser?.assignedPrograms 
+        ? courses.filter(course => currentUser.assignedPrograms.includes(course.program))
+        : courses
+      
+      console.log('[CHART] Department courses:', departmentCourses.length)
       
       const courseData = departmentCourses.map(course => {
-        const courseEvaluations = enhancedEvaluations.filter(e => e.courseId === course.id)
+        const courseEvaluations = allEvaluations.filter(e => 
+          e.sectionId === course.id || e.courseId === course.id
+        )
+        
         const positive = courseEvaluations.filter(e => e.sentiment === 'positive').length
         const neutral = courseEvaluations.filter(e => e.sentiment === 'neutral').length
         const negative = courseEvaluations.filter(e => e.sentiment === 'negative').length
         
         return {
-          name: course.classCode || course.name, // Display course code on X-axis
+          name: course.classCode || course.name,
           positive,
           neutral,
           negative,
-          fullName: course.name, // Full course name for tooltip
+          fullName: course.name,
           courseCode: course.classCode,
           total: positive + neutral + negative
         }
       })
       
       // Sort by total evaluations and apply limit
-      const sortedData = courseData.sort((a, b) => b.total - a.total)
-      return chartLimit === 'all' ? sortedData : sortedData.slice(0, parseInt(chartLimit))
+      const sortedData = courseData.filter(d => d.total > 0).sort((a, b) => b.total - a.total)
+      const finalData = chartLimit === 'all' ? sortedData : sortedData.slice(0, parseInt(chartLimit))
+      console.log('[CHART] Final chart data:', finalData.length, 'courses')
+      return finalData
     }
-  }, [enhancedEvaluations, filterOptions.programs, courses, currentUser, chartLimit])
+  }, [allEvaluations, courses, currentUser, chartLimit])
 
   const getSentimentColor = (sentiment) => {
     switch (sentiment) {
@@ -317,7 +403,7 @@ export default function Evaluations() {
     <div className="min-h-screen lpu-background">
       {/* Enhanced LPU Header */}
       <header className="lpu-header">
-        <div className="container mx-auto px-6 py-6">
+        <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-8 lg:py-10 max-w-screen-2xl">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-4">
               <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center shadow-md">
@@ -336,15 +422,15 @@ export default function Evaluations() {
         </div>
       </header>
 
-      <div className="container mx-auto px-6 py-8">
+      <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-10 lg:py-12 max-w-screen-2xl">
         {/* Enhanced Evaluation Statistics */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
-          <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200">
+        <div className="grid md:grid-cols-2 lg:grid-cols-6 gap-5 lg:gap-6 mb-12">
+          <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-white/90 mb-2">Survey Participation</h3>
-                <p className="text-3xl font-bold text-white">{evaluationStats.total}/{evaluationStats.totalEnrolledStudents}</p>
-                <p className="text-xs text-purple-100 mt-1">students ({evaluationStats.participationRate}%)</p>
+                <p className="text-4xl lg:text-5xl font-bold text-white">{evaluationStats.total}/{evaluationStats.totalEnrolledStudents}</p>
+                <p className="text-xs text-white/80 mt-1">students ({evaluationStats.participationRate}%)</p>
               </div>
               <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
                 <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -354,11 +440,11 @@ export default function Evaluations() {
             </div>
           </div>
           
-          <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200">
+          <div className="bg-gradient-to-br from-[#C41E3A] to-[#9D1535] rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-white/90 mb-2">Participation Rate</h3>
-                <p className="text-3xl font-bold text-white">{evaluationStats.participationRate}%</p>
+                <p className="text-4xl lg:text-5xl font-bold text-white">{evaluationStats.participationRate}%</p>
               </div>
               <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
                 <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -378,11 +464,11 @@ export default function Evaluations() {
             </div>
           </div>
           
-          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200">
+          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-white/90 mb-2">Positive Feedback</h3>
-                <p className="text-3xl font-bold text-white">{evaluationStats.positive}</p>
+                <p className="text-4xl lg:text-5xl font-bold text-white">{evaluationStats.positive}</p>
               </div>
               <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
                 <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -392,11 +478,11 @@ export default function Evaluations() {
             </div>
           </div>
           
-          <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200">
+          <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-white/90 mb-2">Neutral Feedback</h3>
-                <p className="text-3xl font-bold text-white">{evaluationStats.neutral}</p>
+                <p className="text-4xl lg:text-5xl font-bold text-white">{evaluationStats.neutral}</p>
               </div>
               <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
                 <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -406,11 +492,11 @@ export default function Evaluations() {
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200">
+          <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-white/90 mb-2">Negative Feedback</h3>
-                <p className="text-3xl font-bold text-white">{evaluationStats.negative}</p>
+                <p className="text-4xl lg:text-5xl font-bold text-white">{evaluationStats.negative}</p>
               </div>
               <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
                 <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -420,11 +506,11 @@ export default function Evaluations() {
             </div>
           </div>
           
-          <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200">
+          <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-white/90 mb-2">Average Rating</h3>
-                <p className="text-3xl font-bold text-white">{evaluationStats.overallAvgRating}/4.0</p>
+                <p className="text-4xl lg:text-5xl font-bold text-white">{evaluationStats.overallAvgRating}/4.0</p>
               </div>
               <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
                 <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -517,7 +603,7 @@ export default function Evaluations() {
               <svg className="w-6 h-6 text-[#7a0000] mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
               </svg>
-              <h3 className="text-xl font-bold text-gray-900">Evaluation Filters</h3>
+              <h3 className="text-2xl font-bold text-gray-900">Evaluation Filters</h3>
             </div>
             <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
               {filteredEvaluations.length} results
@@ -579,21 +665,37 @@ export default function Evaluations() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-[#1e293b] mb-3">Academic Period</label>
+              <label className="block text-sm font-semibold text-[#1e293b] mb-3">Evaluation Period</label>
               <select
-                value={semesterFilter}
-                onChange={(e) => setSemesterFilter(e.target.value)}
+                value={selectedPeriod || ''}
+                onChange={(e) => setSelectedPeriod(e.target.value ? parseInt(e.target.value) : null)}
                 className="lpu-select"
               >
-                <option value="all">All Semesters</option>
-                {filterOptions.semesters.map(semester => (
-                  <option key={semester} value={semester}>{semester}</option>
+                <option value="">
+                  {activePeriod ? `${activePeriod.name} (${activePeriod.academic_year}) - Active` : 'Select Period'}
+                </option>
+                {evaluationPeriods.filter(p => p.status !== 'active').map(period => (
+                  <option key={period.id} value={period.id}>
+                    {period.name} ({period.academic_year})
+                  </option>
                 ))}
               </select>
             </div>
           </div>
         </div>
 
+        {/* Show warning if no active period and no selection */}
+        {!activePeriod && !selectedPeriod ? (
+          <div className="lpu-card text-center py-16">
+            <svg className="w-20 h-20 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <h3 className="text-xl font-semibold text-gray-700 mb-2">No Active Evaluation Period</h3>
+            <p className="text-gray-500 mb-4">There is currently no active evaluation period.</p>
+            <p className="text-gray-500">Please contact the administrator to activate an evaluation period, or select a specific period from the filter above.</p>
+          </div>
+        ) : (
+        <>
         {/* Enhanced Evaluations Table */}
         <div className="lpu-card">
           <div className="flex items-center justify-between border-b border-gray-200 pb-4 mb-6">
@@ -602,7 +704,7 @@ export default function Evaluations() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 4h.01M9 16h.01"></path>
               </svg>
               <div>
-                <h2 className="text-xl font-bold text-gray-900">Student Evaluation Records</h2>
+                <h2 className="text-2xl font-bold text-gray-900">Student Evaluation Records</h2>
                 <p className="text-gray-600 text-sm mt-1">
                   Displaying {filteredEvaluations.length} of {evaluationStats.total} total evaluations
                 </p>
@@ -739,23 +841,23 @@ export default function Evaluations() {
               </div>
             )}
           </div>
+          
+          {/* Pagination Controls */}
+          {pagination && pagination.total > 0 && (
+            <div className="mt-6 px-6 pb-6">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={pagination.pages}
+                totalItems={pagination.total}
+                onPageChange={setCurrentPage}
+                itemLabel="evaluations"
+              />
+            </div>
+          )}
         </div>
+        </>
+        )}
 
-        {/* Enhanced Export Options */}
-        <div className="mt-8 flex justify-center space-x-4">
-          <button className="lpu-btn-secondary inline-flex items-center">
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-            </svg>
-            Export to Excel
-          </button>
-          <button className="lpu-btn-primary inline-flex items-center">
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-            </svg>
-            Generate Report
-          </button>
-        </div>
       </div>
     </div>
   )

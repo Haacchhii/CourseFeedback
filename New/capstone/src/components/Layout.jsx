@@ -29,9 +29,10 @@ export default function Layout({ children }) {
   const adminNavigationItems = [
     { path: '/admin/dashboard', label: 'Dashboard', icon: '🏠' },
     { path: '/admin/users', label: 'User Management', icon: '👥' },
-    { path: '/admin/periods', label: 'Evaluation Periods', icon: '�' },
+    { path: '/admin/enrollment-list', label: 'Enrollment List', icon: '📋' },
+    { path: '/admin/student-management', label: 'Student Advancement', icon: '🎓' },
+    { path: '/admin/periods', label: 'Evaluation Periods', icon: '📅' },
     { path: '/admin/courses', label: 'Course Management', icon: '📚' },
-    { path: '/admin/settings', label: 'System Settings', icon: '⚙️' },
     { path: '/admin/export', label: 'Data Export', icon: '📤' },
     { path: '/admin/audit-logs', label: 'Audit Logs', icon: '📋' }
   ]

@@ -10,8 +10,6 @@ export default function EvaluateCourse(){
   const [course, setCourse] = useState(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [isEditMode, setIsEditMode] = useState(false)
-  const [evaluationId, setEvaluationId] = useState(null)
   
   // Initialize ratings state from questionnaire config
   const [ratings, setRatings] = useState(() => {
@@ -29,14 +27,14 @@ export default function EvaluateCourse(){
   const [currentCategory, setCurrentCategory] = useState(0)
   const nav = useNavigate()
 
-  // Fetch course details and check if editing existing evaluation
+  // Fetch course details and prevent access if already evaluated
   useEffect(() => {
     const fetchCourseAndEvaluation = async () => {
       try {
         setLoading(true)
         const currentUser = user || JSON.parse(localStorage.getItem('currentUser'))
         
-        // First, check if student has already evaluated this course
+        // Check if student has already evaluated this course
         const coursesData = await studentAPI.getCourses(currentUser.id)
         const courses = coursesData?.data || coursesData || []
         const thisCourse = courses.find(c => 
@@ -44,51 +42,27 @@ export default function EvaluateCourse(){
         )
         
         if (thisCourse) {
-          setCourse(thisCourse)
-          
-          // If already evaluated, fetch the existing evaluation
-          if (thisCourse.already_evaluated && thisCourse.evaluation_id) {
-            setIsEditMode(true)
-            setEvaluationId(thisCourse.evaluation_id)
-            
-            try {
-              console.log('Fetching evaluation for edit, ID:', thisCourse.evaluation_id)
-              const evalData = await studentAPI.getEvaluationForEdit(thisCourse.evaluation_id)
-              console.log('Evaluation data received:', evalData)
-              
-              if (evalData?.data) {
-                console.log('Ratings from backend:', evalData.data.ratings)
-                console.log('Comment from backend:', evalData.data.comment)
-                
-                // Pre-fill ratings if available
-                if (evalData.data.ratings && Object.keys(evalData.data.ratings).length > 0) {
-                  console.log('Setting ratings:', evalData.data.ratings)
-                  setRatings(evalData.data.ratings)  // Replace entirely instead of merging
-                }
-                // Pre-fill comment if available
-                if (evalData.data.comment) {
-                  setComment(evalData.data.comment)
-                }
-              }
-            } catch (err) {
-              console.error('Could not fetch existing evaluation:', err)
-              console.error('Error details:', err.response?.data)
-            }
+          // If already evaluated, redirect back to courses
+          if (thisCourse.already_evaluated) {
+            alert('You have already submitted an evaluation for this course. Evaluations cannot be edited once submitted.')
+            nav('/student/courses')
+            return
           }
+          
+          setCourse(thisCourse)
         } else {
           // Fallback: try to get course details directly
           const data = await studentAPI.getCourseDetails(courseId)
           setCourse(data || { name: courseId, class_section_id: courseId })
         }
       } catch (err) {
-        console.error('Error fetching course:', err)
         setCourse({ name: courseId, class_section_id: courseId })
       } finally {
         setLoading(false)
       }
     }
     fetchCourseAndEvaluation()
-  }, [courseId, user])
+  }, [courseId, user, nav])
 
   function setRating(questionId, value) {
     setRatings(prev => ({...prev, [questionId]: Number(value)}))
@@ -109,49 +83,29 @@ export default function EvaluateCourse(){
 
   async function submit(){
     setError('')
-    
+
     if (!canSubmit()) {
       return setError('Please complete all ratings before submitting')
     }
-    
+
     try {
       setSubmitting(true)
       const currentUser = user || JSON.parse(localStorage.getItem('currentUser'))
-      
+
       const evaluationData = {
         class_section_id: parseInt(courseId),
         student_id: currentUser.id,
+        evaluation_period_id: course?.evaluation_period_id || null,
         ratings,
         comment
       }
       
-      if (isEditMode && evaluationId) {
-        // Update existing evaluation
-        console.log('Updating evaluation:', {
-          evaluationId,
-          ratingsCount: Object.keys(ratings).length,
-          hasComment: !!comment
-        })
-        
-        await studentAPI.updateEvaluation(evaluationId, evaluationData)
-        alert('Evaluation updated successfully!')
-      } else {
-        // Create new evaluation
-        console.log('Submitting new evaluation:', {
-          courseId,
-          studentId: currentUser.id,
-          ratingsCount: Object.keys(ratings).length,
-          hasComment: !!comment
-        })
-        
-        await studentAPI.submitEvaluation(evaluationData)
-        alert('Evaluation submitted successfully!')
-      }
+      // Submit new evaluation
+      await studentAPI.submitEvaluation(evaluationData)
+      alert('Evaluation submitted successfully! Thank you for your feedback.')
       
       nav('/student/courses')
     } catch (err) {
-      console.error('Error submitting evaluation:', err)
-      console.error('Error response:', err.response?.data)
       const errorMsg = err.response?.data?.detail || err.message || 'Failed to submit evaluation. Please try again.'
       setError(errorMsg)
     } finally {
@@ -161,10 +115,12 @@ export default function EvaluateCourse(){
 
   if (loading) {
     return (
-      <div className="p-6 max-w-3xl mx-auto">
-        <div className="bg-white rounded-lg shadow p-6 text-center">
+      <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9]">
+        <div className="w-full mx-auto max-w-screen-2xl px-6 sm:px-8 lg:px-10 py-10 lg:py-12">
+        <div className="bg-white rounded-card shadow-card p-6 lg:p-8 text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#7a0000] mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading course...</p>
+        </div>
         </div>
       </div>
     )
@@ -172,44 +128,35 @@ export default function EvaluateCourse(){
 
   if (!course) {
     return (
-      <div className="p-6 max-w-3xl mx-auto">
-        <div className="bg-white rounded-lg shadow p-6 text-center">
+      <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9]">
+        <div className="w-full mx-auto max-w-screen-2xl px-6 sm:px-8 lg:px-10 py-10 lg:py-12">
+        <div className="bg-white rounded-card shadow-card p-6 lg:p-8 text-center">
           <p className="text-gray-600">Course not found</p>
           <button onClick={() => nav('/student/courses')} className="mt-4 px-4 py-2 bg-[#7a0000] text-white rounded">
             Back to Courses
           </button>
+        </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-5xl mx-auto pb-2" style={{scrollBehavior: 'auto'}}>
-      <div className="bg-white rounded-lg shadow-lg">
-        {/* Edit Mode Banner */}
-        {isEditMode && (
-          <div className="bg-blue-50 border-b-2 border-blue-200 px-6 py-3">
-            <div className="flex items-center gap-2 text-blue-800">
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
-              </svg>
-              <span className="font-medium">Edit Mode: You can modify your previous responses</span>
-            </div>
-          </div>
-        )}
-        
+    <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9]">
+      <div className="w-full mx-auto max-w-screen-2xl px-6 sm:px-8 lg:px-10 py-10 lg:py-12">
+      <div className="bg-white rounded-card shadow-card">
         {/* Header */}
-        <div className="p-6 border-b bg-gradient-to-r from-[#7a0000] to-[#8f0000]">
-          <button 
-            onClick={() => nav('/student/courses')} 
-            className="text-white hover:text-gray-200 mb-3 flex items-center text-sm"
+        <div className="p-6 lg:p-8 border-b bg-gradient-to-r from-[#7a0000] to-[#8f0000]">
+          <button
+            onClick={() => nav('/student/courses')}
+            className="text-white hover:text-gray-200 mb-4 lg:mb-5 flex items-center text-sm"
           >
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
             </svg>
             Back to Courses
           </button>
-          <h1 className="text-2xl font-bold text-white">{isEditMode ? 'Editing Evaluation: ' : 'Evaluating: '}{course.name || 'Course'}</h1>
+          <h1 className="text-3xl lg:text-4xl font-bold text-white">Course Evaluation: {course.name || 'Course'}</h1>
           <p className="text-sm text-gray-200 mt-1">
             {course.class_code || course.code || ''}
           </p>
@@ -219,24 +166,24 @@ export default function EvaluateCourse(){
         </div>
 
         {/* Progress Bar */}
-        <div className="px-6 py-4 bg-gray-50 border-b">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700">Overall Progress</span>
-            <span className="text-sm text-gray-600">
-              {Object.values(ratings).filter(r => r !== null).length} of {Object.keys(ratings).length} questions answered
+        <div className="px-6 lg:px-8 py-5 lg:py-6 bg-gradient-to-r from-gray-50 to-gray-100 border-b">
+          <div className="flex items-center justify-between mb-4 lg:mb-5">
+            <span className="text-sm font-semibold text-gray-700">Overall Progress</span>
+            <span className="text-sm font-medium text-gray-600">
+              {Object.values(ratings).filter(r => r !== null).length} of {Object.keys(ratings).length} answered
             </span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
-              className="bg-[#7a0000] h-2 rounded-full transition-all duration-300"
+          <div className="w-full bg-gray-300 rounded-full h-3 shadow-inner">
+            <div
+              className="bg-gradient-to-r from-[#7a0000] to-[#a31111] h-3 rounded-full transition-all duration-500 shadow-sm"
               style={{width: `${(Object.values(ratings).filter(r => r !== null).length / Object.keys(ratings).length) * 100}%`}}
             ></div>
           </div>
         </div>
 
         {/* Category Tabs */}
-        <div className="px-6 pt-4 border-b">
-          <div className="flex overflow-x-auto space-x-2 -mb-px">
+        <div className="px-6 lg:px-8 pt-4 lg:pt-5 border-b">
+          <div className="flex overflow-x-auto gap-4 lg:gap-5 -mb-px">
             {questionnaireCategories.map((category, idx) => {
               const progress = getCategoryProgress(idx)
               return (
@@ -270,8 +217,8 @@ export default function EvaluateCourse(){
         </div>
 
         {/* Questions */}
-        <div className="p-6">
-          <div className="mb-6">
+        <div className="p-6 lg:p-8">
+          <div className="mb-6 lg:mb-8">
             <h2 className="text-lg font-semibold text-gray-800">{questionnaireCategories[currentCategory].name}</h2>
             <p className="text-sm text-gray-600 mt-1">{questionnaireCategories[currentCategory].description}</p>
             
@@ -287,15 +234,15 @@ export default function EvaluateCourse(){
             </div>
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-8">
             {questionnaireCategories[currentCategory].questions.map((question, index) => (
-              <div key={question.id} className={index !== questionnaireCategories[currentCategory].questions.length - 1 ? "border-b pb-5" : "pb-2"}>
-                <div className="mb-3">
-                  <div className="font-medium text-gray-800">{question.text}</div>
-                  <div className="text-xs text-gray-500 mt-1">{question.shortLabel}</div>
+              <div key={question.id} className={index !== questionnaireCategories[currentCategory].questions.length - 1 ? "border-b border-gray-200 pb-6" : ""}>
+                <div className="mb-4">
+                  <div className="font-semibold text-gray-900 text-base">{question.text}</div>
+                  <div className="text-sm text-gray-500 mt-1">{question.shortLabel}</div>
                 </div>
                 {/* Left-aligned ratings */}
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-4">
                   {[1, 2, 3, 4].map(value => (
                     <label key={value} className="cursor-pointer" onClick={(e) => e.preventDefault()}>
                       <input
@@ -309,15 +256,15 @@ export default function EvaluateCourse(){
                         }}
                         className="sr-only"
                       />
-                      <span 
+                      <span
                         onClick={(e) => {
                           e.preventDefault()
                           setRating(question.id, value)
                         }}
-                        className={`w-14 h-14 flex items-center justify-center rounded-full border-3 font-bold text-lg transition-all shadow-sm ${
+                        className={`w-16 h-16 flex items-center justify-center rounded-full border-2 font-bold text-lg transition-all duration-200 ${
                           ratings[question.id] === value
-                            ? 'bg-[#7a0000] text-white border-[#7a0000] scale-110 shadow-lg'
-                            : 'bg-white text-gray-700 border-gray-400 hover:border-[#7a0000] hover:bg-gray-50 hover:scale-105'
+                            ? 'bg-[#7a0000] text-white border-[#7a0000] shadow-lg'
+                            : 'bg-white text-gray-700 border-gray-300 hover:border-[#7a0000] hover:bg-gray-50 shadow-sm'
                         }`}>
                         {value}
                       </span>
@@ -357,7 +304,7 @@ export default function EvaluateCourse(){
         </div>
 
         {/* Comments Section */}
-        <div className="px-6 py-3 bg-gray-50 border-t">
+        <div className="px-6 lg:px-8 py-4 lg:py-5 bg-gray-50 border-t">
           <div className="font-medium mb-2">Additional Comments (optional)</div>
           <textarea
             rows={4}
@@ -374,7 +321,7 @@ export default function EvaluateCourse(){
         </div>
 
         {/* Submit Section */}
-        <div className="px-6 py-3 bg-white border-t">
+        <div className="px-6 lg:px-8 py-4 lg:py-5 bg-white border-t">
           {error && (
             <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
               {error}
@@ -409,11 +356,12 @@ export default function EvaluateCourse(){
                   <span>{isEditMode ? 'Updating...' : 'Submitting...'}</span>
                 </>
               ) : (
-                <span>{isEditMode ? 'Update Evaluation' : 'Submit Evaluation'}</span>
+                <span>Submit Evaluation</span>
               )}
             </button>
           </div>
         </div>
+      </div>
       </div>
     </div>
   )

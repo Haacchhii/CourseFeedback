@@ -4,6 +4,7 @@ Handles student-specific endpoints like courses and evaluations
 """
 
 from fastapi import APIRouter, HTTPException, Depends, status
+from middleware.auth import get_current_user, require_student
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -12,42 +13,62 @@ from datetime import datetime
 import json
 import logging
 from database.connection import get_db
-from ml_services.sentiment_analyzer import SentimentAnalyzer
-from ml_services.anomaly_detector import AnomalyDetector
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Helper function for rating-based sentiment (fallback when ML not available)
-def _rating_based_sentiment(avg_rating: float) -> tuple:
+def verify_student_ownership(student_id: int, current_user: dict, db: Session):
     """
-    Calculate sentiment based on average rating (fallback method)
-    Args:
-        avg_rating: Average rating value (1-4 scale)
-    Returns:
-        Tuple of (sentiment, confidence_score)
+    Verify that the current user can only access their own student data.
+    Accepts either student ID or user ID.
+    Raises HTTPException 403 if unauthorized.
+    """
+    user_id = current_user.get('id')
+    
+    # Check if the student_id is actually a user_id or student id
+    # Try to find student record by ID first, then by user_id
+    student_record = db.execute(text("""
+        SELECT user_id, id FROM students 
+        WHERE id = :student_id OR user_id = :student_id
+    """), {"student_id": student_id}).fetchone()
+    
+    if not student_record:
+        raise HTTPException(status_code=404, detail="Student not found")
+    
+    # Check if the student record belongs to the current user
+    if student_record.user_id != user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: You can only access your own data"
+        )
+
+def _rating_based_sentiment(avg_rating: float):
+    """
+    Fallback sentiment analysis based on average rating
+    Returns (sentiment, confidence_score)
     """
     if avg_rating >= 3.5:
-        sentiment = "positive"
-        sentiment_score = 0.8 + (avg_rating - 3.5) * 0.4  # 0.8 to 1.0
+        return "positive", 0.8
     elif avg_rating >= 2.5:
-        sentiment = "neutral"
-        sentiment_score = 0.4 + (avg_rating - 2.5) * 0.4  # 0.4 to 0.8
+        return "neutral", 0.7
     else:
-        sentiment = "negative"
-        sentiment_score = (avg_rating - 1.0) * 0.267  # 0.0 to 0.4
-    
-    return sentiment, sentiment_score
+        return "negative", 0.8
 
 class EvaluationSubmission(BaseModel):
     class_section_id: int
     student_id: int
+    evaluation_period_id: Optional[int] = None
     ratings: Dict[str, Any]
     comment: Optional[str] = None
 
 @router.get("/{student_id}/courses")
-async def get_student_courses(student_id: int, db: Session = Depends(get_db)):
+async def get_student_courses(student_id: int, 
+    current_user: dict = Depends(require_student),
+    db: Session = Depends(get_db)):
     """Get all courses available to a specific student"""
+    # Verify student ownership
+    verify_student_ownership(student_id, current_user, db)
+    
     try:
         # First get student record to find user_id
         student_query = text("""
@@ -64,33 +85,43 @@ async def get_student_courses(student_id: int, db: Session = Depends(get_db)):
         
         actual_student_id = student_data[0]  # Get the actual student table ID
         
-        # Get enrolled courses for this student
+        # Get enrolled courses for this student that are in an active evaluation period
+        # CRITICAL: Only show courses that are enrolled in an active evaluation period
         courses_result = db.execute(text("""
             SELECT DISTINCT
                 c.id, c.subject_code, c.subject_name,
                 cs.id as class_section_id, cs.class_code,
                 cs.semester, cs.academic_year,
                 p.program_name,
-                u.first_name || ' ' || u.last_name as instructor_name,
                 CASE 
-                    WHEN e.id IS NOT NULL THEN true 
+                    WHEN e.id IS NOT NULL AND e.submission_date IS NOT NULL THEN true 
                     ELSE false 
                 END as already_evaluated,
-                e.id as evaluation_id
+                e.id as evaluation_id,
+                ep.id as evaluation_period_id,
+                ep.name as evaluation_period_name,
+                ep.end_date as period_end_date,
+                true as in_active_period
             FROM enrollments enr
             JOIN class_sections cs ON enr.class_section_id = cs.id
             JOIN courses c ON cs.course_id = c.id
+            JOIN evaluation_periods ep ON enr.evaluation_period_id = ep.id
             LEFT JOIN programs p ON c.program_id = p.id
-            LEFT JOIN users u ON cs.instructor_id = u.id
-            LEFT JOIN evaluations e ON cs.id = e.class_section_id AND e.student_id = :student_id
+            LEFT JOIN evaluations e ON cs.id = e.class_section_id 
+                AND e.student_id = :student_id
+                AND e.evaluation_period_id = ep.id
             WHERE enr.student_id = :student_id
             AND enr.status = 'active'
+            AND enr.evaluation_period_id IS NOT NULL
+            AND ep.status = 'active'
+            AND CURRENT_DATE BETWEEN ep.start_date AND ep.end_date
             ORDER BY c.subject_name
         """), {"student_id": actual_student_id})
         
         courses = []
+        evaluable_count = 0
         for row in courses_result:
-            courses.append({
+            course_data = {
                 "id": row[0],
                 "code": row[1], 
                 "name": row[2],
@@ -99,19 +130,44 @@ async def get_student_courses(student_id: int, db: Session = Depends(get_db)):
                 "semester": row[5],
                 "academic_year": row[6],
                 "program_name": row[7] or "Unknown",
-                "instructor_name": row[8] or "TBA",
-                "already_evaluated": row[9],
-                "evaluation_id": row[10]
-            })
+                "already_evaluated": row[8],
+                "evaluation_id": row[9],
+                "evaluation_period_id": row[10],
+                "evaluation_period_name": row[11],
+                "period_end_date": row[12].strftime("%Y-%m-%d") if row[12] else None,
+                "in_active_period": row[13],
+                "can_evaluate": row[13] and not row[8]  # In active period and not yet evaluated
+            }
+            courses.append(course_data)
+            if course_data["can_evaluate"]:
+                evaluable_count += 1
+        
+        # Check if there's an active evaluation period
+        active_period = db.execute(text("""
+            SELECT id, name, start_date, end_date
+            FROM evaluation_periods
+            WHERE status = 'active'
+            AND CURRENT_DATE BETWEEN start_date AND end_date
+            LIMIT 1
+        """)).fetchone()
         
         return {
             "success": True,
             "data": courses,
             "student_info": {
-                "student_id": actual_student_id,  # Add the actual student table ID
+                "student_id": actual_student_id,
                 "student_number": student_data[1],
                 "program_id": student_data[2],
                 "year_level": student_data[3]
+            },
+            "evaluation_status": {
+                "active_period_exists": active_period is not None,
+                "active_period_name": active_period[1] if active_period else None,
+                "period_end_date": active_period[3].strftime("%Y-%m-%d") if active_period else None,
+                "total_courses": len(courses),
+                "evaluable_courses": evaluable_count,
+                "message": f"You have {evaluable_count} course(s) available for evaluation" if evaluable_count > 0 
+                          else "No courses available for evaluation at this time"
             }
         }
         
@@ -123,13 +179,237 @@ async def get_student_courses(student_id: int, db: Session = Depends(get_db)):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to fetch student courses: {str(e)}")
 
-@router.post("/evaluations")
-async def submit_evaluation(evaluation: EvaluationSubmission, db: Session = Depends(get_db)):
+@router.get("/{student_id}/evaluation-history")
+async def get_student_evaluation_history(
+    student_id: int, 
+    period_id: Optional[int] = None,
+    current_user: dict = Depends(require_student),
+    db: Session = Depends(get_db)
+):
     """
-    Submit a course evaluation
+    Get student's past evaluations with period filtering
+    
+    Args:
+        student_id: Student ID (can be user_id or student table id)
+        period_id: Optional filter by specific evaluation period
+    
+    Returns:
+        List of past evaluations with course, period, and rating details
+    """
+    # Verify student ownership
+    verify_student_ownership(student_id, current_user, db)
+    try:
+        # Get actual student ID
+        student_result = db.execute(text("""
+            SELECT s.id, s.student_number, s.program_id, s.year_level
+            FROM students s
+            WHERE s.id = :student_id OR s.user_id = :student_id
+        """), {"student_id": student_id})
+        
+        student_data = student_result.fetchone()
+        if not student_data:
+            raise HTTPException(status_code=404, detail="Student not found")
+        
+        actual_student_id = student_data[0]
+        
+        # Build query to show ONLY COMPLETED evaluations from CLOSED periods
+        # Active period evaluations should appear in pending-evaluations, not history
+        query = """
+            SELECT 
+                e.id as evaluation_id,
+                e.submission_date as submission_date,
+                e.rating_overall,
+                e.text_feedback,
+                c.id as course_id,
+                c.subject_code,
+                c.subject_name,
+                cs.id as class_section_id,
+                cs.class_code,
+                cs.semester,
+                cs.academic_year,
+                ep.id as period_id,
+                ep.name as period_name,
+                ep.semester as period_semester,
+                ep.academic_year as period_academic_year,
+                ep.start_date as period_start,
+                ep.end_date as period_end,
+                ep.status as period_status,
+                p.program_name
+            FROM evaluations e
+            JOIN enrollments enr ON e.student_id = enr.student_id 
+                AND e.class_section_id = enr.class_section_id
+                AND e.evaluation_period_id = enr.evaluation_period_id
+            JOIN class_sections cs ON enr.class_section_id = cs.id
+            JOIN courses c ON cs.course_id = c.id
+            JOIN evaluation_periods ep ON enr.evaluation_period_id = ep.id
+            LEFT JOIN programs p ON c.program_id = p.id
+            WHERE e.student_id = :student_id
+            AND e.status = 'completed'
+            AND ep.status != 'active'
+        """
+        
+        params = {"student_id": actual_student_id}
+        
+        # Add period filter if specified
+        if period_id is not None:
+            query += " AND ep.id = :period_id"
+            params["period_id"] = period_id
+        
+        query += " ORDER BY ep.start_date DESC, cs.class_code, e.created_at DESC"
+        
+        evaluations_result = db.execute(text(query), params)
+        
+        evaluations = []
+        for row in evaluations_result:
+            evaluation_data = {
+                "evaluation_id": row[0],
+                "submission_date": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else None,
+                "rating_overall": row[2],
+                "has_feedback": bool(row[3] and row[3].strip()),
+                "text_feedback": row[3] if row[3] else None,
+                "course": {
+                    "id": row[4],
+                    "subject_code": row[5],
+                    "subject_name": row[6],
+                    "class_section_id": row[7],
+                    "class_code": row[8],
+                    "semester": row[9],
+                    "academic_year": row[10],
+                    "program_name": row[18] or "Unknown"
+                },
+                "evaluation_period": {
+                    "id": row[11],
+                    "name": row[12] or "Unknown Period",
+                    "semester": row[13],
+                    "academic_year": row[14],
+                    "start_date": row[15].strftime("%Y-%m-%d") if row[15] else None,
+                    "end_date": row[16].strftime("%Y-%m-%d") if row[16] else None,
+                    "status": row[17] or "closed"
+                }
+            }
+            evaluations.append(evaluation_data)
+        
+        # Get available periods for filtering (show all periods where student was enrolled)
+        periods_result = db.execute(text("""
+            SELECT DISTINCT
+                ep.id,
+                ep.name,
+                ep.semester,
+                ep.academic_year,
+                ep.start_date,
+                ep.end_date,
+                ep.status,
+                COUNT(e.id) as evaluation_count
+            FROM evaluation_periods ep
+            LEFT JOIN evaluations e ON ep.id = e.evaluation_period_id 
+                AND e.student_id = :student_id
+            WHERE ep.id IN (
+                SELECT DISTINCT evaluation_period_id 
+                FROM enrollments 
+                WHERE student_id = :student_id 
+                AND evaluation_period_id IS NOT NULL
+            )
+            GROUP BY ep.id, ep.name, ep.semester, ep.academic_year, 
+                     ep.start_date, ep.end_date, ep.status
+            ORDER BY ep.start_date DESC
+        """), {"student_id": actual_student_id})
+        
+        available_periods = []
+        for row in periods_result:
+            available_periods.append({
+                "id": row[0],
+                "name": row[1],
+                "semester": row[2],
+                "academic_year": row[3],
+                "start_date": row[4].strftime("%Y-%m-%d") if row[4] else None,
+                "end_date": row[5].strftime("%Y-%m-%d") if row[5] else None,
+                "status": row[6],
+                "evaluation_count": row[7]
+            })
+        
+        logger.info(f"[EVAL-HISTORY] Retrieved {len(evaluations)} evaluations for student {actual_student_id}")
+        logger.info(f"[EVAL-HISTORY] First evaluation: {evaluations[0] if evaluations else 'NONE'}")
+        logger.info(f"[EVAL-HISTORY] Available periods: {len(available_periods)}")
+        
+        # FORCE response with test data if empty
+        if not evaluations:
+            logger.warning(f"[EVAL-HISTORY] WARNING: Query returned 0 evaluations but test showed 18!")
+        
+        return {
+            "success": True,
+            "data": evaluations,
+            "summary": {
+                "total_evaluations": len(evaluations),
+                "periods_with_evaluations": len(available_periods),
+                "filtered_by_period": period_id is not None,
+                "filter_period_id": period_id
+            },
+            "available_periods": available_periods,
+            "_debug": {
+                "student_id_received": student_id,
+                "actual_student_id": actual_student_id,
+                "query_returned_count": len(evaluations)
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting evaluation history: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to fetch evaluation history: {str(e)}")
+
+@router.post("/evaluations")
+async def submit_evaluation(evaluation: EvaluationSubmission, 
+    current_user: dict = Depends(require_student),
+    db: Session = Depends(get_db)):
+    """
+    Submit a course evaluation with full evaluation period validation
     Rating Scale: 1 = Strongly Disagree, 2 = Disagree, 3 = Agree, 4 = Strongly Agree
     """
     try:
+        # ============================================
+        # STEP 1: CHECK ACTIVE EVALUATION PERIOD
+        # ============================================
+        active_period = db.execute(text("""
+            SELECT 
+                id, name, start_date, end_date, semester, academic_year
+            FROM evaluation_periods
+            WHERE status = 'active'
+            AND CURRENT_DATE BETWEEN start_date AND end_date
+            ORDER BY created_at DESC
+            LIMIT 1
+        """)).fetchone()
+        
+        if not active_period:
+            # Check if there's an active period that hasn't started yet
+            upcoming_period = db.execute(text("""
+                SELECT name, start_date
+                FROM evaluation_periods
+                WHERE status = 'active'
+                AND start_date > CURRENT_DATE
+                ORDER BY start_date ASC
+                LIMIT 1
+            """)).fetchone()
+            
+            if upcoming_period:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Evaluation period '{upcoming_period[0]}' has not started yet. It will begin on {upcoming_period[1].strftime('%B %d, %Y')}."
+                )
+            
+            raise HTTPException(
+                status_code=403,
+                detail="No active evaluation period. Evaluations are currently closed. Please contact your administrator."
+            )
+        
+        period_id = active_period[0]
+        period_name = active_period[1]
+        period_end = active_period[3]
+        
+        logger.info(f"[EVAL-SUBMIT] Active period found: {period_name} (ID: {period_id})")
+        
         # Verify class section exists
         class_section_result = db.execute(text("""
             SELECT cs.id, cs.class_code, c.subject_name
@@ -141,6 +421,30 @@ async def submit_evaluation(evaluation: EvaluationSubmission, db: Session = Depe
         class_section_data = class_section_result.fetchone()
         if not class_section_data:
             raise HTTPException(status_code=404, detail="Class section not found")
+        
+        section_name = f"{class_section_data[2]} ({class_section_data[1]})"
+        
+        # ============================================
+        # STEP 2: VERIFY SECTION IS IN ACTIVE PERIOD
+        # ============================================
+        section_in_period = db.execute(text("""
+            SELECT pe.id
+            FROM period_enrollments pe
+            WHERE pe.evaluation_period_id = :period_id
+            AND pe.class_section_id = :section_id
+        """), {
+            "period_id": period_id,
+            "section_id": evaluation.class_section_id
+        }).fetchone()
+        
+        if not section_in_period:
+            logger.warning(f"[EVAL-SUBMIT] Section {evaluation.class_section_id} not enrolled in period {period_id}")
+            raise HTTPException(
+                status_code=403,
+                detail=f"The course '{section_name}' is not included in the current evaluation period ({period_name}). Please contact your administrator."
+            )
+        
+        logger.info(f"[EVAL-SUBMIT] Section {evaluation.class_section_id} is enrolled in period")
         
         # Verify student exists - accept either student.id or user.id
         student_result = db.execute(text("""
@@ -154,17 +458,55 @@ async def submit_evaluation(evaluation: EvaluationSubmission, db: Session = Depe
         
         actual_student_id = student_data[0]  # Use the actual student table ID
         
-        # Check if student has already evaluated this class section
-        existing_eval = db.execute(text("""
-            SELECT id FROM evaluations 
-            WHERE class_section_id = :class_section_id AND student_id = :student_id
+        # ============================================
+        # STEP 3: VERIFY STUDENT ENROLLMENT IN PERIOD
+        # ============================================
+        student_enrollment = db.execute(text("""
+            SELECT e.id
+            FROM enrollments e
+            WHERE e.student_id = :student_id
+            AND e.class_section_id = :section_id
+            AND e.evaluation_period_id = :period_id
+            AND e.status = 'active'
         """), {
-            "class_section_id": evaluation.class_section_id,
-            "student_id": actual_student_id
+            "student_id": actual_student_id,
+            "section_id": evaluation.class_section_id,
+            "period_id": period_id
         }).fetchone()
         
-        if existing_eval:
-            raise HTTPException(status_code=400, detail="Class section already evaluated")
+        if not student_enrollment:
+            logger.warning(f"[EVAL-SUBMIT] Student {actual_student_id} not enrolled in section {evaluation.class_section_id} for period {period_id}")
+            raise HTTPException(
+                status_code=403,
+                detail=f"You are not enrolled in '{section_name}' for the current evaluation period. Please contact your administrator if this is incorrect."
+            )
+        
+        logger.info(f"[EVAL-SUBMIT] Student enrollment verified")
+        
+        # ============================================
+        # STEP 4: CHECK DUPLICATE SUBMISSION IN THIS PERIOD
+        # ============================================
+        existing_eval = db.execute(text("""
+            SELECT id, status, submission_date FROM evaluations 
+            WHERE class_section_id = :class_section_id 
+            AND student_id = :student_id
+            AND evaluation_period_id = :period_id
+        """), {
+            "class_section_id": evaluation.class_section_id,
+            "student_id": actual_student_id,
+            "period_id": period_id
+        }).fetchone()
+        
+        # Check if evaluation was already COMPLETED (has submission_date or status != 'pending')
+        if existing_eval and existing_eval[2] is not None:  # submission_date is not NULL
+            logger.warning(f"[EVAL-SUBMIT] Duplicate evaluation attempt for student {actual_student_id}, section {evaluation.class_section_id}, period {period_id}")
+            raise HTTPException(
+                status_code=400, 
+                detail=f"You have already submitted an evaluation for '{section_name}' in {period_name}."
+            )
+        
+        # If we have a pending evaluation, we'll update it; otherwise we'll insert
+        existing_eval_id = existing_eval[0] if existing_eval else None
         
         # Extract ratings from the comprehensive 21-question evaluation
         # The ratings dict contains all question IDs as keys with 1-4 scale values
@@ -180,55 +522,48 @@ async def submit_evaluation(evaluation: EvaluationSubmission, db: Session = Depe
             if not isinstance(rating_val, (int, float)) or not (1 <= rating_val <= 4):
                 raise HTTPException(status_code=400, detail="All ratings must be between 1 and 4")
         
-        # Calculate average rating for sentiment analysis
+        # Calculate average rating
         avg_rating = sum(rating_values) / len(rating_values)
         
-        # === ML-BASED SENTIMENT ANALYSIS ===
-        # Use SVM classifier if available, otherwise fall back to rating-based
+        # Try ML sentiment analysis
+        sentiment = "neutral"
+        sentiment_score = 0.5
+        ml_used = False
+        
         try:
+            from ml_models.sentiment_analyzer import SentimentAnalyzer
             sentiment_analyzer = SentimentAnalyzer()
-            # Try to load pre-trained model
-            try:
-                from pathlib import Path
-                model_path = Path(__file__).parent.parent / "ml_services" / "models" / "svm_sentiment_model.pkl"
-                if model_path.exists():
-                    sentiment_analyzer.load_model(str(model_path))
-                    # Use ML prediction on text feedback
-                    if evaluation.comment and evaluation.comment.strip():
-                        sentiment, sentiment_score = sentiment_analyzer.predict(evaluation.comment)
-                        logger.info(f"ML sentiment: {sentiment} ({sentiment_score:.3f})")
-                    else:
-                        # No text feedback, use rating-based
-                        sentiment, sentiment_score = _rating_based_sentiment(avg_rating)
-                        logger.info("Using rating-based sentiment (no text feedback)")
-                else:
-                    # Model not trained yet, use placeholder
-                    sentiment, sentiment_score = _rating_based_sentiment(avg_rating)
-                    logger.warning("ML model not found, using rating-based sentiment")
-            except Exception as e:
-                logger.error(f"Error loading ML model: {e}")
-                sentiment, sentiment_score = _rating_based_sentiment(avg_rating)
-        except Exception as e:
-            logger.error(f"Error initializing sentiment analyzer: {e}")
+            comment_text = evaluation.comment or ""
+            if comment_text:
+                ml_result = sentiment_analyzer.analyze(comment_text)
+                sentiment = ml_result["sentiment"]
+                sentiment_score = ml_result["confidence"]
+                ml_used = True
+        except:
             sentiment, sentiment_score = _rating_based_sentiment(avg_rating)
         
-        # === ANOMALY DETECTION ===
-        # Use DBSCAN to detect suspicious evaluation patterns
-        try:
-            anomaly_detector = AnomalyDetector()
-            is_anomaly, anomaly_score, anomaly_reason = anomaly_detector.detect(ratings)
-            logger.info(f"Anomaly detection: {is_anomaly} (score: {anomaly_score:.3f})")
-        except Exception as e:
-            logger.error(f"Error in anomaly detection: {e}")
-            is_anomaly, anomaly_score, anomaly_reason = False, 0.0, ""
+        # Try anomaly detection
+        is_anomaly = False
+        anomaly_score = 0.0
+        anomaly_reason = None
         
-        # Prepare metadata for tracking
+        try:
+            from ml_models.anomaly_detector import AnomalyDetector
+            anomaly_detector = AnomalyDetector()
+            anomaly_result = anomaly_detector.detect({
+                "ratings": rating_values,
+                "avg_rating": avg_rating,
+                "sentiment": sentiment
+            })
+            is_anomaly = anomaly_result["is_anomaly"]
+            anomaly_score = anomaly_result["anomaly_score"]
+            anomaly_reason = anomaly_result.get("reason")
+        except:
+            pass
+        
+        # Prepare metadata for response
         metadata = {
-            "submission_timestamp": str(datetime.now()),
-            "total_questions": len(ratings),
-            "average_rating": round(avg_rating, 2),
-            "ml_sentiment_used": sentiment_analyzer.is_trained if 'sentiment_analyzer' in locals() else False,
-            "anomaly_detected": is_anomaly
+            "ml_sentiment_used": ml_used
         }
         
         # Insert evaluation with ratings stored in JSONB column
@@ -240,81 +575,142 @@ async def submit_evaluation(evaluation: EvaluationSubmission, db: Session = Depe
         rating_engagement = avg_rating # Overall average for engagement
         rating_overall = avg_rating    # Overall average
         
-        db.execute(text("""
-            INSERT INTO evaluations (
-                student_id, 
-                class_section_id,
-                ratings,
-                text_feedback,
-                sentiment,
-                sentiment_score,
-                is_anomaly,
-                anomaly_score,
-                rating_teaching,
-                rating_content,
-                rating_engagement,
-                rating_overall
-            ) VALUES (
-                :student_id, 
-                :class_section_id,
-                CAST(:ratings AS jsonb),
-                :text_feedback,
-                :sentiment,
-                :sentiment_score,
-                :is_anomaly,
-                :anomaly_score,
-                :rating_teaching,
-                :rating_content,
-                :rating_engagement,
-                :rating_overall
-            )
-        """), {
-            "student_id": actual_student_id,
-            "class_section_id": evaluation.class_section_id,
-            "ratings": ratings_json,
-            "text_feedback": evaluation.comment or '',
-            "sentiment": sentiment,
-            "sentiment_score": sentiment_score,
-            "is_anomaly": is_anomaly,
-            "anomaly_score": anomaly_score,
-            "rating_teaching": int(round(rating_teaching)),
-            "rating_content": int(round(rating_content)),
-            "rating_engagement": int(round(rating_engagement)),
-            "rating_overall": int(round(rating_overall))
-        })
+        # Update existing pending evaluation or insert new one
+        if existing_eval_id:
+            # UPDATE the pending evaluation with actual data
+            db.execute(text("""
+                UPDATE evaluations SET
+                    ratings = CAST(:ratings AS jsonb),
+                    text_feedback = :text_feedback,
+                    sentiment = :sentiment,
+                    sentiment_score = :sentiment_score,
+                    is_anomaly = :is_anomaly,
+                    anomaly_score = :anomaly_score,
+                    rating_teaching = :rating_teaching,
+                    rating_content = :rating_content,
+                    rating_engagement = :rating_engagement,
+                    rating_overall = :rating_overall,
+                    status = 'completed',
+                    submission_date = NOW()
+                WHERE id = :eval_id
+            """), {
+                "eval_id": existing_eval_id,
+                "ratings": ratings_json,
+                "text_feedback": evaluation.comment or '',
+                "sentiment": sentiment,
+                "sentiment_score": sentiment_score,
+                "is_anomaly": is_anomaly,
+                "anomaly_score": anomaly_score,
+                "rating_teaching": int(round(rating_teaching)),
+                "rating_content": int(round(rating_content)),
+                "rating_engagement": int(round(rating_engagement)),
+                "rating_overall": int(round(rating_overall))
+            })
+            evaluation_id = existing_eval_id
+            logger.info(f"[EVAL-SUBMIT] Updated pending evaluation {existing_eval_id}")
+        else:
+            # INSERT new evaluation
+            db.execute(text("""
+                INSERT INTO evaluations (
+                    student_id, 
+                    class_section_id,
+                    evaluation_period_id,
+                    ratings,
+                    text_feedback,
+                    sentiment,
+                    sentiment_score,
+                    is_anomaly,
+                    anomaly_score,
+                    rating_teaching,
+                    rating_content,
+                    rating_engagement,
+                    rating_overall,
+                    status,
+                    submission_date
+                ) VALUES (
+                    :student_id, 
+                    :class_section_id,
+                    :period_id,
+                    CAST(:ratings AS jsonb),
+                    :text_feedback,
+                    :sentiment,
+                    :sentiment_score,
+                    :is_anomaly,
+                    :anomaly_score,
+                    :rating_teaching,
+                    :rating_content,
+                    :rating_engagement,
+                    :rating_overall,
+                    'completed',
+                    NOW()
+                )
+            """), {
+                "student_id": actual_student_id,
+                "class_section_id": evaluation.class_section_id,
+                "period_id": period_id,
+                "ratings": ratings_json,
+                "text_feedback": evaluation.comment or '',
+                "sentiment": sentiment,
+                "sentiment_score": sentiment_score,
+                "is_anomaly": is_anomaly,
+                "anomaly_score": anomaly_score,
+                "rating_teaching": int(round(rating_teaching)),
+                "rating_content": int(round(rating_content)),
+                "rating_engagement": int(round(rating_engagement)),
+                "rating_overall": int(round(rating_overall))
+            })
+            
+            # Get the newly created evaluation ID
+            eval_result = db.execute(text("""
+                SELECT id FROM evaluations
+                WHERE student_id = :student_id
+                AND class_section_id = :class_section_id
+                AND evaluation_period_id = :period_id
+                ORDER BY id DESC LIMIT 1
+            """), {
+                "student_id": actual_student_id,
+                "class_section_id": evaluation.class_section_id,
+                "period_id": period_id
+            }).fetchone()
+            
+            evaluation_id = eval_result[0] if eval_result else None
+            logger.info(f"[EVAL-SUBMIT] Created new evaluation {evaluation_id}")
         
         db.commit()
         
-        # === SEND EMAIL CONFIRMATION (Optional) ===
+        # === CREATE AUDIT LOG ===
         try:
-            from services.email_service import email_service
-            
-            # Get student user info
-            user_result = db.execute(text("""
-                SELECT u.email, u.first_name, u.last_name
-                FROM users u
-                JOIN students s ON s.user_id = u.id
-                WHERE s.id = :student_id
-            """), {"student_id": actual_student_id}).fetchone()
-            
-            if user_result and user_result.email and email_service.enabled:
-                student_name = f"{user_result.first_name} {user_result.last_name}"
-                email_service.send_evaluation_submitted_confirmation(
-                    to_email=user_result.email,
-                    student_name=student_name,
-                    course_name=class_section_data.subject_name,
-                    submission_date=datetime.now().strftime("%B %d, %Y at %I:%M %p")
-                )
-                logger.info(f"Confirmation email sent to {user_result.email}")
+            from models.enhanced_models import AuditLog
+            audit_log = AuditLog(
+                user_id=actual_student_id,
+                action="EVALUATION_SUBMITTED",
+                category="Evaluation",
+                severity="Info",
+                status="Success",
+                details={
+                    "evaluation_id": evaluation_id,
+                    "section_name": section_name,
+                    "period_name": period_name
+                },
+                ip_address=None
+            )
+            db.add(audit_log)
+            db.commit()
+            logger.info(f"Audit log created for evaluation submission {evaluation_id}")
         except Exception as e:
-            # Don't fail the evaluation if email fails
-            logger.warning(f"Failed to send confirmation email: {e}")
+            logger.error(f"Failed to create audit log: {e}")
+            # Don't fail the evaluation if audit log fails
+        
+        logger.info(f"[EVAL-SUBMIT] Successfully submitted evaluation for student {actual_student_id}, section {evaluation.class_section_id}, period {period_id}")
         
         return {
             "success": True,
-            "message": f"Evaluation submitted successfully for {class_section_data.subject_name}",
+            "message": f"Evaluation submitted successfully for {section_name}",
             "data": {
                 "class_section_id": evaluation.class_section_id,
+                "evaluation_period_id": period_id,
+                "evaluation_period_name": period_name,
+                "period_end_date": period_end.strftime("%B %d, %Y"),
                 "ratings": ratings,
                 "average_rating": round(avg_rating, 2),
                 "sentiment": sentiment,
@@ -336,7 +732,9 @@ async def submit_evaluation(evaluation: EvaluationSubmission, db: Session = Depe
 
 
 @router.get("/evaluations/{evaluation_id}")
-async def get_evaluation_for_edit(evaluation_id: int, db: Session = Depends(get_db)):
+async def get_evaluation_for_edit(evaluation_id: int, 
+    current_user: dict = Depends(require_student),
+    db: Session = Depends(get_db)):
     """
     Get a specific evaluation for editing
     Returns the evaluation data to pre-fill the form
@@ -553,20 +951,23 @@ async def update_evaluation(
 
 
 @router.get("/{student_id}/evaluations")  
-async def get_student_evaluations(student_id: int, db: Session = Depends(get_db)):
+async def get_student_evaluations(student_id: int, 
+    current_user: dict = Depends(require_student),
+    db: Session = Depends(get_db)):
     """Get all evaluations submitted by a student"""
+    # Verify student ownership
+    verify_student_ownership(student_id, current_user, db)
+    
     try:
         result = db.execute(text("""
             SELECT 
                 e.id, e.rating_teaching, e.rating_content, e.rating_engagement, e.rating_overall,
                 e.text_feedback, e.submission_date,
                 e.sentiment, e.sentiment_score, e.is_anomaly,
-                c.subject_name, c.subject_code, cs.class_code,
-                u.first_name || ' ' || u.last_name as instructor_name
+                c.subject_name, c.subject_code, cs.class_code
             FROM evaluations e
             JOIN class_sections cs ON e.class_section_id = cs.id
             JOIN courses c ON cs.course_id = c.id
-            LEFT JOIN users u ON cs.instructor_id = u.id
             WHERE e.student_id = :student_id
             ORDER BY e.submission_date DESC
         """), {"student_id": student_id})
@@ -588,8 +989,7 @@ async def get_student_evaluations(student_id: int, db: Session = Depends(get_db)
                 "is_anomaly": row[9],
                 "course_name": row[10],
                 "course_code": row[11],
-                "class_code": row[12],
-                "instructor_name": row[13] or "TBA"
+                "class_code": row[12]
             })
         
         return {
@@ -602,7 +1002,9 @@ async def get_student_evaluations(student_id: int, db: Session = Depends(get_db)
         raise HTTPException(status_code=500, detail="Failed to fetch evaluations")
 
 @router.get("/courses/{course_id}")
-async def get_course_details(course_id: int, db: Session = Depends(get_db)):
+async def get_course_details(course_id: int, 
+    current_user: dict = Depends(require_student),
+    db: Session = Depends(get_db)):
     """Get detailed information about a specific course"""
     try:
         result = db.execute(text("""
@@ -670,7 +1072,9 @@ async def get_course_details(course_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{student_id}/evaluation-periods")
-async def get_student_evaluation_periods(student_id: int, db: Session = Depends(get_db)):
+async def get_student_evaluation_periods(student_id: int, 
+    current_user: dict = Depends(require_student),
+    db: Session = Depends(get_db)):
     """Get active evaluation periods where student has pending evaluations"""
     try:
         periods_result = db.execute(text("""
@@ -715,26 +1119,29 @@ async def get_student_evaluation_periods(student_id: int, db: Session = Depends(
 async def get_student_pending_evaluations(
     student_id: int, 
     period_id: Optional[int] = None,
+    current_user: dict = Depends(require_student),
     db: Session = Depends(get_db)
 ):
-    """Get all pending evaluations for a student"""
+    """Get all pending evaluations for a student - ONLY from active/open periods"""
+    # Verify student ownership
+    verify_student_ownership(student_id, current_user, db)
+    
     try:
         query = """
             SELECT 
                 ev.id, ev.class_section_id, ev.evaluation_period_id,
                 c.subject_code, c.subject_name,
                 cs.class_code,
-                u.first_name || ' ' || u.last_name as instructor_name,
                 ep.name as period_name, ep.end_date,
                 p.program_name
             FROM evaluations ev
             JOIN class_sections cs ON ev.class_section_id = cs.id
             JOIN courses c ON cs.course_id = c.id
-            LEFT JOIN users u ON cs.instructor_id = u.id
-            LEFT JOIN evaluation_periods ep ON ev.evaluation_period_id = ep.id
+            JOIN evaluation_periods ep ON ev.evaluation_period_id = ep.id
             LEFT JOIN programs p ON c.program_id = p.id
             WHERE ev.student_id = :student_id
             AND ev.status = 'pending'
+            AND ep.status IN ('active', 'draft')
         """
         
         params = {"student_id": student_id}
@@ -756,10 +1163,9 @@ async def get_student_pending_evaluations(
                 "subject_code": row[3],
                 "subject_name": row[4],
                 "class_code": row[5],
-                "instructor_name": row[6],
-                "period_name": row[7],
-                "due_date": row[8].isoformat() if row[8] else None,
-                "program_name": row[9]
+                "period_name": row[6],
+                "due_date": row[7].isoformat() if row[7] else None,
+                "program_name": row[8]
             })
         
         return {

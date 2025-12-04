@@ -1,9 +1,9 @@
 import React, { useMemo, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { isAdmin, isStaffMember } from '../../utils/roleUtils'
 import { useAuth } from '../../context/AuthContext'
-import { adminAPI, deptHeadAPI, secretaryAPI, instructorAPI } from '../../services/api'
+import { adminAPI, deptHeadAPI, secretaryAPI } from '../../services/api'
 
 const SENTIMENT_COLORS = ['#10b981', '#f59e0b', '#ef4444'] // Green, Yellow, Red
 
@@ -27,6 +27,11 @@ export default function SentimentAnalysis() {
   const [programOptions, setProgramOptions] = useState([])
   const [yearLevelOptions, setYearLevelOptions] = useState([])
 
+  // Evaluation Period states
+  const [evaluationPeriods, setEvaluationPeriods] = useState([])
+  const [selectedPeriod, setSelectedPeriod] = useState(null)
+  const [activePeriod, setActivePeriod] = useState(null)
+
   // Redirect unauthorized users
   useEffect(() => {
     if (!currentUser) {
@@ -35,7 +40,7 @@ export default function SentimentAnalysis() {
     }
     
     if (currentUser.role === 'student') {
-      navigate('/student-evaluation')
+      navigate('/student/courses')
       return
     }
     
@@ -51,22 +56,24 @@ export default function SentimentAnalysis() {
       if (!currentUser) return
       
       try {
-        let programsResponse, yearLevelsResponse
+        let programsResponse, yearLevelsResponse, periodsResponse
         
         if (currentUser.role === 'secretary') {
-          [programsResponse, yearLevelsResponse] = await Promise.all([
+          [programsResponse, yearLevelsResponse, periodsResponse] = await Promise.all([
             secretaryAPI.getPrograms(),
-            secretaryAPI.getYearLevels()
+            secretaryAPI.getYearLevels(),
+            secretaryAPI.getEvaluationPeriods()
           ])
         } else if (currentUser.role === 'department_head') {
-          [programsResponse, yearLevelsResponse] = await Promise.all([
+          [programsResponse, yearLevelsResponse, periodsResponse] = await Promise.all([
             deptHeadAPI.getPrograms(),
-            deptHeadAPI.getYearLevels()
+            deptHeadAPI.getYearLevels(),
+            deptHeadAPI.getEvaluationPeriods()
           ])
-        } else if (currentUser.role === 'instructor') {
-          [programsResponse, yearLevelsResponse] = await Promise.all([
-            instructorAPI.getPrograms(),
-            instructorAPI.getYearLevels()
+        } else if (isAdmin(currentUser)) {
+          [programsResponse, periodsResponse] = await Promise.all([
+            adminAPI.getPrograms(),
+            adminAPI.getEvaluationPeriods()
           ])
         }
         
@@ -76,6 +83,14 @@ export default function SentimentAnalysis() {
         if (yearLevelsResponse?.data) {
           setYearLevelOptions(yearLevelsResponse.data)
         }
+        if (periodsResponse?.data) {
+          setEvaluationPeriods(periodsResponse.data)
+          const active = periodsResponse.data.find(p => p.status === 'active' || p.status === 'Active')
+          if (active) {
+            setActivePeriod(active.id)
+            setSelectedPeriod(active.id)
+          }
+        }
       } catch (err) {
         console.error('Error fetching filter options:', err)
       }
@@ -84,10 +99,14 @@ export default function SentimentAnalysis() {
     fetchFilterOptions()
   }, [currentUser?.role])
 
-  // Fetch sentiment analysis from API
+  // State for evaluations data
+  const [evaluations, setEvaluations] = useState([])
+  
+  // Fetch sentiment analysis and evaluations from API
   useEffect(() => {
     const fetchSentiment = async () => {
       if (!currentUser) return
+      if (!selectedPeriod && !activePeriod) return
       
       try {
         setLoading(true)
@@ -95,25 +114,36 @@ export default function SentimentAnalysis() {
         if (selectedSemester !== 'all') filters.semester = selectedSemester
         if (selectedYearLevel !== 'all') filters.yearLevel = selectedYearLevel
         if (selectedProgram !== 'all') filters.program_id = selectedProgram
+        if (selectedPeriod) filters.period_id = selectedPeriod
         
-        let data
+        let sentimentResponse, evaluationsResponse
         
         // Use appropriate API based on user role
         if (isAdmin(currentUser)) {
-          data = await adminAPI.getSentimentAnalysis(filters)
+          [sentimentResponse, evaluationsResponse] = await Promise.all([
+            adminAPI.getSentimentAnalysis(filters),
+            adminAPI.getEvaluations({ ...filters, page: 1, page_size: 100 }) // Limit for performance
+          ])
         } else if (currentUser.role === 'secretary') {
-          data = await secretaryAPI.getSentimentAnalysis(filters)
+          [sentimentResponse, evaluationsResponse] = await Promise.all([
+            secretaryAPI.getSentimentAnalysis(filters),
+            secretaryAPI.getEvaluations({ ...filters, page: 1, page_size: 100 }) // Limit for performance
+          ])
         } else if (currentUser.role === 'department_head') {
-          data = await deptHeadAPI.getSentimentAnalysis(filters)
-        } else if (currentUser.role === 'instructor') {
-          data = await instructorAPI.getSentimentAnalysis(filters)
+          [sentimentResponse, evaluationsResponse] = await Promise.all([
+            deptHeadAPI.getSentimentAnalysis(filters),
+            deptHeadAPI.getEvaluations({ ...filters, page: 1, page_size: 100 }) // Limit for performance
+          ])
         } else {
           throw new Error(`Unsupported role: ${currentUser.role}`)
         }
         
         // Extract data from response (handle both direct object and {success, data} format)
-        const sentimentData = data?.data || data
+        const sentimentData = sentimentResponse?.data || sentimentResponse
+        const evaluationsData = Array.isArray(evaluationsResponse) ? evaluationsResponse : (evaluationsResponse?.data || [])
+        
         setSentimentData(sentimentData)
+        setEvaluations(evaluationsData)
       } catch (err) {
         console.error('Error fetching sentiment analysis:', err)
         setError(err.message || 'Failed to load sentiment analysis')
@@ -123,24 +153,28 @@ export default function SentimentAnalysis() {
     }
     
     fetchSentiment()
-  }, [currentUser, selectedSemester, selectedYearLevel, selectedProgram])
+  }, [currentUser, selectedSemester, selectedYearLevel, selectedProgram, selectedPeriod])
 
   // Fetch anomalies (merged from AnomalyDetection.jsx)
   useEffect(() => {
     const fetchAnomalies = async () => {
       if (!currentUser) return
+      if (!selectedPeriod && !activePeriod) return
       
       try {
         setAnomaliesLoading(true)
+        const params = {}
+        if (selectedPeriod) params.period_id = selectedPeriod
+        
         let data
         
         // Use appropriate API based on user role
         if (isAdmin(currentUser)) {
-          data = await adminAPI.getAnomalies()
+          data = await adminAPI.getAnomalies(params)
         } else if (currentUser.role === 'secretary') {
-          data = await secretaryAPI.getAnomalies()
+          data = await secretaryAPI.getAnomalies(params)
         } else if (currentUser.role === 'department_head') {
-          data = await deptHeadAPI.getAnomalies()
+          data = await deptHeadAPI.getAnomalies(params)
         }
         
         // Extract data from response
@@ -154,35 +188,35 @@ export default function SentimentAnalysis() {
     }
     
     fetchAnomalies()
-  }, [currentUser])
+  }, [currentUser, selectedPeriod])
 
   // Filter anomalies by search term
   const filteredAnomalies = useMemo(() => {
     return anomalies.filter(anomaly => {
       if (searchTerm === '') return true
       return anomaly.courseName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-             anomaly.comment?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-             anomaly.instructorName?.toLowerCase().includes(searchTerm.toLowerCase())
+             anomaly.comment?.toLowerCase().includes(searchTerm.toLowerCase())
     })
   }, [anomalies, searchTerm])
 
-  // Since API doesn't return courses/evaluations arrays, use the trend and overall data
+  // Since API doesn't return courses/evaluations arrays, use the trend and summary data
   const sentimentOverview = useMemo(() => {
-    if (!sentimentData?.overall) {
+    // Backend returns 'summary' not 'overall'
+    const summary = sentimentData?.summary || sentimentData?.overall
+    if (!summary) {
       return { positive: 0, neutral: 0, negative: 0 }
     }
     
-    const overall = sentimentData.overall
-    const total = (overall.positive || 0) + (overall.neutral || 0) + (overall.negative || 0)
+    const total = (summary.positive || 0) + (summary.neutral || 0) + (summary.negative || 0)
     
     if (total === 0) {
       return { positive: 0, neutral: 0, negative: 0 }
     }
 
     return {
-      positive: Math.round(((overall.positive || 0) / total) * 100),
-      neutral: Math.round(((overall.neutral || 0) / total) * 100),
-      negative: Math.round(((overall.negative || 0) / total) * 100)
+      positive: Math.round(((summary.positive || 0) / total) * 100),
+      neutral: Math.round(((summary.neutral || 0) / total) * 100),
+      negative: Math.round(((summary.negative || 0) / total) * 100)
     }
   }, [sentimentData])
 
@@ -199,15 +233,88 @@ export default function SentimentAnalysis() {
     }))
   }, [sentimentData])
 
-  // Year level-wise sentiment data - not available in current API
+  // Year level-wise sentiment data - calculate from evaluations
   const yearLevelSentiment = useMemo(() => {
-    return [] // Empty for now since API doesn't provide this breakdown
-  }, [])
+    if (!evaluations || evaluations.length === 0) {
+      console.log('[SENTIMENT] No evaluations data:', evaluations)
+      return []
+    }
+    
+    console.log('[SENTIMENT] Evaluations count:', evaluations.length)
+    console.log('[SENTIMENT] First evaluation sample:', evaluations[0])
+    console.log('[SENTIMENT] First eval fields:', Object.keys(evaluations[0] || {}))
+    
+    const yearLevels = [1, 2, 3, 4]
+    
+    const result = yearLevels.map(level => {
+      const levelEvals = evaluations.filter(e => e.yearLevel === level || e.year_level === level)
+      console.log(`[SENTIMENT] Year ${level}: found ${levelEvals.length} evaluations`)
+      const positive = levelEvals.filter(e => e.sentiment === 'positive').length
+      const neutral = levelEvals.filter(e => e.sentiment === 'neutral').length
+      const negative = levelEvals.filter(e => e.sentiment === 'negative').length
+      
+      return {
+        name: `Year ${level}`,
+        positive,
+        neutral,
+        negative,
+        total: positive + neutral + negative
+      }
+    }).filter(level => level.total > 0)
+    
+    console.log('[SENTIMENT] Year level sentiment result:', result)
+    return result
+  }, [evaluations])
 
-  // Evaluation criteria breakdown - not available in current API
+  // Evaluation criteria breakdown - calculate from evaluations ratings
   const criteriaBreakdown = useMemo(() => {
-    return [] // Empty for now since API doesn't provide detailed criteria
-  }, [])
+    if (!evaluations || evaluations.length === 0) {
+      console.log('[CRITERIA] No evaluations for criteria breakdown')
+      return []
+    }
+    
+    console.log('[CRITERIA] Processing', evaluations.length, 'evaluations')
+    console.log('[CRITERIA] First eval ratings:', evaluations[0]?.ratings)
+    
+    // Define the 6 main categories from the LPU evaluation form
+    const categories = {
+      "Relevance of Course": { questions: [1, 2, 3, 4, 5, 6], total: 0, count: 0 },
+      "Course Organization & ILOs": { questions: [7, 8, 9, 10, 11], total: 0, count: 0 },
+      "Teaching - Learning": { questions: [12, 13, 14, 15, 16, 17, 18], total: 0, count: 0 },
+      "Assessment": { questions: [19, 20, 21, 22, 23, 24], total: 0, count: 0 },
+      "Learning Environment": { questions: [25, 26, 27, 28, 29, 30], total: 0, count: 0 },
+      "Counseling": { questions: [31], total: 0, count: 0 }
+    }
+    
+    // Calculate averages from evaluations
+    evaluations.forEach(evaluation => {
+      const ratings = evaluation.ratings
+      if (!ratings || typeof ratings !== 'object') {
+        console.log('[CRITERIA] Evaluation has no valid ratings:', evaluation.id)
+        return
+      }
+      
+      Object.entries(categories).forEach(([categoryName, categoryData]) => {
+        categoryData.questions.forEach(qNum => {
+          const qKey = qNum.toString()
+          if (ratings[qKey] && typeof ratings[qKey] === 'number') {
+            categoryData.total += ratings[qKey]
+            categoryData.count += 1
+          }
+        })
+      })
+    })
+    
+    // Format results for display
+    return Object.entries(categories)
+      .map(([name, data]) => ({
+        name,
+        rating: data.count > 0 ? (data.total / data.count).toFixed(2) : '0.00',
+        count: data.count
+      }))
+      .filter(category => category.count > 0) // Only show categories with data
+      .sort((a, b) => parseFloat(b.rating) - parseFloat(a.rating)) // Sort by rating
+  }, [evaluations])
 
   if (!currentUser) return null
 
@@ -250,7 +357,7 @@ export default function SentimentAnalysis() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Enhanced LPU Header */}
       <header className="bg-gradient-to-r from-[#7a0000] to-[#a31111] shadow-lg">
-        <div className="container mx-auto px-6 py-6">
+        <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-8 lg:py-10 max-w-screen-2xl">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-4">
               <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center shadow-md">
@@ -271,19 +378,32 @@ export default function SentimentAnalysis() {
         </div>
       </header>
 
-      <div className="container mx-auto px-6 py-8">
+      <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-10 lg:py-12 max-w-screen-2xl">
+        
+        {/* Show warning if no active period and no selection */}
+        {!activePeriod && !selectedPeriod ? (
+          <div className="lpu-card text-center py-16 mb-10">
+            <svg className="w-20 h-20 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <h3 className="text-xl font-semibold text-gray-700 mb-2">No Active Evaluation Period</h3>
+            <p className="text-gray-500 mb-4">There is currently no active evaluation period.</p>
+            <p className="text-gray-500">Please contact the administrator to activate an evaluation period, or select a specific period from the filter below.</p>
+          </div>
+        ) : (
+          <>
         {/* Enhanced Sentiment Overview */}
-        <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
+        <div className="bg-white rounded-card shadow-card p-7 lg:p-8 mb-12">
           <div className="flex items-center justify-between border-b border-gray-200 pb-4 mb-6">
             <div className="flex items-center">
               <svg className="w-6 h-6 text-[#7a0000] mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path>
               </svg>
-              <h2 className="text-xl font-bold text-gray-900">Academic Sentiment Overview</h2>
+              <h2 className="text-2xl font-bold text-gray-900">Academic Sentiment Overview</h2>
             </div>
             <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-              {sentimentData?.overall ? 
-                ((sentimentData.overall.positive || 0) + (sentimentData.overall.neutral || 0) + (sentimentData.overall.negative || 0)) : 0
+              {sentimentData?.total_evaluations || sentimentData?.summary ? 
+                (sentimentData.total_evaluations || ((sentimentData.summary?.positive || 0) + (sentimentData.summary?.neutral || 0) + (sentimentData.summary?.negative || 0))) : 0
               } total responses
             </span>
           </div>
@@ -292,7 +412,7 @@ export default function SentimentAnalysis() {
             <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-6 border border-green-200">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm font-semibold text-gray-700">Positive Feedback</span>
-                <span className="text-xl font-bold text-green-600">{sentimentOverview.positive}%</span>
+                <span className="text-4xl lg:text-5xl font-bold text-green-600">{sentimentOverview.positive}%</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-3">
                 <div 
@@ -311,7 +431,7 @@ export default function SentimentAnalysis() {
             <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg p-6 border border-yellow-200">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm font-semibold text-gray-700">Neutral Feedback</span>
-                <span className="text-xl font-bold text-yellow-600">{sentimentOverview.neutral}%</span>
+                <span className="text-4xl lg:text-5xl font-bold text-yellow-600">{sentimentOverview.neutral}%</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-3">
                 <div 
@@ -330,7 +450,7 @@ export default function SentimentAnalysis() {
             <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-6 border border-red-200">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm font-semibold text-gray-700">Negative Feedback</span>
-                <span className="text-xl font-bold text-red-600">{sentimentOverview.negative}%</span>
+                <span className="text-4xl lg:text-5xl font-bold text-red-600">{sentimentOverview.negative}%</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-3">
                 <div 
@@ -365,7 +485,26 @@ export default function SentimentAnalysis() {
 
           {showFilters && (
             <div className="lpu-card p-6 bg-gray-50">
-              <div className="grid md:grid-cols-3 gap-6">
+              <div className="grid md:grid-cols-4 gap-6">
+                {/* Evaluation Period Filter */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Evaluation Period
+                  </label>
+                  <select
+                    value={selectedPeriod || ''}
+                    onChange={(e) => setSelectedPeriod(e.target.value)}
+                    className="lpu-select w-full"
+                  >
+                    <option value="">Select Period</option>
+                    {evaluationPeriods.map((period) => (
+                      <option key={period.id} value={period.id}>
+                        {period.name} {period.status === 'active' || period.status === 'Active' ? '(Active)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 {/* Program Filter */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -445,14 +584,14 @@ export default function SentimentAnalysis() {
         </div>
 
         {/* Sentiment Trend and Analysis Grid */}
-        <div className="grid lg:grid-cols-2 gap-8 mb-8">
+        <div className="grid lg:grid-cols-2 gap-5 lg:gap-6 mb-12">
           {/* Academic Year Level Analysis */}
-          <div className="bg-white rounded-xl shadow-lg p-8">
+          <div className="bg-white rounded-card shadow-card p-7 lg:p-8">
             <div className="flex items-center mb-4">
               <svg className="w-6 h-6 text-[#7a0000] mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
               </svg>
-              <h2 className="text-xl font-bold text-gray-900">Academic Year Level Analysis</h2>
+              <h2 className="text-2xl font-bold text-gray-900">Academic Year Level Analysis</h2>
             </div>
             <p className="text-gray-600 text-sm mb-6">Sentiment distribution across different year levels</p>
             
@@ -473,9 +612,13 @@ export default function SentimentAnalysis() {
                       boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
                     }}
                   />
-                  <Bar dataKey="positive" stackId="a" fill="#10b981" name="Positive" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="neutral" stackId="a" fill="#f59e0b" name="Neutral" radius={[4, 4, 0, 0]} minPointSize={2} />
-                  <Bar dataKey="negative" stackId="a" fill="#ef4444" name="Negative" radius={[4, 4, 0, 0]} minPointSize={2} />
+                  <Legend 
+                    wrapperStyle={{ paddingTop: '20px' }}
+                    iconType="rect"
+                  />
+                  <Bar dataKey="positive" fill="#10b981" name="Positive" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="neutral" fill="#f59e0b" name="Neutral" radius={[4, 4, 0, 0]} minPointSize={2} />
+                  <Bar dataKey="negative" fill="#ef4444" name="Negative" radius={[4, 4, 0, 0]} minPointSize={2} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -489,12 +632,12 @@ export default function SentimentAnalysis() {
           </div>
 
           {/* Enhanced Criteria Analysis */}
-          <div className="bg-white rounded-xl shadow-lg p-8">
+          <div className="bg-white rounded-card shadow-card p-7 lg:p-8">
             <div className="flex items-center mb-4">
               <svg className="w-6 h-6 text-[#7a0000] mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
               </svg>
-              <h2 className="text-xl font-bold text-gray-900">Academic Criteria Performance</h2>
+              <h2 className="text-2xl font-bold text-gray-900">Academic Criteria Performance</h2>
             </div>
             <p className="text-gray-600 text-sm mb-6">Average ratings across evaluation criteria</p>
             
@@ -506,19 +649,19 @@ export default function SentimentAnalysis() {
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="font-semibold text-gray-900">{criterion.name}</h3>
                         <div className="flex items-center space-x-2">
-                          <span className="text-2xl font-bold text-[#7a0000]">
-                            {criterion.rating}
+                          <span className="text-4xl lg:text-5xl font-bold text-[#7a0000]">
+                            {parseFloat(criterion.rating).toFixed(2)}
                           </span>
-                          <span className="text-gray-500 text-sm">/ 5.0</span>
+                          <span className="text-gray-500 text-sm">/ 4.0</span>
                         </div>
                       </div>
                       
                       <div className="flex items-center space-x-2 mb-3">
-                        {[1, 2, 3, 4, 5].map((star) => (
+                        {[1, 2, 3, 4].map((star) => (
                           <svg
                             key={star}
                             className={`w-5 h-5 ${
-                              star <= criterion.rating ? 'text-[#ffd700]' : 'text-gray-300'
+                              star <= parseFloat(criterion.rating) ? 'text-[#ffd700]' : 'text-gray-300'
                             }`}
                             fill="currentColor"
                             viewBox="0 0 20 20"
@@ -531,11 +674,11 @@ export default function SentimentAnalysis() {
                       <div className="w-full bg-gray-200 rounded-full h-3">
                         <div 
                           className={`h-3 rounded-full transition-all duration-300 ${
-                            criterion.rating >= 4 ? 'bg-green-500' :
-                            criterion.rating >= 3 ? 'bg-yellow-500' :
+                            parseFloat(criterion.rating) >= 3.5 ? 'bg-green-500' :
+                            parseFloat(criterion.rating) >= 2.5 ? 'bg-yellow-500' :
                             'bg-red-500'
                           }`}
-                          style={{ width: `${(criterion.rating / 5) * 100}%` }}
+                          style={{ width: `${(parseFloat(criterion.rating) / 4) * 100}%` }}
                         ></div>
                       </div>
                     </div>
@@ -584,12 +727,12 @@ export default function SentimentAnalysis() {
           </div>
 
           {/* Anomaly Summary Cards */}
-          <div className="grid md:grid-cols-3 gap-6 mb-8">
-            <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-2xl shadow-lg p-6">
+          <div className="grid md:grid-cols-3 gap-5 lg:gap-6 mb-12">
+            <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-card shadow-card p-7 lg:p-8">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-white/90 mb-2">Total Anomalies</h3>
-                  <p className="text-4xl font-bold text-white">{anomalies.length}</p>
+                  <p className="text-4xl lg:text-5xl font-bold text-white">{anomalies.length}</p>
                   <p className="text-xs text-white/70 mt-1">Detected issues</p>
                 </div>
                 <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
@@ -600,11 +743,11 @@ export default function SentimentAnalysis() {
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl shadow-lg p-6">
+            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-card shadow-card p-7 lg:p-8">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-white/90 mb-2">Filtered Results</h3>
-                  <p className="text-4xl font-bold text-white">{filteredAnomalies.length}</p>
+                  <p className="text-4xl lg:text-5xl font-bold text-white">{filteredAnomalies.length}</p>
                   <p className="text-xs text-white/70 mt-1">Matching search</p>
                 </div>
                 <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
@@ -615,13 +758,13 @@ export default function SentimentAnalysis() {
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl shadow-lg p-6">
+            <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-card shadow-card p-7 lg:p-8">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-white/90 mb-2">Flagged Rate</h3>
-                  <p className="text-4xl font-bold text-white">
-                    {sentimentData?.overall ? 
-                      Math.round((anomalies.length / (sentimentData.overall.positive + sentimentData.overall.neutral + sentimentData.overall.negative)) * 100) 
+                  <p className="text-4xl lg:text-5xl font-bold text-white">
+                    {sentimentData?.overall ?
+                      Math.round((anomalies.length / (sentimentData.overall.positive + sentimentData.overall.neutral + sentimentData.overall.negative)) * 100)
                       : 0}%
                   </p>
                   <p className="text-xs text-white/70 mt-1">Of total evaluations</p>
@@ -640,7 +783,7 @@ export default function SentimentAnalysis() {
             <div className="relative">
               <input
                 type="text"
-                placeholder="Search anomalies by course, instructor, or comment..."
+                placeholder="Search anomalies by course or comment..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="lpu-input pl-12"
@@ -666,7 +809,6 @@ export default function SentimentAnalysis() {
                   <thead className="bg-gray-50 border-b">
                     <tr>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Course</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Instructor</th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Anomaly Type</th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Rating</th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Date</th>
@@ -678,9 +820,6 @@ export default function SentimentAnalysis() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900">{anomaly.courseName || 'N/A'}</div>
                           <div className="text-xs text-gray-500">{anomaly.courseCode || ''}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                          {anomaly.instructorName || 'N/A'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-3 py-1 rounded-full text-xs font-medium ${
@@ -717,6 +856,8 @@ export default function SentimentAnalysis() {
             </div>
           </div>
         </div>
+        </>
+        )}
       </div>
     </div>
   )

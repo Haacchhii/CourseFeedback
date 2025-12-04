@@ -5,6 +5,7 @@ import { isSystemAdmin } from '../../utils/roleUtils'
 import { useAuth } from '../../context/AuthContext'
 import { adminAPI } from '../../services/api'
 import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
+import Pagination from '../../components/Pagination'
 
 export default function EnhancedCourseManagement() {
   const navigate = useNavigate()
@@ -49,8 +50,13 @@ export default function EnhancedCourseManagement() {
   // Enrollment Filters
   const [sectionSearchTerm, setSectionSearchTerm] = useState('')
   const [sectionProgramFilter, setSectionProgramFilter] = useState('all')
+  const [sectionProgramSectionFilter, setSectionProgramSectionFilter] = useState('all')
   const [sectionSemesterFilter, setSectionSemesterFilter] = useState('all')
   const [sectionYearFilter, setSectionYearFilter] = useState('all')
+  const [sectionPeriodFilter, setSectionPeriodFilter] = useState('all')
+  
+  // Evaluation Periods for filtering
+  const [evaluationPeriods, setEvaluationPeriods] = useState([])
   
   // Bulk Section Selection State
   const [selectedSections, setSelectedSections] = useState([])
@@ -209,13 +215,17 @@ export default function EnhancedCourseManagement() {
   useEffect(() => {
     if (activeTab === 'enrollment') {
       loadSections()
+      loadProgramSections() // Load program sections for the filter
+      if (evaluationPeriods.length === 0) {
+        loadEvaluationPeriods() // Load periods for filtering
+      }
     }
-  }, [activeTab, sectionSearchTerm, sectionProgramFilter, sectionSemesterFilter, sectionYearFilter])
+  }, [activeTab, sectionSearchTerm, sectionProgramFilter, sectionProgramSectionFilter, sectionSemesterFilter, sectionYearFilter, sectionPeriodFilter])
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setSectionCurrentPage(1)
-  }, [sectionSearchTerm, sectionProgramFilter, sectionSemesterFilter, sectionYearFilter])
+  }, [sectionSearchTerm, sectionProgramFilter, sectionProgramSectionFilter, sectionSemesterFilter, sectionYearFilter, sectionPeriodFilter])
 
   // Analytics data
   const analytics = useMemo(() => {
@@ -636,18 +646,31 @@ export default function EnhancedCourseManagement() {
     )
   }
 
+  // Load evaluation periods for filtering
+  const loadEvaluationPeriods = async () => {
+    try {
+      const response = await adminAPI.getPeriods()
+      setEvaluationPeriods(response?.data || [])
+    } catch (err) {
+      console.error('Error loading evaluation periods:', err)
+    }
+  }
+
   // Section Management Functions
   const loadSections = async () => {
     try {
       const response = await adminAPI.getSections({
         search: sectionSearchTerm || undefined,
         program_code: sectionProgramFilter !== 'all' ? sectionProgramFilter : undefined,
+        program_section_id: sectionProgramSectionFilter !== 'all' && sectionProgramSectionFilter ? parseInt(sectionProgramSectionFilter) : undefined,
         year_level: sectionYearFilter !== 'all' ? parseInt(sectionYearFilter) : undefined,
-        semester: sectionSemesterFilter !== 'all' ? parseInt(sectionSemesterFilter) : undefined
+        semester: sectionSemesterFilter !== 'all' ? parseInt(sectionSemesterFilter) : undefined,
+        period_id: sectionPeriodFilter !== 'all' ? parseInt(sectionPeriodFilter) : undefined
       })
       setSections(response?.data || [])
     } catch (err) {
       console.error('Error loading sections:', err)
+      setSections([]) // Clear sections on error
     }
   }
 
@@ -742,6 +765,7 @@ export default function EnhancedCourseManagement() {
     try {
       setLoadingProgramSections(true)
       const response = await adminAPI.getProgramSections({ isActive: true })
+      console.log('[EnhancedCourseManagement] Program sections loaded:', response?.data)
       setProgramSections(response?.data || [])
     } catch (err) {
       console.error('Error loading program sections:', err)
@@ -1015,21 +1039,28 @@ student2@example.com,IT-PROG1-2024,email,
       if (newFormData.program_id && newFormData.year_level && newFormData.semester) {
         try {
           setLoadingMatching(true)
+          console.log('[Quick Bulk] Fetching with filters:', {
+            program_id: parseInt(newFormData.program_id),
+            year_level: parseInt(newFormData.year_level),
+            semester: parseInt(newFormData.semester)
+          })
           // Fetch both courses and program sections in parallel
           const [coursesResp, programSectionsResp] = await Promise.all([
             adminAPI.getCourses({
-              program_id: newFormData.program_id,
-              year_level: newFormData.year_level,
-              semester: newFormData.semester,
+              program_id: parseInt(newFormData.program_id),
+              year_level: parseInt(newFormData.year_level),
+              semester: parseInt(newFormData.semester),
               page_size: 1000
             }),
             adminAPI.getProgramSections({
-              program_id: newFormData.program_id,
-              year_level: newFormData.year_level,
-              semester: newFormData.semester,
+              program_id: parseInt(newFormData.program_id),
+              year_level: parseInt(newFormData.year_level),
+              semester: parseInt(newFormData.semester),
               is_active: true
             })
           ])
+          console.log('[Quick Bulk] Found courses:', coursesResp?.data?.length || 0)
+          console.log('[Quick Bulk] Found program sections:', programSectionsResp?.data?.length || 0, programSectionsResp?.data)
           setMatchingCourses(coursesResp?.data || [])
           setAvailableProgramSectionsForBulk(programSectionsResp?.data || [])
         } catch (err) {
@@ -1071,19 +1102,26 @@ student2@example.com,IT-PROG1-2024,email,
       for (const course of matchingCourses) {
         try {
           // Create a section for this course with program section parameters and auto-enroll students
-          const response = await adminAPI.createSection({
+          const sectionData = {
             course_id: course.id,
             class_code: `${course.subject_code}-${selectedProgramSection.sectionName}`,
             semester: parseInt(quickBulkFormData.semester),
             academic_year: selectedProgramSection.schoolYear || '2024-2025',
-            max_students: 40
-          }, true) // Enable auto-enrollment
+            max_students: 40,
+            program_section_id: selectedProgramSection.id  // Pass program section ID for targeted enrollment
+          }
+          console.log(`[Quick Bulk] Creating section for ${course.subject_code}:`, sectionData)
+          const response = await adminAPI.createSection(sectionData, true) // Enable auto-enrollment
           successCount++
+          console.log(`[Quick Bulk] Response for ${course.subject_code}:`, response.data)
           if (response.data?.enrolled_count > 0) {
-            console.log(`Auto-enrolled ${response.data.enrolled_count} students into ${course.subject_code}`)
+            console.log(`✅ Auto-enrolled ${response.data.enrolled_count} students into ${course.subject_code}`)
+          } else {
+            console.warn(`⚠️ No students enrolled into ${course.subject_code}`)
           }
         } catch (err) {
           failCount++
+          console.error(`❌ Failed to create section for ${course.subject_code}:`, err)
           errors.push(`${course.subject_code}: ${err.response?.data?.detail || err.message}`)
         }
       }
@@ -1293,32 +1331,30 @@ student2@example.com,IT-PROG1-2024,email,
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Header */}
-      <header className="bg-gradient-to-r from-indigo-600 to-indigo-700 shadow-xl border-b-4 border-indigo-800">
-        <div className="container mx-auto px-6 py-6">
+      <header className="lpu-header">
+        <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-8 lg:py-10 max-w-screen-2xl">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-4">
-              <button onClick={() => navigate('/admin/dashboard')} className="w-12 h-12 bg-white/20 hover:bg-white/30 rounded-xl flex items-center justify-center transition-all">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
-                </svg>
-              </button>
+              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg">
+                <span className="text-[#7a0000] font-bold text-xl">LPU</span>
+              </div>
               <div>
-                <h1 className="text-3xl font-bold text-white">Enhanced Course Management</h1>
-                <p className="text-indigo-100 text-sm mt-1">Comprehensive course administration and analytics</p>
+                <h1 className="lpu-header-title text-3xl">Enhanced Course Management</h1>
+                <p className="lpu-header-subtitle text-lg">Comprehensive course administration and analytics</p>
               </div>
             </div>
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-6 py-8">
+      <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-10 lg:py-12 max-w-screen-2xl">
         {/* Tabs */}
-        <div className="bg-white rounded-xl shadow-md mb-6 p-2 flex space-x-2">
+        <div className="bg-white rounded-card shadow-card mb-12 p-2 flex space-x-2">
           <button
             onClick={() => setActiveTab('courses')}
             className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
               activeTab === 'courses'
-                ? 'bg-indigo-600 text-white shadow-lg'
+                ? 'bg-red-600 text-white shadow-lg'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
@@ -1328,7 +1364,7 @@ student2@example.com,IT-PROG1-2024,email,
             onClick={() => setActiveTab('enrollment')}
             className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
               activeTab === 'enrollment'
-                ? 'bg-indigo-600 text-white shadow-lg'
+                ? 'bg-red-600 text-white shadow-lg'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
@@ -1340,46 +1376,46 @@ student2@example.com,IT-PROG1-2024,email,
         {activeTab === 'courses' && (
           <>
             {/* Stats Cards */}
-            <div className="grid md:grid-cols-4 gap-6 mb-6">
-              <div className="bg-white rounded-xl shadow-md p-6">
+            <div className="grid md:grid-cols-4 gap-5 lg:gap-6 mb-12">
+              <div className="bg-white rounded-card shadow-card p-7 lg:p-8">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600">Total Courses</p>
-                    <p className="text-3xl font-bold text-gray-900">{totalCourses}</p>
+                    <p className="text-xs lg:text-sm text-gray-600 uppercase tracking-wide">Total Courses</p>
+                    <p className="text-4xl lg:text-5xl font-bold text-gray-900">{totalCourses}</p>
                     <p className="text-xs text-gray-500 mt-1">Showing {filteredCourses.length} on this page</p>
                   </div>
-                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
                     </svg>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white rounded-xl shadow-md p-6">
+              <div className="bg-white rounded-card shadow-card p-7 lg:p-8">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600">Active Programs</p>
-                    <p className="text-3xl font-bold text-green-600">{programs.length}</p>
+                    <p className="text-xs lg:text-sm text-gray-600 uppercase tracking-wide">Active Programs</p>
+                    <p className="text-4xl lg:text-5xl font-bold text-yellow-600">{programs.length}</p>
                   </div>
-                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                    <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
                     </svg>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white rounded-xl shadow-md p-6">
+              <div className="bg-white rounded-card shadow-card p-7 lg:p-8">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600">Total Students</p>
-                    <p className="text-3xl font-bold text-purple-600">
+                    <p className="text-xs lg:text-sm text-gray-600 uppercase tracking-wide">Total Students</p>
+                    <p className="text-4xl lg:text-5xl font-bold text-yellow-600">
                       {filteredCourses.reduce((sum, c) => sum + (c.enrolledStudents || 0), 0)}
                     </p>
                   </div>
-                  <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                    <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
                     </svg>
                   </div>
@@ -1390,14 +1426,14 @@ student2@example.com,IT-PROG1-2024,email,
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">Avg Rating</p>
-                    <p className="text-3xl font-bold text-orange-600">
+                    <p className="text-3xl font-bold text-yellow-600">
                       {filteredCourses.length > 0
                         ? (filteredCourses.reduce((sum, c) => sum + c.avgRating, 0) / filteredCourses.length).toFixed(2)
                         : '0.00'}
                     </p>
                   </div>
-                  <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                    <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path>
                     </svg>
                   </div>
@@ -1448,16 +1484,16 @@ student2@example.com,IT-PROG1-2024,email,
 
             {/* Bulk Actions */}
             {selectedCourses.length > 0 && (
-              <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-6 flex items-center justify-between">
-                <p className="text-indigo-900 font-semibold">{selectedCourses.length} course(s) selected</p>
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 flex items-center justify-between">
+                <p className="text-red-900 font-semibold">{selectedCourses.length} course(s) selected</p>
                 <div className="flex space-x-2">
-                  <button onClick={() => setShowAssignInstructorModal(true)} className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all">
+                  <button onClick={() => setShowAssignInstructorModal(true)} className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all">
                     Assign Instructor
                   </button>
-                  <button onClick={() => alert('Archiving selected courses...')} className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-all">
+                  <button onClick={() => alert('Archiving selected courses...')} className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg transition-all">
                     Archive
                   </button>
-                  <button onClick={() => alert('Exporting selected courses...')} className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-all">
+                  <button onClick={() => alert('Exporting selected courses...')} className="px-4 py-2 bg-yellow-500 hover:bg-amber-600 text-white rounded-lg transition-all">
                     Export
                   </button>
                 </div>
@@ -1465,7 +1501,7 @@ student2@example.com,IT-PROG1-2024,email,
             )}
 
             {/* Courses Table */}
-            <div className="bg-white rounded-xl shadow-md overflow-hidden">
+            <div className="bg-white rounded-card shadow-card overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
@@ -1481,59 +1517,59 @@ student2@example.com,IT-PROG1-2024,email,
                               setSelectedCourses(filteredCourses.map(c => c.id))
                             }
                           }}
-                          className="w-4 h-4 text-indigo-600 rounded focus:ring-2 focus:ring-indigo-500"
+                          className="w-4 h-4 text-red-600 rounded focus:ring-2 focus:ring-indigo-500"
                         />
                       </th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Code</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Course Name</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Program</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Students</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Rating</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
-                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">Actions</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Code</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Course Name</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Program</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Students</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Rating</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Status</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {filteredCourses.map((course) => (
                       <tr key={course.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-3">
                           <input
                             type="checkbox"
                             checked={selectedCourses.includes(course.id)}
                             onChange={(e) => toggleCourseSelection(course.id, e)}
-                            className="w-4 h-4 text-indigo-600 rounded focus:ring-2 focus:ring-indigo-500"
+                            className="w-4 h-4 text-red-600 rounded focus:ring-2 focus:ring-indigo-500"
                           />
                         </td>
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{course.classCode || course.id}</td>
-                        <td className="px-6 py-4">
-                          <div className="font-medium text-gray-900">{course.name}</div>
+                        <td className="px-4 py-3 text-xs font-medium text-gray-900">{course.classCode || course.id}</td>
+                        <td className="px-4 py-3">
+                          <div className="text-sm font-medium text-gray-900">{course.name}</div>
                           <div className="text-xs text-gray-500">Year {course.yearLevel} • {course.semester}</div>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{course.program}</td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm font-semibold text-gray-900">{course.enrolledStudents || 0}</div>
+                        <td className="px-4 py-3 text-xs text-gray-600">{course.program}</td>
+                        <td className="px-4 py-3">
+                          <div className="text-xs font-semibold text-gray-900">{course.enrolledStudents || 0}</div>
                           <div className="text-xs text-gray-500">{course.evaluationCount || 0} evals</div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-3">
                           <div className="flex items-center">
                             <svg className="w-4 h-4 text-yellow-400 mr-1" fill="currentColor" viewBox="0 0 20 20">
                               <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
                             </svg>
-                            <span className="text-sm font-semibold text-gray-900">{course.avgRating || 0}</span>
+                            <span className="text-xs font-semibold text-gray-900">{course.avgRating || 0}</span>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
-                            course.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${
+                            course.status === 'Active' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
                           }`}>
                             {course.status}
                           </span>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-3">
                           <div className="flex items-center justify-center space-x-2">
                             <button
                               onClick={() => navigate(`/courses`)}
-                              className="p-2 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg transition-all"
+                              className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-all"
                               title="View Course Details"
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1543,7 +1579,7 @@ student2@example.com,IT-PROG1-2024,email,
                             </button>
                             <button
                               onClick={(e) => handleEditCourse(course, e)}
-                              className="p-2 bg-purple-100 hover:bg-purple-200 text-purple-600 rounded-lg transition-all"
+                              className="p-2 bg-yellow-100 hover:bg-amber-200 text-yellow-600 rounded-lg transition-all"
                               title="Edit Course"
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1559,45 +1595,14 @@ student2@example.com,IT-PROG1-2024,email,
               </div>
               
               {/* Pagination Controls */}
-              <div className="bg-white rounded-b-xl border-t border-gray-200 px-6 py-4 flex items-center justify-between">
-                <div className="text-sm text-gray-700">
-                  Showing <span className="font-semibold">{((currentPage - 1) * pageSize) + 1}</span> to{' '}
-                  <span className="font-semibold">{Math.min(currentPage * pageSize, totalCourses)}</span> of{' '}
-                  <span className="font-semibold">{totalCourses}</span> courses
-                </div>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => setCurrentPage(1)}
-                    disabled={currentPage === 1}
-                    className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    First
-                  </button>
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1}
-                    className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Previous
-                  </button>
-                  <span className="px-4 py-2 text-sm font-medium text-gray-700">
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage >= totalPages}
-                    className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Next
-                  </button>
-                  <button
-                    onClick={() => setCurrentPage(totalPages)}
-                    disabled={currentPage >= totalPages}
-                    className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Last
-                  </button>
-                </div>
+              <div className="bg-white rounded-b-xl border-t border-gray-200 px-6 py-4">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={totalCourses}
+                  onPageChange={setCurrentPage}
+                  itemLabel="courses"
+                />
               </div>
             </div>
           </>
@@ -1614,7 +1619,7 @@ student2@example.com,IT-PROG1-2024,email,
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowQuickBulkEnrollModal(true)}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-all flex items-center gap-2"
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all flex items-center gap-2"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
@@ -1622,17 +1627,8 @@ student2@example.com,IT-PROG1-2024,email,
                   Quick Bulk Enroll
                 </button>
                 <button
-                  onClick={() => setShowBulkEnrollModal(true)}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-all flex items-center gap-2"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-                  </svg>
-                  CSV Bulk Enroll
-                </button>
-                <button
                   onClick={handleOpenCreateSectionModal}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all flex items-center gap-2"
+                  className="px-4 py-2 bg-yellow-600 hover:bg-amber-700 text-white rounded-lg font-semibold transition-all flex items-center gap-2"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
@@ -1641,7 +1637,7 @@ student2@example.com,IT-PROG1-2024,email,
                 </button>
                 <button
                   onClick={loadSections}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all"
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all"
                 >
                   🔄 Refresh
                 </button>
@@ -1649,30 +1645,78 @@ student2@example.com,IT-PROG1-2024,email,
             </div>
 
             {/* Filters */}
-            <div className="mb-6 grid md:grid-cols-5 gap-4">
+            <div className="mb-6 grid md:grid-cols-7 gap-4">
               <input
                 type="text"
                 placeholder="🔍 Search sections..."
                 value={sectionSearchTerm}
                 onChange={(e) => setSectionSearchTerm(e.target.value)}
-                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-red-500"
               />
               
               <select
+                value={sectionPeriodFilter}
+                onChange={(e) => setSectionPeriodFilter(e.target.value)}
+                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-yellow-500"
+                title="Filter sections by evaluation period"
+              >
+                <option value="all">All Periods</option>
+                {evaluationPeriods.map(period => (
+                  <option key={period.id} value={period.id}>
+                    {period.name} ({period.status})
+                  </option>
+                ))}
+              </select>
+              
+              <select
                 value={sectionProgramFilter}
-                onChange={(e) => setSectionProgramFilter(e.target.value)}
-                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                onChange={(e) => {
+                  setSectionProgramFilter(e.target.value)
+                  setSectionProgramSectionFilter('all') // Reset program section when program changes
+                }}
+                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-red-500"
               >
                 <option value="all">All Programs</option>
                 {apiData?.programs && apiData.programs.map(prog => (
                   <option key={prog.id} value={prog.code}>{prog.code}</option>
                 ))}
               </select>
+              
+              <select
+                value={sectionProgramSectionFilter}
+                onChange={(e) => setSectionProgramSectionFilter(e.target.value)}
+                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-red-500"
+                disabled={sectionProgramFilter === 'all'}
+                title={sectionProgramFilter === 'all' ? 'Please select a program first' : 'Filter by program section'}
+              >
+                <option value="all">{sectionProgramFilter === 'all' ? 'Select a program first...' : 'All Sections'}</option>
+                {sectionProgramFilter !== 'all' && programSections
+                  .filter(ps => {
+                    const psProgram = ps.programCode || ps.program_code || ps.programName || ps.program_name || ''
+                    return psProgram.toLowerCase().includes(sectionProgramFilter.toLowerCase())
+                  })
+                  .map(ps => {
+                    // Handle both camelCase and snake_case field names
+                    const name = ps.sectionName || ps.section_name || ps.name || 'Unnamed Section'
+                    const prog = ps.programCode || ps.program_code || ps.programName || ps.program_name || ''
+                    const year = ps.yearLevel || ps.year_level || ps.year || ''
+                    const sem = ps.semester || ''
+                    const schoolYear = ps.schoolYear || ps.school_year || ''
+                    
+                    // Only show if we have meaningful data
+                    if (!name || name === 'Unnamed Section') return null
+                    
+                    return (
+                      <option key={ps.id} value={ps.id}>
+                        {name} {prog ? `- ${prog}` : ''} {year ? `(Yr ${year}` : '(Yr ?'}{sem ? `, Sem ${sem}` : ''}{schoolYear ? `, ${schoolYear}` : ''})</option>
+                    )
+                  }).filter(Boolean)}
+              </select>
 
               <select
                 value={sectionYearFilter}
                 onChange={(e) => setSectionYearFilter(e.target.value)}
-                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-red-500"
               >
                 <option value="all">All Year Levels</option>
                 <option value="1">1st Year</option>
@@ -1684,7 +1728,7 @@ student2@example.com,IT-PROG1-2024,email,
               <select
                 value={sectionSemesterFilter}
                 onChange={(e) => setSectionSemesterFilter(e.target.value)}
-                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-red-500"
               >
                 <option value="all">All Semesters</option>
                 <option value="1">First Semester</option>
@@ -1706,7 +1750,7 @@ student2@example.com,IT-PROG1-2024,email,
 
             {/* Bulk Actions Bar */}
             {selectedSections.length > 0 && (
-              <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-4 mb-4 shadow-lg">
+              <div className="bg-gradient-to-r from-red-800 to-amber-700 rounded-xl p-4 mb-4 shadow-lg">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
                     <span className="text-white font-semibold">
@@ -1720,26 +1764,6 @@ student2@example.com,IT-PROG1-2024,email,
                     </button>
                   </div>
                   <div className="flex space-x-2">
-                    <button
-                      onClick={handleBulkActivateSections}
-                      disabled={submitting}
-                      className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-semibold transition-all disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                      </svg>
-                      <span>Activate</span>
-                    </button>
-                    <button
-                      onClick={handleBulkDeactivateSections}
-                      disabled={submitting}
-                      className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-semibold transition-all disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
-                      </svg>
-                      <span>Deactivate</span>
-                    </button>
                     <button
                       onClick={handleBulkDeleteSections}
                       disabled={submitting}
@@ -1777,7 +1801,7 @@ student2@example.com,IT-PROG1-2024,email,
                     type="checkbox"
                     checked={paginatedSections.length > 0 && selectedSections.length === paginatedSections.length}
                     onChange={handleSelectAllSections}
-                    className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                    className="w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-indigo-500"
                   />
                   <label className="text-sm font-semibold text-gray-700 cursor-pointer" onClick={handleSelectAllSections}>
                     Select All ({paginatedSections.length} on this page)
@@ -1790,7 +1814,7 @@ student2@example.com,IT-PROG1-2024,email,
                     key={section.id}
                     className={`border-2 rounded-xl p-4 hover:shadow-lg transition-all relative group ${
                       selectedSections.includes(section.id) 
-                        ? 'border-indigo-500 bg-indigo-50' 
+                        ? 'border-red-500 bg-red-50' 
                         : 'border-gray-200'
                     }`}
                   >
@@ -1801,7 +1825,7 @@ student2@example.com,IT-PROG1-2024,email,
                         checked={selectedSections.includes(section.id)}
                         onChange={() => handleSelectSection(section.id)}
                         onClick={(e) => e.stopPropagation()}
-                        className="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                        className="w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
                       />
                     </div>
 
@@ -1809,7 +1833,7 @@ student2@example.com,IT-PROG1-2024,email,
                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={(e) => handleEditSection(section, e)}
-                        className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+                        className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
                         title="Edit Section"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1838,7 +1862,7 @@ student2@example.com,IT-PROG1-2024,email,
                           <p className="text-sm text-gray-600">{section.subject_name}</p>
                           <p className="text-xs text-gray-500 mt-1">Section: {section.class_code || 'N/A'}</p>
                         </div>
-                        <span className="text-2xl font-bold text-indigo-600">
+                        <span className="text-2xl font-bold text-red-600">
                           {section.enrolled_count || 0}
                         </span>
                       </div>
@@ -1858,7 +1882,7 @@ student2@example.com,IT-PROG1-2024,email,
                   <button
                     onClick={() => setSectionCurrentPage(prev => Math.max(1, prev - 1))}
                     disabled={sectionCurrentPage === 1}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-all"
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-all"
                   >
                     ← Previous
                   </button>
@@ -1878,7 +1902,7 @@ student2@example.com,IT-PROG1-2024,email,
                             onClick={() => setSectionCurrentPage(pageNum)}
                             className={`px-4 py-2 rounded-lg font-semibold transition-all ${
                               sectionCurrentPage === pageNum
-                                ? 'bg-indigo-600 text-white'
+                                ? 'bg-red-600 text-white'
                                 : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
                             }`}
                           >
@@ -1898,7 +1922,7 @@ student2@example.com,IT-PROG1-2024,email,
                   <button
                     onClick={() => setSectionCurrentPage(prev => Math.min(sectionTotalPages, prev + 1))}
                     disabled={sectionCurrentPage === sectionTotalPages}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-all"
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-all"
                   >
                     Next →
                   </button>
@@ -1913,8 +1937,8 @@ student2@example.com,IT-PROG1-2024,email,
       {/* Add Course Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 p-6 border-b-4 border-indigo-800">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl">
+            <div className="bg-gradient-to-r from-red-800 to-red-900 p-6 border-b-4 border-indigo-800 flex-shrink-0">
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-white">➕ Add New Course</h2>
                 <button onClick={() => setShowAddModal(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
@@ -1925,7 +1949,7 @@ student2@example.com,IT-PROG1-2024,email,
               </div>
             </div>
             
-            <form onSubmit={handleAddCourse} className="p-6 space-y-4">
+            <form onSubmit={handleAddCourse} className="flex-1 overflow-y-auto p-6 space-y-4">
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Course Name *</label>
@@ -2032,7 +2056,7 @@ student2@example.com,IT-PROG1-2024,email,
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                   disabled={submitting}
                 >
                   {submitting ? (
@@ -2053,8 +2077,8 @@ student2@example.com,IT-PROG1-2024,email,
       {/* Edit Course Modal */}
       {showEditModal && selectedCourse && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="bg-gradient-to-r from-purple-600 to-purple-700 p-6 border-b-4 border-purple-800">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl">
+            <div className="bg-gradient-to-r from-yellow-600 to-amber-700 p-6 border-b-4 border-yellow-800 flex-shrink-0">
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-white">✏️ Edit Course</h2>
                 <button onClick={() => { setShowEditModal(false); setSelectedCourse(null); }} className="w-10 h-10 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
@@ -2065,7 +2089,7 @@ student2@example.com,IT-PROG1-2024,email,
               </div>
             </div>
             
-            <form onSubmit={handleUpdateCourse} className="p-6 space-y-4">
+            <form onSubmit={handleUpdateCourse} className="flex-1 overflow-y-auto p-6 space-y-4">
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Course Name *</label>
@@ -2197,7 +2221,7 @@ student2@example.com,IT-PROG1-2024,email,
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  className="flex-1 px-6 py-3 bg-yellow-600 hover:bg-amber-700 text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                   disabled={submitting}
                 >
                   {submitting ? (
@@ -2219,7 +2243,7 @@ student2@example.com,IT-PROG1-2024,email,
       {showBulkImportModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="bg-gradient-to-r from-green-600 to-green-700 p-6 border-b-4 border-green-800">
+            <div className="bg-gradient-to-r from-red-700 to-red-900 p-6 border-b-4 border-yellow-800">
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-white">📤 Bulk Import Courses</h2>
                 <button onClick={() => setShowBulkImportModal(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
@@ -2231,9 +2255,9 @@ student2@example.com,IT-PROG1-2024,email,
             </div>
             
             <div className="p-6 space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-sm text-blue-900 font-semibold mb-2">📋 CSV Format Requirements:</p>
-                <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+              <div className="bg-red-50 border border-yellow-200 rounded-lg p-4">
+                <p className="text-sm text-red-900 font-semibold mb-2">📋 CSV Format Requirements:</p>
+                <ul className="text-sm text-red-800 space-y-1 list-disc list-inside">
                   <li>Headers: name, classCode, instructor, program, yearLevel, semester, academicYear</li>
                   <li>Year level must be 1-4</li>
                   <li>Program must match existing programs</li>
@@ -2246,7 +2270,7 @@ student2@example.com,IT-PROG1-2024,email,
                   type="file"
                   accept=".csv"
                   onChange={handleFileUpload}
-                  className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:border-green-500 transition-all"
+                  className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:border-yellow-500 transition-all"
                 />
               </div>
 
@@ -2264,8 +2288,8 @@ student2@example.com,IT-PROG1-2024,email,
 
               {importPreview.length > 0 && (
                 <>
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <p className="text-sm text-green-900 font-semibold">✅ Preview: {importPreview.length} courses ready to import</p>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <p className="text-sm text-yellow-900 font-semibold">✅ Preview: {importPreview.length} courses ready to import</p>
                   </div>
 
                   <div className="border-2 border-gray-200 rounded-lg overflow-hidden">
@@ -2305,7 +2329,7 @@ student2@example.com,IT-PROG1-2024,email,
                 <button
                   onClick={handleBulkImport}
                   disabled={importPreview.length === 0 || submitting}
-                  className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center"
+                  className="flex-1 px-6 py-3 bg-yellow-600 hover:bg-amber-700 text-white rounded-lg font-semibold transition-all disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center"
                 >
                   {submitting ? (
                     <>
@@ -2326,7 +2350,7 @@ student2@example.com,IT-PROG1-2024,email,
       {showAssignInstructorModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl">
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6 border-b-4 border-blue-800">
+            <div className="bg-gradient-to-r from-red-800 to-red-900 p-6 border-b-4 border-yellow-800">
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-white">👨‍🏫 Assign Instructor</h2>
                 <button onClick={() => setShowAssignInstructorModal(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
@@ -2338,8 +2362,8 @@ student2@example.com,IT-PROG1-2024,email,
             </div>
             
             <div className="p-6 space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-sm text-blue-900">Assigning instructor to <strong>{selectedCourses.length} course(s)</strong></p>
+              <div className="bg-red-50 border border-yellow-200 rounded-lg p-4">
+                <p className="text-sm text-red-900">Assigning instructor to <strong>{selectedCourses.length} course(s)</strong></p>
               </div>
 
               <div>
@@ -2370,7 +2394,7 @@ student2@example.com,IT-PROG1-2024,email,
                 <button
                   onClick={handleAssignInstructor}
                   disabled={!formData.instructor || submitting}
-                  className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center"
+                  className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center"
                 >
                   {submitting ? (
                     <>
@@ -2391,13 +2415,13 @@ student2@example.com,IT-PROG1-2024,email,
       {showSectionModal && selectedSection && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 p-6 border-b-4 border-indigo-800 sticky top-0 z-10">
+            <div className="bg-gradient-to-r from-red-800 to-red-900 p-6 border-b-4 border-indigo-800 sticky top-0 z-10">
               <div className="flex justify-between items-center">
                 <div>
                   <h2 className="text-2xl font-bold text-white">
                     {selectedSection.subject_code} - {selectedSection.section_name}
                   </h2>
-                  <p className="text-indigo-100">{selectedSection.subject_name}</p>
+                  <p className="text-red-100">{selectedSection.subject_name}</p>
                 </div>
                 <button
                   onClick={() => setShowSectionModal(false)}
@@ -2415,7 +2439,7 @@ student2@example.com,IT-PROG1-2024,email,
                 {/* Enrolled Students */}
                 <div className="bg-gray-50 rounded-xl p-4">
                   <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
-                    <span className="bg-green-100 text-green-700 px-3 py-1 rounded-lg mr-2">
+                    <span className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-lg mr-2">
                       {enrolledStudents.length}
                     </span>
                     Enrolled Students
@@ -2449,10 +2473,10 @@ student2@example.com,IT-PROG1-2024,email,
                 </div>
 
                 {/* Available Students */}
-                <div className="bg-blue-50 rounded-xl p-4">
+                <div className="bg-red-50 rounded-xl p-4">
                   <div className="mb-4">
                     <h3 className="text-lg font-bold text-gray-900 mb-2 flex items-center">
-                      <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg mr-2">
+                      <span className="bg-red-100 text-red-700 px-3 py-1 rounded-lg mr-2">
                         {availableStudents.length} {availableStudents.length === 1 ? 'student' : 'students'}
                       </span>
                       Available to Enroll
@@ -2488,7 +2512,7 @@ student2@example.com,IT-PROG1-2024,email,
                                 setSelectedStudentIds(selectedStudentIds.filter(id => id !== student.id))
                               }
                             }}
-                            className="mr-3 w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                            className="mr-3 w-5 h-5 text-red-600 rounded focus:ring-2 focus:ring-blue-500"
                           />
                           <div className="flex-1">
                             <p className="font-semibold text-gray-900">
@@ -2502,7 +2526,7 @@ student2@example.com,IT-PROG1-2024,email,
                   <button
                     onClick={handleEnrollStudents}
                     disabled={selectedStudentIds.length === 0 || submitting}
-                    className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center mb-2"
+                    className="w-full px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center mb-2"
                   >
                     {submitting ? (
                       <>
@@ -2517,7 +2541,7 @@ student2@example.com,IT-PROG1-2024,email,
                   <button
                     onClick={openProgramSectionModal}
                     disabled={submitting}
-                    className="w-full px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-all disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="w-full px-4 py-3 bg-yellow-600 hover:bg-amber-700 text-white rounded-lg font-semibold transition-all disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
@@ -2535,13 +2559,13 @@ student2@example.com,IT-PROG1-2024,email,
       {showProgramSectionModal && selectedSection && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="bg-gradient-to-r from-purple-600 to-purple-700 p-6 border-b-4 border-purple-800">
+            <div className="bg-gradient-to-r from-yellow-600 to-amber-700 p-6 border-b-4 border-yellow-800">
               <div className="flex justify-between items-center">
                 <div>
                   <h2 className="text-2xl font-bold text-white">
                     📚 Enroll Program Section
                   </h2>
-                  <p className="text-purple-100">
+                  <p className="text-yellow-100">
                     Bulk enroll students from a program section into {selectedSection.class_code}
                   </p>
                 </div>
@@ -2557,8 +2581,8 @@ student2@example.com,IT-PROG1-2024,email,
             </div>
 
             <div className="p-6 space-y-4">
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                <p className="text-sm text-purple-900">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <p className="text-sm text-yellow-900">
                   <span className="font-semibold">💡 Tip:</span> Select a program section to enroll all its students at once.
                   Students already enrolled will be skipped automatically.
                 </p>
@@ -2566,7 +2590,7 @@ student2@example.com,IT-PROG1-2024,email,
 
               {loadingProgramSections ? (
                 <div className="text-center py-8">
-                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600"></div>
                   <p className="mt-2 text-gray-600">Loading program sections...</p>
                 </div>
               ) : programSections.length === 0 ? (
@@ -2583,7 +2607,7 @@ student2@example.com,IT-PROG1-2024,email,
                     <select
                       value={selectedProgramSectionId}
                       onChange={(e) => setSelectedProgramSectionId(e.target.value)}
-                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-yellow-500"
                     >
                       <option value="">Choose a program section...</option>
                       {programSections.map(section => (
@@ -2595,13 +2619,13 @@ student2@example.com,IT-PROG1-2024,email,
                   </div>
 
                   {selectedProgramSectionId && (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                       {(() => {
                         const section = programSections.find(ps => ps.id === parseInt(selectedProgramSectionId))
                         return section ? (
                           <div>
-                            <p className="font-semibold text-green-900">{section.sectionName}</p>
-                            <p className="text-sm text-green-700 mt-1">
+                            <p className="font-semibold text-yellow-900">{section.sectionName}</p>
+                            <p className="text-sm text-yellow-700 mt-1">
                               {section.programName} • {section.studentCount} student{section.studentCount !== 1 ? 's' : ''}
                             </p>
                           </div>
@@ -2623,7 +2647,7 @@ student2@example.com,IT-PROG1-2024,email,
                 <button
                   onClick={handleEnrollProgramSection}
                   disabled={!selectedProgramSectionId || submitting}
-                  className="flex-1 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-all disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center"
+                  className="flex-1 px-6 py-3 bg-yellow-600 hover:bg-amber-700 text-white rounded-lg font-semibold transition-all disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center"
                 >
                   {submitting ? (
                     <>
@@ -2649,7 +2673,7 @@ student2@example.com,IT-PROG1-2024,email,
       {showCreateSectionModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="bg-gradient-to-r from-green-600 to-green-700 p-6 border-b-4 border-green-800">
+            <div className="bg-gradient-to-r from-red-700 to-red-900 p-6 border-b-4 border-yellow-800">
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-white">➕ Create New Section</h2>
                 <button 
@@ -2680,7 +2704,7 @@ student2@example.com,IT-PROG1-2024,email,
                       course_id: ''
                     })
                   }}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-yellow-500"
                 >
                   <option value="">Select a program</option>
                   {apiData?.programs && apiData.programs.map(program => (
@@ -2707,7 +2731,7 @@ student2@example.com,IT-PROG1-2024,email,
                       course_id: ''
                     })
                   }}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-yellow-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 >
                   <option value="">Select year level</option>
                   <option value="1">1st Year</option>
@@ -2735,7 +2759,7 @@ student2@example.com,IT-PROG1-2024,email,
                       course_id: '' // Reset course selection
                     })
                   }}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-yellow-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 >
                   <option value="">Select semester</option>
                   <option value="1">First Semester</option>
@@ -2755,7 +2779,7 @@ student2@example.com,IT-PROG1-2024,email,
                   disabled={!sectionFormData.semester}
                   value={sectionFormData.course_id}
                   onChange={(e) => setSectionFormData({ ...sectionFormData, course_id: parseInt(e.target.value) })}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-yellow-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 >
                   <option value="">Select a course</option>
                   {filteredCoursesForSection.length === 0 && sectionFormData.semester && (
@@ -2784,7 +2808,7 @@ student2@example.com,IT-PROG1-2024,email,
                   placeholder="e.g., CS101-A, IT201-1"
                   value={sectionFormData.class_code}
                   onChange={(e) => setSectionFormData({ ...sectionFormData, class_code: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-yellow-500"
                 />
               </div>
 
@@ -2798,7 +2822,7 @@ student2@example.com,IT-PROG1-2024,email,
                     placeholder="2024-2025"
                     value={sectionFormData.academic_year}
                     onChange={(e) => setSectionFormData({ ...sectionFormData, academic_year: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-yellow-500"
                   />
                 </div>
 
@@ -2810,7 +2834,7 @@ student2@example.com,IT-PROG1-2024,email,
                     min="1"
                     value={sectionFormData.max_students}
                     onChange={(e) => setSectionFormData({ ...sectionFormData, max_students: parseInt(e.target.value) })}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-yellow-500"
                   />
                 </div>
               </div>
@@ -2826,7 +2850,7 @@ student2@example.com,IT-PROG1-2024,email,
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg font-semibold transition-all flex items-center gap-2"
+                  className="px-6 py-3 bg-yellow-600 hover:bg-amber-700 disabled:bg-gray-400 text-white rounded-lg font-semibold transition-all flex items-center gap-2"
                 >
                   {submitting ? (
                     <>
@@ -2852,7 +2876,7 @@ student2@example.com,IT-PROG1-2024,email,
       {showEditSectionModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6 border-b-4 border-blue-800">
+            <div className="bg-gradient-to-r from-red-800 to-red-900 p-6 border-b-4 border-yellow-800">
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-white">✏️ Edit Section</h2>
                 <button 
@@ -2876,7 +2900,7 @@ student2@example.com,IT-PROG1-2024,email,
                   placeholder="e.g., CS101-A, IT201-1"
                   value={sectionFormData.class_code}
                   onChange={(e) => setSectionFormData({ ...sectionFormData, class_code: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-yellow-500"
                 />
               </div>
 
@@ -2890,7 +2914,7 @@ student2@example.com,IT-PROG1-2024,email,
                     placeholder="2024-2025"
                     value={sectionFormData.academic_year}
                     onChange={(e) => setSectionFormData({ ...sectionFormData, academic_year: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-yellow-500"
                   />
                 </div>
 
@@ -2902,7 +2926,7 @@ student2@example.com,IT-PROG1-2024,email,
                     min="1"
                     value={sectionFormData.max_students}
                     onChange={(e) => setSectionFormData({ ...sectionFormData, max_students: parseInt(e.target.value) })}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-yellow-500"
                   />
                 </div>
               </div>
@@ -2918,7 +2942,7 @@ student2@example.com,IT-PROG1-2024,email,
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg font-semibold transition-all flex items-center gap-2"
+                  className="px-6 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white rounded-lg font-semibold transition-all flex items-center gap-2"
                 >
                   {submitting ? (
                     <>
@@ -2944,11 +2968,11 @@ student2@example.com,IT-PROG1-2024,email,
       {showBulkEnrollModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-purple-700 text-white p-6 rounded-t-2xl">
+            <div className="sticky top-0 bg-gradient-to-r from-yellow-600 to-amber-700 text-white p-6 rounded-t-2xl">
               <div className="flex justify-between items-center">
                 <div>
                   <h2 className="text-2xl font-bold">📤 Bulk Student Enrollment</h2>
-                  <p className="text-purple-100 mt-1">Enroll multiple students to sections via CSV upload</p>
+                  <p className="text-yellow-100 mt-1">Enroll multiple students to sections via CSV upload</p>
                 </div>
                 <button
                   onClick={() => {
@@ -2969,35 +2993,35 @@ student2@example.com,IT-PROG1-2024,email,
 
             <div className="p-6 space-y-6">
               {/* Template Download Section */}
-              <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
+              <div className="bg-red-50 border-2 border-yellow-200 rounded-xl p-4">
                 <div className="flex items-start gap-3">
-                  <svg className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-6 h-6 text-red-600 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                   </svg>
                   <div className="flex-1">
-                    <h3 className="font-semibold text-blue-900 mb-2">CSV Format Instructions</h3>
-                    <p className="text-sm text-blue-800 mb-3">
+                    <h3 className="font-semibold text-red-900 mb-2">CSV Format Instructions</h3>
+                    <p className="text-sm text-red-800 mb-3">
                       Download the template to see the required format. Your CSV must include these columns:
                     </p>
                     <div className="grid md:grid-cols-2 gap-2 text-sm mb-3">
                       <div>
                         <span className="font-semibold text-red-600">Required:</span>
-                        <ul className="list-disc list-inside text-blue-800 ml-2">
-                          <li><code className="bg-blue-100 px-1 rounded">student_identifier</code> - Email or student number</li>
-                          <li><code className="bg-blue-100 px-1 rounded">section_identifier</code> - Class code or section ID</li>
+                        <ul className="list-disc list-inside text-red-800 ml-2">
+                          <li><code className="bg-red-100 px-1 rounded">student_identifier</code> - Email or student number</li>
+                          <li><code className="bg-red-100 px-1 rounded">section_identifier</code> - Class code or section ID</li>
                         </ul>
                       </div>
                       <div>
                         <span className="font-semibold text-gray-600">Optional:</span>
-                        <ul className="list-disc list-inside text-blue-800 ml-2">
-                          <li><code className="bg-blue-100 px-1 rounded">identifier_type</code> - 'email' or 'student_number'</li>
-                          <li><code className="bg-blue-100 px-1 rounded">notes</code> - Any enrollment notes</li>
+                        <ul className="list-disc list-inside text-red-800 ml-2">
+                          <li><code className="bg-red-100 px-1 rounded">identifier_type</code> - 'email' or 'student_number'</li>
+                          <li><code className="bg-red-100 px-1 rounded">notes</code> - Any enrollment notes</li>
                         </ul>
                       </div>
                     </div>
                     <button
                       onClick={downloadEnrollmentCSVTemplate}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all flex items-center gap-2"
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all flex items-center gap-2"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
@@ -3013,7 +3037,7 @@ student2@example.com,IT-PROG1-2024,email,
                 <label className="block text-sm font-bold text-gray-700 mb-2">
                   Upload Enrollment CSV File *
                 </label>
-                <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-purple-500 transition-all bg-gray-50">
+                <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-yellow-500 transition-all bg-gray-50">
                   <input
                     type="file"
                     accept=".csv"
@@ -3076,10 +3100,10 @@ student2@example.com,IT-PROG1-2024,email,
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {bulkEnrollPreview.map((enrollment, idx) => (
-                          <tr key={idx} className={enrollment.valid ? 'bg-green-50' : 'bg-red-50'}>
+                          <tr key={idx} className={enrollment.valid ? 'bg-yellow-50' : 'bg-red-50'}>
                             <td className="px-4 py-3 whitespace-nowrap">
                               {enrollment.valid ? (
-                                <span className="px-2 py-1 text-xs font-semibold text-green-800 bg-green-200 rounded-full">✓ Valid</span>
+                                <span className="px-2 py-1 text-xs font-semibold text-yellow-800 bg-yellow-200 rounded-full">✓ Valid</span>
                               ) : (
                                 <span className="px-2 py-1 text-xs font-semibold text-red-800 bg-red-200 rounded-full">✗ Invalid</span>
                               )}
@@ -3098,20 +3122,20 @@ student2@example.com,IT-PROG1-2024,email,
 
               {/* Progress Bar */}
               {enrollmentProgress.status === 'processing' && (
-                <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
+                <div className="bg-red-50 border-2 border-yellow-200 rounded-xl p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-semibold text-blue-900">Processing enrollments...</span>
-                    <span className="text-sm font-semibold text-blue-900">
+                    <span className="text-sm font-semibold text-red-900">Processing enrollments...</span>
+                    <span className="text-sm font-semibold text-red-900">
                       {enrollmentProgress.current} / {enrollmentProgress.total}
                     </span>
                   </div>
-                  <div className="w-full bg-blue-200 rounded-full h-3">
+                  <div className="w-full bg-red-200 rounded-full h-3">
                     <div
-                      className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                      className="bg-red-600 h-3 rounded-full transition-all duration-300"
                       style={{ width: `${(enrollmentProgress.current / enrollmentProgress.total) * 100}%` }}
                     ></div>
                   </div>
-                  <p className="text-xs text-blue-700 mt-2">
+                  <p className="text-xs text-red-700 mt-2">
                     {Math.round((enrollmentProgress.current / enrollmentProgress.total) * 100)}% complete
                   </p>
                 </div>
@@ -3137,7 +3161,7 @@ student2@example.com,IT-PROG1-2024,email,
                   type="button"
                   onClick={handleBulkEnroll}
                   disabled={!bulkEnrollFile || enrollmentProgress.status === 'processing'}
-                  className="px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white rounded-lg font-semibold transition-all flex items-center gap-2"
+                  className="px-6 py-3 bg-yellow-600 hover:bg-amber-700 disabled:bg-gray-400 text-white rounded-lg font-semibold transition-all flex items-center gap-2"
                 >
                   {enrollmentProgress.status === 'processing' ? (
                     <>
@@ -3163,11 +3187,11 @@ student2@example.com,IT-PROG1-2024,email,
       {showQuickBulkEnrollModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full my-8">
-            <div className="sticky top-0 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white p-6 rounded-t-2xl">
+            <div className="sticky top-0 bg-gradient-to-r from-red-800 to-red-900 text-white p-6 rounded-t-2xl">
               <div className="flex justify-between items-center">
                 <div>
                   <h2 className="text-2xl font-bold">⚡ Quick Bulk Section Creation</h2>
-                  <p className="text-indigo-100 mt-1">Create sections for all courses in a program/year/semester</p>
+                  <p className="text-red-100 mt-1">Create sections for all courses in a program/year/semester</p>
                 </div>
                 <button
                   onClick={() => {
@@ -3187,14 +3211,14 @@ student2@example.com,IT-PROG1-2024,email,
 
             <div className="p-6 space-y-6">
               {/* Info Box */}
-              <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
+              <div className="bg-red-50 border-2 border-yellow-200 rounded-xl p-4">
                 <div className="flex items-start gap-3">
-                  <svg className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-6 h-6 text-red-600 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                   </svg>
                   <div className="flex-1">
-                    <h3 className="font-semibold text-blue-900 mb-2">How it works</h3>
-                    <p className="text-sm text-blue-800">
+                    <h3 className="font-semibold text-red-900 mb-2">How it works</h3>
+                    <p className="text-sm text-red-800">
                       Select a program, year level, and semester. The system will find all courses matching those criteria 
                       and create class sections for each course based on a template section you select.
                     </p>
@@ -3210,7 +3234,7 @@ student2@example.com,IT-PROG1-2024,email,
                     required
                     value={quickBulkFormData.program_id}
                     onChange={(e) => handleQuickBulkFormChange('program_id', e.target.value)}
-                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-red-500"
                   >
                     <option value="">Select program...</option>
                     {apiData?.programs?.map(program => (
@@ -3225,7 +3249,7 @@ student2@example.com,IT-PROG1-2024,email,
                     required
                     value={quickBulkFormData.year_level}
                     onChange={(e) => handleQuickBulkFormChange('year_level', e.target.value)}
-                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-red-500"
                   >
                     <option value="">Select year...</option>
                     <option value="1">1st Year</option>
@@ -3241,7 +3265,7 @@ student2@example.com,IT-PROG1-2024,email,
                     required
                     value={quickBulkFormData.semester}
                     onChange={(e) => handleQuickBulkFormChange('semester', e.target.value)}
-                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-red-500"
                   >
                     <option value="">Select semester...</option>
                     <option value="1">1st Semester</option>
@@ -3256,17 +3280,27 @@ student2@example.com,IT-PROG1-2024,email,
                     required
                     value={quickBulkFormData.program_section_id}
                     onChange={(e) => handleQuickBulkFormChange('program_section_id', e.target.value)}
-                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-red-500"
+                    disabled={!quickBulkFormData.program_id}
                   >
-                    <option value="">Select program section...</option>
-                    {availableProgramSectionsForBulk.map(section => (
-                      <option key={section.id} value={section.id}>
-                        {section.sectionName} ({section.studentCount} students)
-                      </option>
-                    ))}
+                    <option value="">{!quickBulkFormData.program_id ? 'Select program first...' : 'Select program section...'}</option>
+                    {availableProgramSectionsForBulk.map(section => {
+                      const name = section.sectionName || section.section_name || 'Unnamed'
+                      const prog = section.programCode || section.program_code || ''
+                      const year = section.yearLevel || section.year_level || ''
+                      const sem = section.semester || ''
+                      const count = section.studentCount || 0
+                      return (
+                        <option key={section.id} value={section.id}>
+                          {name} - {prog} (Yr {year}, Sem {sem}) • {count} students
+                        </option>
+                      )
+                    })}
                   </select>
                   <p className="text-xs text-gray-500 mt-1">
-                    Class sections will be created for this student group (e.g., BSCS-DS-3A)
+                    {availableProgramSectionsForBulk.length === 0 && quickBulkFormData.program_id 
+                      ? 'No program sections found for selected criteria'
+                      : 'Class sections will be created for this student group'}
                   </p>
                 </div>
               </div>
@@ -3278,8 +3312,8 @@ student2@example.com,IT-PROG1-2024,email,
                   <p className="text-gray-600">Loading matching courses...</p>
                 </div>
               ) : matchingCourses.length > 0 ? (
-                <div className="bg-green-50 border-2 border-green-200 rounded-xl p-4">
-                  <h3 className="font-semibold text-green-900 mb-3">
+                <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-4">
+                  <h3 className="font-semibold text-yellow-900 mb-3">
                     ✅ Found {matchingCourses.length} matching course(s)
                   </h3>
                   <div className="max-h-48 overflow-y-auto space-y-2">
@@ -3294,7 +3328,7 @@ student2@example.com,IT-PROG1-2024,email,
                     ))}
                   </div>
                   {quickBulkFormData.program_section_id && (
-                    <p className="text-sm text-green-700 mt-3">
+                    <p className="text-sm text-yellow-700 mt-3">
                       📝 Sections will be named: [SUBJECT_CODE]-{availableProgramSectionsForBulk.find(s => s.id === parseInt(quickBulkFormData.program_section_id))?.sectionName}
                     </p>
                   )}
@@ -3324,7 +3358,7 @@ student2@example.com,IT-PROG1-2024,email,
                   type="button"
                   onClick={handleQuickBulkEnroll}
                   disabled={!quickBulkFormData.program_section_id || matchingCourses.length === 0 || submitting}
-                  className="flex-1 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
+                  className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
                 >
                   {submitting ? (
                     <>
@@ -3348,3 +3382,7 @@ student2@example.com,IT-PROG1-2024,email,
     </div>
   )
 }
+
+
+
+

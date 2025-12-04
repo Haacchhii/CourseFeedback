@@ -50,13 +50,13 @@ class Course(Base):
     )
 
 class User(Base):
-    """System users - student, instructor, secretary, admin"""
+    """System users - student, secretary, admin, department_head"""
     __tablename__ = "users"
     
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
-    role = Column(String(50), nullable=False)  # student, instructor, secretary, admin
+    role = Column(String(50), nullable=False)  # student, secretary, admin, department_head, staff
     first_name = Column(String(100), nullable=True)
     last_name = Column(String(100), nullable=True)
     department = Column(String(100), nullable=True)
@@ -66,7 +66,6 @@ class User(Base):
     
     # Relationships
     students = relationship("Student", back_populates="user")
-    class_sections = relationship("ClassSection", back_populates="instructor")
     
     # Indexes
     __table_args__ = (
@@ -100,12 +99,11 @@ class Student(Base):
     )
 
 class ClassSection(Base):
-    """Course sections taught by instructors"""
+    """Course sections for evaluation - no instructor tracking needed"""
     __tablename__ = "class_sections"
     
     id = Column(Integer, primary_key=True, index=True)
     course_id = Column(Integer, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
-    instructor_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     class_code = Column(String(50), unique=True, nullable=False)
     semester = Column(String(20), nullable=False)
     academic_year = Column(String(20), nullable=False)  # e.g., '2024-2025'
@@ -114,14 +112,12 @@ class ClassSection(Base):
     
     # Relationships
     course = relationship("Course", back_populates="class_sections")
-    instructor = relationship("User", back_populates="class_sections")
     enrollments = relationship("Enrollment", back_populates="class_section")
     evaluations = relationship("Evaluation", back_populates="class_section")
     
     # Indexes
     __table_args__ = (
         Index('idx_class_sections_course', 'course_id'),
-        Index('idx_class_sections_instructor', 'instructor_id'),
         Index('idx_class_sections_academic_year', 'academic_year'),
     )
 

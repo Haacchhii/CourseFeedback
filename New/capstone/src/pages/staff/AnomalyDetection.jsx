@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { isAdmin, isStaffMember } from '../../utils/roleUtils'
 import { useAuth } from '../../context/AuthContext'
-import { adminAPI, deptHeadAPI, secretaryAPI, instructorAPI } from '../../services/api'
+import { adminAPI, deptHeadAPI, secretaryAPI } from '../../services/api'
 
 export default function AnomalyDetection() {
   const navigate = useNavigate()
@@ -26,6 +26,11 @@ export default function AnomalyDetection() {
   const [yearLevels, setYearLevels] = useState([])
   const [courses, setCourses] = useState([])
 
+  // Evaluation Period states
+  const [evaluationPeriods, setEvaluationPeriods] = useState([])
+  const [selectedPeriod, setSelectedPeriod] = useState(null)
+  const [activePeriod, setActivePeriod] = useState(null)
+
   // Redirect unauthorized users
   useEffect(() => {
     if (!currentUser) {
@@ -34,7 +39,7 @@ export default function AnomalyDetection() {
     }
     
     if (currentUser.role === 'student') {
-      navigate('/student-evaluation')
+      navigate('/student/courses')
       return
     }
     
@@ -50,37 +55,42 @@ export default function AnomalyDetection() {
       if (!currentUser) return
       
       try {
-        let programsRes, yearLevelsRes, coursesRes
+        let programsRes, yearLevelsRes, coursesRes, periodsRes
         
         if (isAdmin(currentUser)) {
-          [programsRes, yearLevelsRes, coursesRes] = await Promise.all([
+          [programsRes, yearLevelsRes, coursesRes, periodsRes] = await Promise.all([
             adminAPI.getPrograms(),
             Promise.resolve({ data: [{ id: 1, year_level: 1 }, { id: 2, year_level: 2 }, { id: 3, year_level: 3 }, { id: 4, year_level: 4 }] }),
-            adminAPI.getCourses()
+            adminAPI.getCourses(),
+            adminAPI.getEvaluationPeriods()
           ])
         } else if (currentUser.role === 'secretary') {
-          [programsRes, yearLevelsRes, coursesRes] = await Promise.all([
+          [programsRes, yearLevelsRes, coursesRes, periodsRes] = await Promise.all([
             secretaryAPI.getPrograms(),
             secretaryAPI.getYearLevels(),
-            secretaryAPI.getCourses()
+            secretaryAPI.getCourses(),
+            secretaryAPI.getEvaluationPeriods()
           ])
         } else if (currentUser.role === 'department_head') {
-          [programsRes, yearLevelsRes, coursesRes] = await Promise.all([
+          [programsRes, yearLevelsRes, coursesRes, periodsRes] = await Promise.all([
             deptHeadAPI.getPrograms(),
             deptHeadAPI.getYearLevels(),
-            deptHeadAPI.getCourses()
-          ])
-        } else if (currentUser.role === 'instructor') {
-          [programsRes, yearLevelsRes, coursesRes] = await Promise.all([
-            instructorAPI.getPrograms(),
-            instructorAPI.getYearLevels(),
-            instructorAPI.getCourses()
+            deptHeadAPI.getCourses(),
+            deptHeadAPI.getEvaluationPeriods()
           ])
         }
         
         if (programsRes?.data) setPrograms(programsRes.data)
         if (yearLevelsRes?.data) setYearLevels(yearLevelsRes.data)
         if (coursesRes?.data) setCourses(coursesRes.data)
+        if (periodsRes?.data) {
+          setEvaluationPeriods(periodsRes.data)
+          const active = periodsRes.data.find(p => p.status === 'active' || p.status === 'Active')
+          if (active) {
+            setActivePeriod(active.id)
+            setSelectedPeriod(active.id)
+          }
+        }
       } catch (err) {
         console.error('Error fetching filter options:', err)
       }
@@ -93,20 +103,22 @@ export default function AnomalyDetection() {
   useEffect(() => {
     const fetchAnomalies = async () => {
       if (!currentUser) return
+      if (!selectedPeriod && !activePeriod) return
       
       try {
         setLoading(true)
+        const params = {}
+        if (selectedPeriod) params.period_id = selectedPeriod
+        
         let data
         
         // Use appropriate API based on user role
         if (isAdmin(currentUser)) {
-          data = await adminAPI.getAnomalies()
+          data = await adminAPI.getAnomalies(params)
         } else if (currentUser.role === 'secretary') {
-          data = await secretaryAPI.getAnomalies()
+          data = await secretaryAPI.getAnomalies(params)
         } else if (currentUser.role === 'department_head') {
-          data = await deptHeadAPI.getAnomalies()
-        } else if (currentUser.role === 'instructor') {
-          data = await instructorAPI.getAnomalies()
+          data = await deptHeadAPI.getAnomalies(params)
         } else {
           throw new Error(`Unsupported role: ${currentUser.role}`)
         }
@@ -123,7 +135,7 @@ export default function AnomalyDetection() {
     }
     
     fetchAnomalies()
-  }, [currentUser])
+  }, [currentUser, selectedPeriod])
 
   // Enhanced filter logic
   const filteredAnomalies = useMemo(() => {
@@ -242,7 +254,7 @@ export default function AnomalyDetection() {
     <div className="min-h-screen lpu-background">
       {/* Enhanced LPU Header */}
       <header className="lpu-header">
-        <div className="container mx-auto px-6 py-6">
+        <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-8 lg:py-10 max-w-screen-2xl">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-4">
               <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center shadow-md">
@@ -286,14 +298,27 @@ export default function AnomalyDetection() {
         </div>
       </header>
 
-      <div className="container mx-auto px-6 py-8">
+      <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-10 lg:py-12 max-w-screen-2xl">
+        
+        {/* Show warning if no active period and no selection */}
+        {!activePeriod && !selectedPeriod ? (
+          <div className="lpu-card text-center py-16 mb-10">
+            <svg className="w-20 h-20 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <h3 className="text-xl font-semibold text-gray-700 mb-2">No Active Evaluation Period</h3>
+            <p className="text-gray-500 mb-4">There is currently no active evaluation period.</p>
+            <p className="text-gray-500">Please contact the administrator to activate an evaluation period, or select a specific period from the filter below.</p>
+          </div>
+        ) : (
+          <>
         {/* Enhanced Anomaly Statistics */}
-        <div className="grid md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200">
+        <div className="grid md:grid-cols-4 gap-5 lg:gap-6 mb-12">
+          <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-white/90 mb-2">Total Anomalies</h3>
-                <p className="text-3xl font-bold text-white">{anomalyStats.total}</p>
+                <p className="text-4xl lg:text-5xl font-bold text-white">{anomalyStats.total}</p>
               </div>
               <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
                 <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -303,11 +328,11 @@ export default function AnomalyDetection() {
             </div>
           </div>
           
-          <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200">
+          <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-white/90 mb-2">High Severity</h3>
-                <p className="text-3xl font-bold text-white">{anomalyStats.high}</p>
+                <p className="text-4xl lg:text-5xl font-bold text-white">{anomalyStats.high}</p>
               </div>
               <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
                 <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -317,11 +342,11 @@ export default function AnomalyDetection() {
             </div>
           </div>
           
-          <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200">
+          <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-white/90 mb-2">Medium Severity</h3>
-                <p className="text-3xl font-bold text-white">{anomalyStats.medium}</p>
+                <p className="text-4xl lg:text-5xl font-bold text-white">{anomalyStats.medium}</p>
               </div>
               <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
                 <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -331,11 +356,11 @@ export default function AnomalyDetection() {
             </div>
           </div>
           
-          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200">
+          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-white/90 mb-2">Low Severity</h3>
-                <p className="text-3xl font-bold text-white">{anomalyStats.low}</p>
+                <p className="text-4xl lg:text-5xl font-bold text-white">{anomalyStats.low}</p>
               </div>
               <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
                 <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -349,7 +374,7 @@ export default function AnomalyDetection() {
         {/* Enhanced Severity Distribution Chart */}
         <div className="lpu-card mb-8">
           <div className="border-b border-gray-200 pb-4 mb-6">
-            <h2 className="text-xl font-bold text-[#7a0000] flex items-center">
+            <h2 className="text-2xl font-bold text-[#7a0000] flex items-center">
               <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2-2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
               </svg>
@@ -390,7 +415,7 @@ export default function AnomalyDetection() {
         {/* Enhanced Filter and Search */}
         <div className="lpu-card mb-8 p-8">
           <div className="border-b border-gray-200 pb-4 mb-6">
-            <h2 className="text-lg font-semibold text-[#7a0000] flex items-center">
+            <h2 className="text-2xl font-semibold text-[#7a0000] flex items-center">
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.414A1 1 0 013 6.707V4z"></path>
               </svg>
@@ -401,8 +426,24 @@ export default function AnomalyDetection() {
           
           {/* Enhanced Multi-Row Filters */}
           <div className="space-y-4">
-            {/* Row 1: Search and Severity */}
-            <div className="grid md:grid-cols-2 gap-4">
+            {/* Row 1: Evaluation Period, Search, and Severity */}
+            <div className="grid md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">📅 Evaluation Period</label>
+                <select
+                  value={selectedPeriod || ''}
+                  onChange={(e) => setSelectedPeriod(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent bg-white transition-all duration-200"
+                >
+                  <option value="">Select Period</option>
+                  {evaluationPeriods.map((period) => (
+                    <option key={period.id} value={period.id}>
+                      {period.name} {period.status === 'active' || period.status === 'Active' ? '(Active)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">🔍 Search Anomalies</label>
                 <div className="relative">
@@ -557,7 +598,7 @@ export default function AnomalyDetection() {
           <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-[#7a0000]/5 to-[#ffd700]/5">
             <div className="flex justify-between items-center">
               <div>
-                <h2 className="text-xl font-bold text-[#7a0000] flex items-center">
+                <h2 className="text-2xl font-bold text-[#7a0000] flex items-center">
                   <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                   </svg>
@@ -692,12 +733,12 @@ export default function AnomalyDetection() {
                       {Object.entries(anomaly.ratings).map(([criterion, rating]) => (
                         <div key={criterion} className="bg-white p-3 rounded-lg border shadow-sm">
                           <div className="text-xs text-gray-600 font-medium mb-1">{criterion}</div>
-                          <div className="text-lg font-bold text-blue-800">{rating}/5</div>
+                          <div className="text-lg font-bold text-blue-800">{parseFloat(rating).toFixed(2)}/4.0</div>
                           <div className="flex mt-1">
-                            {[...Array(5)].map((_, i) => (
+                            {[...Array(4)].map((_, i) => (
                               <svg 
                                 key={i} 
-                                className={`w-3 h-3 ${i < rating ? 'text-[#ffd700]' : 'text-gray-300'}`} 
+                                className={`w-3 h-3 ${i < Math.floor(rating) ? 'text-[#ffd700]' : 'text-gray-300'}`} 
                                 fill="currentColor" 
                                 viewBox="0 0 20 20"
                               >
@@ -747,6 +788,8 @@ export default function AnomalyDetection() {
             </div>
           </div>
         </div>
+        </>
+        )}
       </div>
     </div>
   )

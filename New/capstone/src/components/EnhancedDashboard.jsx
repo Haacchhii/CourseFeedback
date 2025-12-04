@@ -102,7 +102,7 @@ export default function EnhancedDashboard() {
     <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9]">
       {/* Enhanced LPU Header */}
       <header className="lpu-header">
-        <div className="container mx-auto px-6 py-6">
+        <div className="container mx-auto px-4 py-6">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-4">
               <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg">

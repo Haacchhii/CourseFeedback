@@ -111,41 +111,36 @@ export default function EmailNotifications() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Header */}
-      <header className="bg-gradient-to-r from-purple-600 to-purple-700 shadow-xl border-b-4 border-purple-800">
-        <div className="container mx-auto px-6 py-6">
+      <header className="lpu-header">
+        <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-10 lg:py-12 max-w-screen-2xl">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-4">
-              <button 
-                onClick={() => navigate('/admin/dashboard')} 
-                className="w-12 h-12 bg-white/20 hover:bg-white/30 rounded-xl flex items-center justify-center transition-all"
-              >
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
-                </svg>
-              </button>
+              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg">
+                <span className="text-[#7a0000] font-bold text-xl">LPU</span>
+              </div>
               <div>
-                <h1 className="text-3xl font-bold text-white">📧 Email Notifications</h1>
-                <p className="text-purple-100 text-sm mt-1">Send automated notifications to students</p>
+                <h1 className="lpu-header-title text-3xl">📧 Email Notifications</h1>
+                <p className="lpu-header-subtitle text-lg">Send automated notifications to students</p>
               </div>
             </div>
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-6 py-8">
+      <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-10 lg:py-12 max-w-screen-2xl">
         {/* Email Configuration Status */}
-        <div className={`mb-6 p-6 rounded-xl shadow-md ${
+        <div className={`mb-12 p-8 lg:p-10 rounded-card shadow-card ${
           isConfigured 
-            ? 'bg-green-50 border-2 border-green-200' 
+            ? 'bg-yellow-50 border-2 border-yellow-200' 
             : 'bg-yellow-50 border-2 border-yellow-200'
         }`}>
           <div className="flex items-start justify-between">
             <div>
-              <h3 className={`text-lg font-bold ${isConfigured ? 'text-green-900' : 'text-yellow-900'}`}>
+              <h3 className={`text-lg font-bold ${isConfigured ? 'text-yellow-900' : 'text-yellow-900'}`}>
                 {isConfigured ? '✅ Email Service Configured' : '⚠️ Email Service Not Configured'}
               </h3>
               {isConfigured ? (
-                <div className="mt-2 text-sm text-green-800">
+                <div className="mt-2 text-sm text-yellow-800">
                   <p><strong>SMTP Server:</strong> {emailConfig.smtp_server}:{emailConfig.smtp_port}</p>
                   <p><strong>From:</strong> {emailConfig.from_name} &lt;{emailConfig.from_email}&gt;</p>
                 </div>
@@ -167,12 +162,12 @@ SMTP_FROM_EMAIL=your-email@gmail.com`}
         </div>
 
         {/* Tabs */}
-        <div className="bg-white rounded-xl shadow-md mb-6 p-2 flex space-x-2">
+        <div className="bg-white rounded-card shadow-card hover:shadow-card-hover transition-all duration-250 mb-12 p-2 flex space-x-2">
           <button
             onClick={() => setActiveTab('send')}
             className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
               activeTab === 'send'
-                ? 'bg-purple-600 text-white shadow-lg'
+                ? 'bg-yellow-600 text-white shadow-lg'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
@@ -182,7 +177,7 @@ SMTP_FROM_EMAIL=your-email@gmail.com`}
             onClick={() => setActiveTab('history')}
             className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
               activeTab === 'history'
-                ? 'bg-purple-600 text-white shadow-lg'
+                ? 'bg-yellow-600 text-white shadow-lg'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
@@ -192,7 +187,7 @@ SMTP_FROM_EMAIL=your-email@gmail.com`}
 
         {/* Send Notifications Tab */}
         {activeTab === 'send' && (
-          <div className="bg-white rounded-xl shadow-md p-6">
+          <div className="bg-white rounded-card shadow-card p-6 lg:p-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Send Email Notifications</h2>
             
             <form onSubmit={handleSendNotification} className="space-y-6">
@@ -209,8 +204,6 @@ SMTP_FROM_EMAIL=your-email@gmail.com`}
                 >
                   <option value="test">🧪 Test Email</option>
                   <option value="period_start">🎯 Evaluation Period Started</option>
-                  <option value="reminder">⚠️ Evaluation Reminder</option>
-                  <option value="period_ending">🚨 Period Ending Soon</option>
                 </select>
               </div>
 
@@ -289,20 +282,7 @@ SMTP_FROM_EMAIL=your-email@gmail.com`}
                       <p>• Call-to-action: Link to student dashboard</p>
                     </>
                   )}
-                  {notificationType === 'reminder' && (
-                    <>
-                      <p>• Subject: <strong>⚠️ REMINDER: Pending Evaluations</strong></p>
-                      <p>• Content: List of pending courses, days remaining</p>
-                      <p>• Recipients: Only students with pending evaluations</p>
-                    </>
-                  )}
-                  {notificationType === 'period_ending' && (
-                    <>
-                      <p>• Subject: <strong>🚨 FINAL NOTICE: Deadline Approaching</strong></p>
-                      <p>• Content: Hours remaining, urgent call-to-action</p>
-                      <p>• Style: High-urgency red theme</p>
-                    </>
-                  )}
+
                   {notificationType !== 'test' && (
                     <p className="mt-2">
                       • Recipients: {customEmails.trim() ? 'Custom list' : 'All active students'}
@@ -315,13 +295,13 @@ SMTP_FROM_EMAIL=your-email@gmail.com`}
               {lastResult && (
                 <div className={`p-4 rounded-lg ${
                   lastResult.success 
-                    ? 'bg-green-50 border-2 border-green-200' 
+                    ? 'bg-yellow-50 border-2 border-yellow-200' 
                     : 'bg-red-50 border-2 border-red-200'
                 }`}>
-                  <h3 className={`font-bold ${lastResult.success ? 'text-green-900' : 'text-red-900'}`}>
+                  <h3 className={`font-bold ${lastResult.success ? 'text-yellow-900' : 'text-red-900'}`}>
                     {lastResult.success ? '✅ Success' : '❌ Failed'}
                   </h3>
-                  <p className={`text-sm mt-1 ${lastResult.success ? 'text-green-800' : 'text-red-800'}`}>
+                  <p className={`text-sm mt-1 ${lastResult.success ? 'text-yellow-800' : 'text-red-800'}`}>
                     {lastResult.message}
                   </p>
                   {lastResult.sent_count !== undefined && (
@@ -339,7 +319,7 @@ SMTP_FROM_EMAIL=your-email@gmail.com`}
                 <button
                   type="button"
                   onClick={() => navigate('/admin/dashboard')}
-                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold transition-all"
+                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-button hover:bg-gray-50 font-semibold transition-all duration-250"
                   disabled={sending}
                 >
                   Cancel
@@ -347,7 +327,7 @@ SMTP_FROM_EMAIL=your-email@gmail.com`}
                 <button
                   type="submit"
                   disabled={sending || !isConfigured}
-                  className="flex-1 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-all disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center"
+                  className="flex-1 px-6 py-3 bg-yellow-600 hover:bg-amber-700 text-white rounded-button font-semibold transition-all duration-250 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center"
                 >
                   {sending ? (
                     <>
@@ -365,7 +345,7 @@ SMTP_FROM_EMAIL=your-email@gmail.com`}
 
         {/* History Tab */}
         {activeTab === 'history' && (
-          <div className="bg-white rounded-xl shadow-md p-6">
+          <div className="bg-white rounded-card shadow-card p-6 lg:p-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Notification History</h2>
             <div className="text-center py-12 text-gray-500">
               <svg className="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -380,3 +360,7 @@ SMTP_FROM_EMAIL=your-email@gmail.com`}
     </div>
   )
 }
+
+
+
+

@@ -17,7 +17,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # JWT Configuration
-SECRET_KEY = os.getenv("SECRET_KEY", "dev-fallback-key-not-for-production")
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise ValueError(
+        "CRITICAL SECURITY ERROR: SECRET_KEY environment variable is not set!\n"
+        "Please set a strong SECRET_KEY in your .env file.\n"
+        "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+    )
+if SECRET_KEY in ["your-secret-key-here-change-in-production", "dev-fallback-key-not-for-production"]:
+    raise ValueError(
+        "CRITICAL SECURITY ERROR: SECRET_KEY is set to a default/insecure value!\n"
+        "Please generate a strong SECRET_KEY with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+    )
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 24
 
@@ -98,6 +110,31 @@ async def login(request: LoginRequest, db = Depends(get_db)):
             'firstLogin': user_data.first_login if hasattr(user_data, 'first_login') else False
         }
         
+        # Update last_login timestamp
+        update_login_query = text("""
+            UPDATE users
+            SET last_login = :last_login
+            WHERE id = :user_id
+        """)
+        db.execute(update_login_query, {
+            "last_login": now_local(),
+            "user_id": user_data.id
+        })
+        
+        # Create audit log for login
+        from models.enhanced_models import AuditLog
+        audit_log = AuditLog(
+            user_id=user_data.id,
+            action="LOGIN",
+            category="Authentication",
+            severity="Info",
+            status="Success",
+            details={"email": user_data.email, "role": user_data.role},
+            ip_address=None  # Can be added from request if needed
+        )
+        db.add(audit_log)
+        db.commit()
+        
         # Generate JWT token
         token_data = {
             "user_id": user['id'],
@@ -133,6 +170,12 @@ async def forgot_password(request: ForgotPasswordRequest, db = Depends(get_db)):
     """
     Initiate password reset process
     Generates a reset token and sends email to user
+    
+    Token Management:
+    - Automatically cleans up expired and used tokens
+    - Deletes any existing tokens for the user before creating a new one
+    - This prevents "token already used" errors on subsequent reset requests
+    - Tokens are valid for 1 hour from creation
     """
     try:
         from sqlalchemy import text
@@ -160,12 +203,28 @@ async def forgot_password(request: ForgotPasswordRequest, db = Depends(get_db)):
         reset_token = secrets.token_urlsafe(32)
         expires_at = now_local() + timedelta(hours=1)
         
+        # Clean up expired tokens (periodic maintenance)
+        cleanup_query = text("""
+            DELETE FROM password_reset_tokens 
+            WHERE expires_at < :current_time OR used = TRUE
+        """)
+        cleanup_result = db.execute(cleanup_query, {"current_time": now_local()})
+        deleted_count = cleanup_result.rowcount
+        if deleted_count > 0:
+            logger.info(f"🧹 Cleaned up {deleted_count} expired/used tokens")
+        
         # Store reset token in database
+        # Clear any existing tokens for this user first to avoid conflicts
+        delete_query = text("""
+            DELETE FROM password_reset_tokens 
+            WHERE user_id = :user_id
+        """)
+        db.execute(delete_query, {"user_id": user_data.id})
+        
+        # Insert new token
         insert_query = text("""
-            INSERT INTO password_reset_tokens (user_id, token, expires_at, created_at)
-            VALUES (:user_id, :token, :expires_at, :created_at)
-            ON CONFLICT (user_id) 
-            DO UPDATE SET token = :token, expires_at = :expires_at, created_at = :created_at
+            INSERT INTO password_reset_tokens (user_id, token, expires_at, created_at, used)
+            VALUES (:user_id, :token, :expires_at, :created_at, FALSE)
         """)
         
         db.execute(insert_query, {
@@ -174,6 +233,21 @@ async def forgot_password(request: ForgotPasswordRequest, db = Depends(get_db)):
             "expires_at": expires_at,
             "created_at": now_local()
         })
+        
+        logger.info(f"🗑️ Cleared old tokens and created new reset token for user_id: {user_data.id}")
+        
+        # Create audit log for password reset request
+        from models.enhanced_models import AuditLog
+        audit_log = AuditLog(
+            user_id=user_data.id,
+            action="PASSWORD_RESET_REQUESTED",
+            category="Authentication",
+            severity="Info",
+            status="Success",
+            details={"email": user_data.email, "user_id": user_data.id},
+            ip_address=None
+        )
+        db.add(audit_log)
         db.commit()
         
         # TODO: Send email with reset link
@@ -184,6 +258,12 @@ async def forgot_password(request: ForgotPasswordRequest, db = Depends(get_db)):
         # Try to send email if email service is configured
         try:
             from services.email_service import send_password_reset_email
+            print(f"\n{'='*60}")
+            print(f"🔑 PASSWORD RESET TOKEN: {reset_token}")
+            print(f"🔗 RESET LINK: {reset_link}")
+            print(f"📧 Sending to: {user_data.email}")
+            print(f"{'='*60}\n")
+            
             send_password_reset_email(
                 to_email=user_data.email,
                 reset_token=reset_token,
@@ -215,24 +295,45 @@ async def reset_password(request: ResetPasswordRequest, db = Depends(get_db)):
         from sqlalchemy import text
         
         # Verify token and check expiration
-        query = text("""
-            SELECT prt.user_id, prt.expires_at, u.email
+        # First check if token exists at all
+        check_query = text("""
+            SELECT prt.user_id, prt.expires_at, prt.used, u.email
             FROM password_reset_tokens prt
             JOIN users u ON u.id = prt.user_id
-            WHERE prt.token = :token AND prt.used = FALSE
+            WHERE prt.token = :token
         """)
         
-        result = db.execute(query, {"token": request.token})
+        result = db.execute(check_query, {"token": request.token})
         token_data = result.fetchone()
         
         if not token_data:
             return ForgotPasswordResponse(
                 success=False,
-                message="Invalid or expired reset token."
+                message="Invalid reset token. The link may be incorrect or the token does not exist."
+            )
+        
+        # Check if token has already been used
+        if token_data.used:
+            return ForgotPasswordResponse(
+                success=False,
+                message="This reset link has already been used. Please request a new password reset."
             )
         
         # Check if token is expired
-        if now_local() > token_data.expires_at:
+        # Ensure both datetimes are timezone-aware for comparison
+        from datetime import timezone
+        current_time = now_local()
+        expires_time = token_data.expires_at
+        
+        # Make expires_time timezone-aware if it's naive
+        if expires_time.tzinfo is None:
+            expires_time = expires_time.replace(tzinfo=timezone.utc)
+        
+        # Make current_time timezone-aware if it's naive
+        if current_time.tzinfo is None:
+            current_time = current_time.replace(tzinfo=timezone.utc)
+        
+        if current_time > expires_time:
             return ForgotPasswordResponse(
                 success=False,
                 message="Reset token has expired. Please request a new one."
@@ -261,6 +362,19 @@ async def reset_password(request: ResetPasswordRequest, db = Depends(get_db)):
         """)
         
         db.execute(mark_used_query, {"token": request.token})
+        
+        # Create audit log for password reset completion
+        from models.enhanced_models import AuditLog
+        audit_log = AuditLog(
+            user_id=token_data.user_id,
+            action="PASSWORD_RESET_COMPLETED",
+            category="Authentication",
+            severity="Info",
+            status="Success",
+            details={"email": token_data.email, "user_id": token_data.user_id},
+            ip_address=None
+        )
+        db.add(audit_log)
         db.commit()
         
         logger.info(f"✅ Password reset successful for user_id: {token_data.user_id}")
@@ -353,6 +467,19 @@ async def change_password(request: ChangePasswordRequest, db = Depends(get_db)):
             "password_hash": new_password_hash,
             "user_id": request.user_id
         })
+        
+        # Create audit log for password change
+        from models.enhanced_models import AuditLog
+        audit_log = AuditLog(
+            user_id=request.user_id,
+            action="PASSWORD_CHANGED",
+            category="Authentication",
+            severity="Info",
+            status="Success",
+            details={"email": user_data.email, "first_login": user_data.first_login, "user_id": request.user_id},
+            ip_address=None
+        )
+        db.add(audit_log)
         db.commit()
         
         logger.info(f"✅ Password changed successfully for user_id: {request.user_id} ({user_data.email})")

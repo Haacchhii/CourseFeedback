@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { adminAPI, secretaryAPI, deptHeadAPI } from '../../services/api'
 import { isAdmin } from '../../utils/roleUtils'
+import Pagination from '../Pagination'
 
-export default function CourseCompletionTable() {
+export default function CourseCompletionTable({ selectedPeriod = null }) {
   const { user: currentUser } = useAuth()
   const [completionData, setCompletionData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -11,10 +12,12 @@ export default function CourseCompletionTable() {
   const [searchTerm, setSearchTerm] = useState('')
   const [sortBy, setSortBy] = useState('completion_rate') // completion_rate, course_name, instructor
   const [filterThreshold, setFilterThreshold] = useState('all') // all, below70, below50
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
 
   useEffect(() => {
     fetchCompletionData()
-  }, [currentUser])
+  }, [currentUser, selectedPeriod])
 
   const fetchCompletionData = async () => {
     if (!currentUser) return
@@ -25,11 +28,11 @@ export default function CourseCompletionTable() {
 
       let response
       if (isAdmin(currentUser)) {
-        response = await adminAPI.getCompletionRates()
+        response = await adminAPI.getCompletionRates(selectedPeriod)
       } else if (currentUser.role === 'secretary') {
-        response = await secretaryAPI.getCompletionRates()
+        response = await secretaryAPI.getCompletionRates(selectedPeriod)
       } else if (currentUser.role === 'department_head') {
-        response = await deptHeadAPI.getCompletionRates()
+        response = await deptHeadAPI.getCompletionRates(selectedPeriod)
       }
 
       if (response?.success && response?.data) {
@@ -75,6 +78,17 @@ export default function CourseCompletionTable() {
 
     return filtered
   }, [completionData, searchTerm, sortBy, filterThreshold])
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredCourses.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedCourses = filteredCourses.slice(startIndex, endIndex)
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, sortBy, filterThreshold])
 
   if (loading) {
     return (
@@ -164,8 +178,18 @@ export default function CourseCompletionTable() {
       </div>
 
       {/* Results Count */}
-      <div className="mb-4 text-sm text-gray-600">
-        Showing {filteredCourses.length} of {completionData?.courses?.length || 0} courses
+      <div className="mb-4 text-sm text-gray-600 flex items-center justify-between">
+        <span>
+          Showing {startIndex + 1}-{Math.min(endIndex, filteredCourses.length)} of {filteredCourses.length} courses
+          {completionData?.courses?.length !== filteredCourses.length && 
+            ` (filtered from ${completionData?.courses?.length} total)`
+          }
+        </span>
+        {totalPages > 1 && (
+          <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full">
+            Page {currentPage} of {totalPages}
+          </span>
+        )}
       </div>
 
       {/* Table */}
@@ -182,8 +206,8 @@ export default function CourseCompletionTable() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {filteredCourses.length > 0 ? (
-              filteredCourses.map((course) => {
+            {paginatedCourses.length > 0 ? (
+              paginatedCourses.map((course) => {
                 const completionRate = course.completion_rate
                 const statusColor = 
                   completionRate >= 85 ? 'green' :
@@ -267,6 +291,17 @@ export default function CourseCompletionTable() {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredCourses.length}
+          onPageChange={setCurrentPage}
+          itemLabel="courses"
+        />
+      )}
     </div>
   )
 }

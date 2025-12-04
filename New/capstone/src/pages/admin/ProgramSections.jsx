@@ -260,19 +260,37 @@ const ProgramSections = () => {
   ];
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Program Sections Management</h2>
-        <button
-          onClick={handleCreateSection}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-        >
-          + Create Section
-        </button>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9]">
+      {/* Header */}
+      <header className="lpu-header">
+        <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-8 lg:py-10 max-w-screen-2xl">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg">
+                <span className="text-[#7a0000] font-bold text-xl">LPU</span>
+              </div>
+              <div>
+                <h1 className="lpu-header-title text-3xl">Program Sections Management</h1>
+                <p className="lpu-header-subtitle text-lg">Manage program sections and student assignments</p>
+              </div>
+            </div>
+            <button
+              onClick={handleCreateSection}
+              className="bg-white hover:bg-[#ffd700] text-[#7a0000] font-semibold px-6 py-3 rounded-xl shadow-lg transition-all flex items-center space-x-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+              <span>Create Section</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-10 lg:py-12 max-w-screen-2xl">
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded-lg shadow mb-6">
+      <div className="bg-white p-6 lg:p-8 rounded-card shadow-card mb-12">
         <div className="grid grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">Program</label>
@@ -336,7 +354,7 @@ const ProgramSections = () => {
           No sections found. Create your first section to get started.
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="bg-white rounded-card shadow-card overflow-hidden">
           <table className="min-w-full">
             <thead className="bg-gray-50">
               <tr>
@@ -369,14 +387,14 @@ const ProgramSections = () => {
                   <td className="px-6 py-4">
                     <button
                       onClick={() => handleViewStudents(section)}
-                      className="text-blue-600 hover:underline font-medium"
+                      className="text-red-600 hover:underline font-medium"
                     >
                       {section.studentCount} student{section.studentCount !== 1 ? 's' : ''}
                     </button>
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 rounded text-xs ${
-                      section.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      section.isActive ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
                     }`}>
                       {section.isActive ? 'Active' : 'Inactive'}
                     </span>
@@ -385,13 +403,13 @@ const ProgramSections = () => {
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleManageStudents(section)}
-                        className="text-blue-600 hover:underline text-sm"
+                        className="text-red-600 hover:underline text-sm"
                       >
                         Add Students
                       </button>
                       <button
                         onClick={() => handleEditSection(section)}
-                        className="text-indigo-600 hover:underline text-sm"
+                        className="text-red-600 hover:underline text-sm"
                       >
                         Edit
                       </button>
@@ -412,12 +430,14 @@ const ProgramSections = () => {
 
       {/* Create/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-xl font-bold mb-4">
-              {modalMode === 'create' ? 'Create Section' : 'Edit Section'}
-            </h3>
-            <form onSubmit={handleSubmit}>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-md max-h-[90vh] flex flex-col">
+            <div className="p-6 border-b flex-shrink-0">
+              <h3 className="text-xl font-bold">
+                {modalMode === 'create' ? 'Create Section' : 'Edit Section'}
+              </h3>
+            </div>
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6">
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Section Name *</label>
@@ -496,7 +516,7 @@ const ProgramSections = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
                 >
                   {modalMode === 'create' ? 'Create' : 'Update'}
                 </button>
@@ -508,11 +528,14 @@ const ProgramSections = () => {
 
       {/* Student Assignment Modal */}
       {showStudentModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold mb-4">
-              Assign Students to {selectedSection?.sectionName}
-            </h3>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div className="p-6 border-b flex-shrink-0">
+              <h3 className="text-xl font-bold">
+                Assign Students to {selectedSection?.sectionName}
+              </h3>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
 
             {/* Student Filters */}
             <div className="bg-gray-50 p-4 rounded-lg mb-4">
@@ -621,10 +644,11 @@ const ProgramSections = () => {
               <button
                 onClick={handleAssignStudents}
                 disabled={selectedStudents.length === 0}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Assign {selectedStudents.length} Student{selectedStudents.length !== 1 ? 's' : ''}
               </button>
+            </div>
             </div>
           </div>
         </div>
@@ -632,11 +656,14 @@ const ProgramSections = () => {
 
       {/* Student List Modal */}
       {showStudentListModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold mb-4">
-              Students in {selectedSection?.sectionName} ({assignedStudents.length})
-            </h3>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-3xl max-h-[90vh] flex flex-col">
+            <div className="p-6 border-b flex-shrink-0">
+              <h3 className="text-xl font-bold">
+                Students in {selectedSection?.sectionName} ({assignedStudents.length})
+              </h3>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
 
             {assignedStudents.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
@@ -668,7 +695,7 @@ const ProgramSections = () => {
               </div>
             )}
 
-            <div className="flex justify-end mt-6">
+            <div className="flex justify-end mt-6 flex-shrink-0 p-6 border-t">
               <button
                 onClick={() => setShowStudentListModal(false)}
                 className="px-4 py-2 border rounded hover:bg-gray-50"
@@ -676,11 +703,17 @@ const ProgramSections = () => {
                 Close
               </button>
             </div>
+            </div>
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };
 
 export default ProgramSections;
+
+
+
+

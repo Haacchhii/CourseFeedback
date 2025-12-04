@@ -104,7 +104,7 @@ export default function FirstTimeLogin() {
         system_admin: '/admin/dashboard',
         department_head: '/depthead/dashboard',
         secretary: '/secretary/dashboard',
-        instructor: '/instructor/dashboard',
+        // instructor role removed from system
         student: '/student/courses'
       }
       
@@ -122,51 +122,53 @@ export default function FirstTimeLogin() {
   if (!userData) return null
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#7a0000] via-[#8f0000] to-[#a00000] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-gradient-to-br from-[#7a0000] to-[#a00000] rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
-            </svg>
+    <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] flex items-center justify-center p-6 sm:p-8"
+         style={{ backgroundImage: 'linear-gradient(135deg, rgba(122, 0, 0, 0.95) 0%, rgba(160, 0, 0, 0.95) 100%)' }}>
+      <div className="w-full max-w-md">
+        <div className="bg-white rounded-card shadow-card p-8 lg:p-10">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 lg:w-24 lg:h-24 bg-gradient-to-br from-[#7a0000] to-[#a00000] rounded-full flex items-center justify-center mx-auto mb-6 shadow-crimson">
+              <svg className="w-10 h-10 lg:w-12 lg:h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+              </svg>
+            </div>
+            <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-3">First Time Login</h1>
+            <p className="text-lg text-gray-600 font-medium">Welcome, {userData.first_name}!</p>
+            <p className="text-sm text-gray-500 mt-3">Please change your temporary password to secure your account</p>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">First Time Login</h1>
-          <p className="text-gray-600">Welcome, {userData.first_name}!</p>
-          <p className="text-sm text-gray-500 mt-2">Please change your temporary password to secure your account</p>
-        </div>
 
-        {/* Info Alert */}
-        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded-lg">
-          <div className="flex items-start">
-            <svg className="w-5 h-5 text-blue-500 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-            <div>
-              <p className="text-sm font-semibold text-blue-900">Account Security</p>
-              <p className="text-xs text-blue-800 mt-1">
-                For your security, you must change your temporary password before accessing the system.
-              </p>
+          {/* Info Alert */}
+          <div className="bg-blue-50 border-l-4 border-blue-500 p-5 mb-8 rounded-input">
+            <div className="flex items-start">
+              <svg className="w-5 h-5 text-blue-500 mr-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <div>
+                <p className="text-sm font-bold text-blue-900">Account Security</p>
+                <p className="text-xs text-blue-800 mt-2">
+                  For your security, you must change your temporary password before accessing the system.
+                </p>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
-            <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
+            <div className="bg-red-50 border-l-4 border-red-500 p-5 rounded-input">
               <div className="flex items-center">
-                <svg className="w-5 h-5 text-red-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-red-500 mr-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
-                <p className="text-sm text-red-800">{error}</p>
+                <p className="text-sm text-red-800 font-medium">{error}</p>
               </div>
             </div>
           )}
 
           {/* New Password */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <label className="block text-base font-bold text-gray-700 mb-3">
               New Password *
             </label>
             <div className="relative">
@@ -175,13 +177,13 @@ export default function FirstTimeLogin() {
                 required
                 value={formData.newPassword}
                 onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-[#7a0000] transition-all"
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-input focus:ring-2 focus:ring-[#7a0000] focus:border-[#7a0000] transition-all duration-250"
                 placeholder="Enter your new password"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
               >
                 {showPassword ? (
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -198,16 +200,16 @@ export default function FirstTimeLogin() {
             
             {/* Password Strength Indicator */}
             {formData.newPassword && (
-              <div className="mt-2">
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="text-gray-600">Password Strength:</span>
-                  <span className={`font-semibold ${passwordStrength.color}`}>
+              <div className="mt-4">
+                <div className="flex items-center justify-between text-sm mb-2">
+                  <span className="text-gray-600 font-medium">Password Strength:</span>
+                  <span className={`font-bold ${passwordStrength.color}`}>
                     {passwordStrength.message}
                   </span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-gray-200 rounded-full h-2.5">
                   <div
-                    className={`h-2 rounded-full transition-all duration-300 ${
+                    className={`h-2.5 rounded-full transition-all duration-300 ${
                       passwordStrength.score <= 2 ? 'bg-red-500' :
                       passwordStrength.score <= 4 ? 'bg-yellow-500' :
                       'bg-green-500'
@@ -218,14 +220,14 @@ export default function FirstTimeLogin() {
               </div>
             )}
 
-            <p className="text-xs text-gray-500 mt-2">
+            <p className="text-sm text-gray-500 mt-3">
               Password must be at least 8 characters and include a mix of letters, numbers, and symbols
             </p>
           </div>
 
           {/* Confirm Password */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <label className="block text-base font-bold text-gray-700 mb-3">
               Confirm New Password *
             </label>
             <input
@@ -233,38 +235,38 @@ export default function FirstTimeLogin() {
               required
               value={formData.confirmPassword}
               onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-[#7a0000] transition-all"
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-input focus:ring-2 focus:ring-[#7a0000] focus:border-[#7a0000] transition-all duration-250"
               placeholder="Confirm your new password"
             />
             {formData.confirmPassword && formData.newPassword !== formData.confirmPassword && (
-              <p className="text-xs text-red-600 mt-1">Passwords do not match</p>
+              <p className="text-sm text-red-600 mt-2 font-medium">Passwords do not match</p>
             )}
           </div>
 
           {/* Password Requirements */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <p className="text-xs font-semibold text-gray-700 mb-2">Password Requirements:</p>
-            <ul className="text-xs text-gray-600 space-y-1">
+          <div className="bg-gray-50 rounded-input p-5">
+            <p className="text-sm font-bold text-gray-700 mb-3">Password Requirements:</p>
+            <ul className="text-sm text-gray-600 space-y-2">
               <li className="flex items-center">
-                <svg className={`w-4 h-4 mr-2 ${formData.newPassword.length >= 8 ? 'text-green-500' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className={`w-5 h-5 mr-3 ${formData.newPassword.length >= 8 ? 'text-green-500' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
                 </svg>
                 At least 8 characters long
               </li>
               <li className="flex items-center">
-                <svg className={`w-4 h-4 mr-2 ${/[a-z]/.test(formData.newPassword) && /[A-Z]/.test(formData.newPassword) ? 'text-green-500' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className={`w-5 h-5 mr-3 ${/[a-z]/.test(formData.newPassword) && /[A-Z]/.test(formData.newPassword) ? 'text-green-500' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
                 </svg>
                 Mix of uppercase and lowercase letters
               </li>
               <li className="flex items-center">
-                <svg className={`w-4 h-4 mr-2 ${/[0-9]/.test(formData.newPassword) ? 'text-green-500' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className={`w-5 h-5 mr-3 ${/[0-9]/.test(formData.newPassword) ? 'text-green-500' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
                 </svg>
                 At least one number
               </li>
               <li className="flex items-center">
-                <svg className={`w-4 h-4 mr-2 ${/[^a-zA-Z0-9]/.test(formData.newPassword) ? 'text-green-500' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className={`w-5 h-5 mr-3 ${/[^a-zA-Z0-9]/.test(formData.newPassword) ? 'text-green-500' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
                 </svg>
                 At least one special character (@, #, $, etc.)
@@ -276,7 +278,7 @@ export default function FirstTimeLogin() {
           <button
             type="submit"
             disabled={submitting || formData.newPassword !== formData.confirmPassword || formData.newPassword.length < 8}
-            className="w-full bg-gradient-to-r from-[#7a0000] to-[#a00000] hover:from-[#8f0000] hover:to-[#b00000] disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg transition-all shadow-lg"
+            className="w-full bg-gradient-to-r from-[#7a0000] to-[#a00000] hover:from-[#8f0000] hover:to-[#b00000] disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed text-white font-bold py-3 px-5 rounded-button transition-all duration-250 shadow-card hover:shadow-card-hover"
           >
             {submitting ? (
               <span className="flex items-center justify-center">
@@ -293,18 +295,19 @@ export default function FirstTimeLogin() {
         </form>
 
         {/* Security Note */}
-        <div className="mt-6 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded-lg">
+        <div className="mt-8 p-5 bg-yellow-50 border-l-4 border-yellow-400 rounded-input">
           <div className="flex items-start">
-            <svg className="w-5 h-5 text-yellow-600 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 text-yellow-600 mr-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
             </svg>
             <div>
-              <p className="text-xs font-semibold text-yellow-900">Security Tip</p>
-              <p className="text-xs text-yellow-800 mt-1">
+              <p className="text-sm font-bold text-yellow-900">Security Tip</p>
+              <p className="text-xs text-yellow-800 mt-2">
                 Never share your password with anyone. LPU staff will never ask for your password.
               </p>
             </div>
           </div>
+        </div>
         </div>
       </div>
     </div>

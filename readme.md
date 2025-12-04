@@ -113,7 +113,6 @@ thesis/
         │   │   ├── EnhancedCourseManagement.jsx  # CRUD + CSV + Batch
         │   │   ├── EvaluationPeriodManagement.jsx
         │   │   ├── EmailNotifications.jsx         # ✅ Email admin panel
-        │   │   ├── SystemSettings.jsx
         │   │   ├── AuditLogViewer.jsx
         │   │   └── DataExportCenter.jsx
         │   ├── staff/
@@ -273,7 +272,6 @@ python train_ml_models.py
 - ✅ Program section management
 - ✅ Evaluation period management
 - ✅ Audit logging for all critical actions
-- ✅ System settings and configuration
 
 ---
 

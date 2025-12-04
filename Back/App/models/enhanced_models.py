@@ -31,7 +31,6 @@ class User(Base):
     # Relationships
     students = relationship("Student", back_populates="user")
     department_heads = relationship("DepartmentHead", back_populates="user")
-    class_sections_taught = relationship("ClassSection", back_populates="instructor")
 
 class Program(Base):
     __tablename__ = "programs"
@@ -87,16 +86,14 @@ class ClassSection(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=False)
-    instructor_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     class_code = Column(String(50), nullable=False)
-    semester = Column(Integer, nullable=False)  # Fixed: INTEGER to match database schema
+    semester = Column(String(10), nullable=False)  # Changed to VARCHAR to match database
     academic_year = Column(String(20), nullable=False)  # "2024-2025"
     max_students = Column(Integer, default=40)
     created_at = Column(DateTime, default=now_local)
     
     # Relationships
     course = relationship("Course", back_populates="class_sections")
-    instructor = relationship("User", back_populates="class_sections_taught")
     enrollments = relationship("Enrollment", back_populates="class_section")
     evaluations = relationship("Evaluation", back_populates="class_section")
     analysis_results = relationship("AnalysisResult", back_populates="class_section")
@@ -107,12 +104,14 @@ class Enrollment(Base):
     id = Column(Integer, primary_key=True, index=True)
     student_id = Column(Integer, ForeignKey("students.id"), nullable=False)
     class_section_id = Column(Integer, ForeignKey("class_sections.id"), nullable=False)
+    evaluation_period_id = Column(Integer, ForeignKey("evaluation_periods.id"), nullable=True)  # Link to evaluation period
     enrolled_at = Column(DateTime, default=now_local)
     status = Column(String(20), default='active')  # active, dropped, completed
     
     # Relationships
     student = relationship("Student", back_populates="enrollments")
     class_section = relationship("ClassSection", back_populates="enrollments")
+    evaluation_period = relationship("EvaluationPeriod")  # Link to period
 
 class Evaluation(Base):
     __tablename__ = "evaluations"
@@ -120,6 +119,7 @@ class Evaluation(Base):
     id = Column(Integer, primary_key=True, index=True)
     student_id = Column(Integer, ForeignKey("students.id"), nullable=False)
     class_section_id = Column(Integer, ForeignKey("class_sections.id"), nullable=False)
+    evaluation_period_id = Column(Integer, ForeignKey("evaluation_periods.id"), nullable=True)
     
     # Basic rating fields (must match actual database columns)
     rating_teaching = Column(Integer, nullable=True)     # 1-4
@@ -148,6 +148,7 @@ class Evaluation(Base):
     evaluation_metadata = Column('metadata', JSONB, nullable=True)
     
     # Processing status fields
+    status = Column(String(20), nullable=True)  # completed, pending
     processing_status = Column(String(50), default='pending')
     processed_at = Column(DateTime, nullable=True)
     
@@ -237,12 +238,11 @@ class AuditLog(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    user_email = Column(String(255), nullable=True)
     action = Column(String(100), nullable=False)  # USER_CREATED, LOGIN, SETTINGS_CHANGED, etc.
     category = Column(String(50), nullable=False)  # User Management, Authentication, System Settings, etc.
     severity = Column(String(20), default='Info')  # Info, Warning, Critical
     status = Column(String(20), default='Success')  # Success, Failed, Blocked
-    ip_address = Column(String(45), nullable=True)
+    ip_address = Column(String(50), nullable=True)
     details = Column(JSONB, nullable=True)  # Additional context in JSON
     created_at = Column(DateTime, default=now_local, index=True)
     
@@ -277,18 +277,6 @@ class ExportHistory(Base):
         Index('idx_export_history_user', 'user_id', 'created_at'),
         Index('idx_export_history_type', 'export_type', 'created_at'),
     )
-
-class SystemSettings(Base):
-    __tablename__ = "system_settings"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    category = Column(String(50), nullable=False, unique=True)  # general, email, security, backup
-    settings = Column(JSONB, nullable=False)  # All settings for that category in JSON
-    updated_by = Column(Integer, ForeignKey("users.id"), nullable=True)
-    updated_at = Column(DateTime, default=now_local, onupdate=now_local)
-    
-    # Relationships
-    updater = relationship("User")
 
 # New tables for ML and analytics
 class AnalysisResult(Base):

@@ -2,17 +2,23 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { isAdmin, isStaffMember } from '../../utils/roleUtils'
 import { useAuth } from '../../context/AuthContext'
-import { adminAPI, deptHeadAPI, secretaryAPI, instructorAPI } from '../../services/api'
+import { adminAPI, deptHeadAPI, secretaryAPI } from '../../services/api'
+import Pagination from '../../components/Pagination'
 
 export default function Courses() {
   const { user: currentUser } = useAuth()
   const [courses, setCourses] = useState([])
   const [evaluations, setEvaluations] = useState([])
   const [programs, setPrograms] = useState([])
+  const [evaluationPeriods, setEvaluationPeriods] = useState([])
+  const [selectedPeriod, setSelectedPeriod] = useState(null) // null means use active period
+  const [activePeriod, setActivePeriod] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedProgram, setSelectedProgram] = useState('all')
+  const [selectedProgramSection, setSelectedProgramSection] = useState('all')
+  const [programSections, setProgramSections] = useState([])
   const [chartLimit, setChartLimit] = useState(10) // Top N courses to show in chart
   const [activeTab, setActiveTab] = useState('overview')
   const [selectedCourse, setSelectedCourse] = useState(null)
@@ -31,12 +37,10 @@ export default function Courses() {
   
   // Data for section creation
   const [availableCourses, setAvailableCourses] = useState([])
-  const [instructors, setInstructors] = useState([])
   
   // Form state for new section
   const [newSection, setNewSection] = useState({
     course_id: '',
-    instructor_id: '',
     class_code: '',
     semester: 1,
     academic_year: '2024-2025',
@@ -45,7 +49,7 @@ export default function Courses() {
   
   const [formErrors, setFormErrors] = useState({})
 
-  // Fetch programs from database
+  // Fetch programs and evaluation periods from database
   useEffect(() => {
     if (!currentUser) return
     
@@ -55,31 +59,19 @@ export default function Courses() {
       try {
         let programsData
         
-        console.log('[COURSES] Fetching programs for role:', currentUser.role)
-        
         if (isAdmin(currentUser)) {
-          console.log('[COURSES] Calling adminAPI.getPrograms()')
           programsData = await adminAPI.getPrograms()
         } else if (currentUser.role === 'secretary') {
-          console.log('[COURSES] Calling secretaryAPI.getPrograms()')
           programsData = await secretaryAPI.getPrograms()
         } else if (currentUser.role === 'department_head') {
-          console.log('[COURSES] Calling deptHeadAPI.getPrograms()')
           programsData = await deptHeadAPI.getPrograms()
-        } else if (currentUser.role === 'instructor') {
-          console.log('[COURSES] Calling instructorAPI.getPrograms()')
-          programsData = await instructorAPI.getPrograms()
         }
         
         if (!isMounted) return // Don't update state if unmounted
         
-        console.log('[COURSES] Programs API response:', programsData)
-        
         if (programsData?.data && Array.isArray(programsData.data) && programsData.data.length > 0) {
-          console.log('[COURSES] Programs loaded successfully:', programsData.data)
           setPrograms(programsData.data)
         } else {
-          console.warn('[COURSES] No programs data in API response, will extract from courses')
           setPrograms([])
         }
       } catch (err) {
@@ -89,7 +81,39 @@ export default function Courses() {
       }
     }
     
+    const fetchEvaluationPeriods = async () => {
+      try {
+        let periodsData
+        
+        if (isAdmin(currentUser)) {
+          periodsData = await adminAPI.getEvaluationPeriods()
+        } else if (currentUser.role === 'secretary') {
+          periodsData = await secretaryAPI.getEvaluationPeriods()
+        } else if (currentUser.role === 'department_head') {
+          periodsData = await deptHeadAPI.getEvaluationPeriods()
+        }
+        
+        if (!isMounted) return
+        
+        if (periodsData?.data && Array.isArray(periodsData.data)) {
+          setEvaluationPeriods(periodsData.data)
+          // Find and set the active period
+          const active = periodsData.data.find(p => p.status === 'active')
+          if (active) {
+            setActivePeriod(active)
+          }
+        } else {
+          setEvaluationPeriods([])
+        }
+      } catch (err) {
+        if (!isMounted) return
+        console.error('[COURSES] Error fetching evaluation periods:', err)
+        setEvaluationPeriods([])
+      }
+    }
+    
     fetchPrograms()
+    fetchEvaluationPeriods()
     
     return () => {
       isMounted = false
@@ -119,6 +143,48 @@ export default function Courses() {
     }
   }, [courses, programs])
 
+  // Fetch program sections
+  useEffect(() => {
+    if (!currentUser) return
+    
+    let isMounted = true
+    
+    const fetchProgramSections = async () => {
+      try {
+        let sectionsData
+        
+        if (isAdmin(currentUser)) {
+          sectionsData = await adminAPI.getProgramSections()
+        } else if (currentUser.role === 'secretary') {
+          sectionsData = await secretaryAPI.getProgramSections()
+        } else if (currentUser.role === 'department_head') {
+          sectionsData = await deptHeadAPI.getProgramSections()
+        } else if (currentUser.role === 'instructor') {
+          sectionsData = await secretaryAPI.getProgramSections()
+        }
+        
+        if (!isMounted) return
+        
+        if (sectionsData?.data && Array.isArray(sectionsData.data)) {
+          setProgramSections(sectionsData.data)
+        } else {
+          console.warn('[COURSES] No program sections data in API response')
+          setProgramSections([])
+        }
+      } catch (err) {
+        if (!isMounted) return
+        console.error('[COURSES] Error fetching program sections:', err)
+        setProgramSections([])
+      }
+    }
+    
+    fetchProgramSections()
+    
+    return () => {
+      isMounted = false
+    }
+  }, [currentUser])
+
   // Add Course functionality removed - monitoring role only
   // Secretary/Dept Head can view and analyze courses but cannot create new ones
 
@@ -134,8 +200,20 @@ export default function Courses() {
       try {
         setLoading(true)
         setError(null)
+        
+        // Check if we have a period to query (either selected or active)
+        if (!selectedPeriod && !activePeriod) {
+          // No period selected and no active period - show empty state
+          setCourses([])
+          setEvaluations([])
+          setLoading(false)
+          return
+        }
+        
         const filters = {}
         if (selectedProgram !== 'all') filters.program = selectedProgram
+        // Use selectedPeriod if set, otherwise backend will use active period
+        if (selectedPeriod) filters.period_id = selectedPeriod
         
         let coursesData, evaluationsData
         
@@ -149,9 +227,6 @@ export default function Courses() {
         } else if (currentUser.role === 'department_head') {
           coursesData = await deptHeadAPI.getCourses(filters)
           evaluationsData = await deptHeadAPI.getEvaluations(filters)
-        } else if (currentUser.role === 'instructor') {
-          coursesData = await instructorAPI.getCourses(filters)
-          evaluationsData = await instructorAPI.getEvaluations(filters)
         } else {
           throw new Error(`Unsupported role: ${currentUser.role}`)
         }
@@ -169,22 +244,26 @@ export default function Courses() {
           name: course.name || course.course_name || '',
           code: course.code || course.course_code || '',
           classCode: course.classCode || course.class_code || '',
-          instructor: course.instructor || course.instructor_name || 'N/A',
           program: course.program || 'N/A',
           yearLevel: course.yearLevel || course.year_level,
-          enrolledStudents: course.enrolledStudents || course.enrolled_students || 0,
+          enrolledStudents: course.enrolledStudents || course.enrolled_students || course.enrollmentCount || 0,
           semester: course.semester || '',
           academic_year: course.academic_year || course.academicYear || '',
           status: course.status || 'active',
-          evaluations_count: course.evaluations_count || course.evaluationCount || 0
+          evaluations_count: course.evaluations_count || course.evaluationCount || 0,
+          overallRating: course.overallRating || 0  // Preserve overallRating from API
         }))
         
-        console.log(`[COURSES] Total courses received: ${normalizedCourses.length}`)
-        console.log(`[COURSES] User role: ${currentUser.role}`)
-        console.log(`[COURSES] First 3 courses:`, normalizedCourses.slice(0, 3))
+        // Normalize evaluations data (ensure all ID fields are present for matching)
+        const normalizedEvaluations = evaluations.map(evaluation => ({
+          ...evaluation,
+          sectionId: evaluation.sectionId || evaluation.class_section_id || evaluation.section_id,
+          class_section_id: evaluation.class_section_id || evaluation.sectionId || evaluation.section_id,
+          courseId: evaluation.courseId || evaluation.course_id
+        }))
         
         setCourses(normalizedCourses)
-        setEvaluations(evaluations)
+        setEvaluations(normalizedEvaluations)
       } catch (err) {
         if (abortController.signal.aborted) return // Ignore aborted requests
         console.error('Error fetching courses:', err)
@@ -205,7 +284,7 @@ export default function Courses() {
       isMounted = false
       abortController.abort()
     }
-  }, [currentUser, selectedProgram])
+  }, [currentUser, selectedProgram, selectedPeriod])
 
   // Enhance courses with evaluation data
   const enhancedCourses = useMemo(() => {
@@ -213,28 +292,30 @@ export default function Courses() {
       // Match evaluations by sectionId (since course.id is actually section_id)
       const courseEvaluations = evaluations.filter(e => e.sectionId === course.id || e.courseId === course.id)
       
-      // Use data from API response first, fallback to calculation
-      const evaluationCount = course.evaluations_count || courseEvaluations.length
-      const enrollmentCount = course.enrolledStudents || course.enrolled_students || 0
+      // Use data from API response first (backend calculates using completed evaluations)
+      const evaluationCount = course.evaluationCount || course.evaluations_count || courseEvaluations.length
+      const enrollmentCount = course.enrollmentCount || course.enrolledStudents || course.enrolled_students || 0
       
-      // Use overallRating from API (already calculated in backend)
+      // Use overallRating from API (backend calculates average from completed evaluations)
+      // This ensures consistency with the Evaluations page
       let overallRating = course.overallRating || 0
       
       // Only recalculate if API didn't provide it and we have evaluations
       if (!overallRating && courseEvaluations.length > 0) {
+        // Use rating_overall field if available (matches backend calculation)
         const totalRating = courseEvaluations.reduce((sum, e) => {
-          const ratings = Object.values(e.ratings || {})
-          const avgRating = ratings.length > 0 ? ratings.reduce((a, b) => a + b) / ratings.length : 0
-          return sum + avgRating
+          return sum + (e.rating_overall || 0)
         }, 0)
-        overallRating = (totalRating / courseEvaluations.length).toFixed(1)
+        overallRating = (totalRating / courseEvaluations.length).toFixed(2)
       }
       
-      const responseRate = enrollmentCount > 0 ? Math.round((evaluationCount / enrollmentCount) * 100) : 0
+      // Cap response rate at 100% (some sections may have duplicate evaluations)
+      const calculatedRate = enrollmentCount > 0 ? Math.round((evaluationCount / enrollmentCount) * 100) : 0
+      const responseRate = Math.min(100, calculatedRate)
       
       return {
         ...course,
-        code: course.classCode || course.id,
+        code: course.classCode || course.code || course.id,
         enrollmentCount,
         evaluationCount,
         overallRating: parseFloat(overallRating),
@@ -278,28 +359,43 @@ export default function Courses() {
   const filteredCourses = enhancedCourses.filter(course => {
     const matchesSearch = (course.name || course.course_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (course.code || course.course_code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (course.instructor || course.instructor_name || '').toLowerCase().includes(searchTerm.toLowerCase())
+                         (course.classCode || '').toLowerCase().includes(searchTerm.toLowerCase())
     
     // Enhanced program matching - handle different field variations
     const courseProgram = course.program || course.program_code || course.program_name || ''
     const matchesProgram = selectedProgram === 'all' || 
                           courseProgram === selectedProgram ||
-                          courseProgram.includes(selectedProgram) ||
-                          selectedProgram.includes(courseProgram)
+                          courseProgram.toLowerCase().includes(selectedProgram.toLowerCase()) ||
+                          selectedProgram.toLowerCase().includes(courseProgram.toLowerCase())
     
-    return matchesSearch && matchesProgram
+    // Program section matching - filter by section if selected
+    let matchesProgramSection = true
+    if (selectedProgramSection !== 'all') {
+      // Match by program section ID, section name, or year level + semester combination
+      const courseProgramSection = course.program_section_id || course.section_id || ''
+      const courseProgramSectionName = course.program_section_name || course.section_name || ''
+      const courseYearSemester = `Year ${course.yearLevel || course.year_level || ''} - Sem ${course.semester || ''}`
+      
+      matchesProgramSection = 
+        courseProgramSection.toString() === selectedProgramSection.toString() ||
+        courseProgramSectionName.toLowerCase().includes(selectedProgramSection.toLowerCase()) ||
+        courseYearSemester.includes(selectedProgramSection)
+    }
+    
+    return matchesSearch && matchesProgram && matchesProgramSection
   })
   
-  // Calculate pagination
-  const totalPages = Math.ceil(filteredCourses.length / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
+  // Calculate pagination - ensure we don't show empty pages
+  const totalPages = Math.max(1, Math.ceil(filteredCourses.length / itemsPerPage))
+  const safeCurrentPage = Math.min(currentPage, totalPages) // Prevent page overflow
+  const startIndex = (safeCurrentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
   const paginatedCourses = filteredCourses.slice(startIndex, endIndex)
   
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, selectedProgram])
+  }, [searchTerm, selectedProgram, selectedProgramSection])
 
   // Calculate active courses (courses with status 'active' or ongoing evaluations)
   const activeCourses = enhancedCourses.filter(course => {
@@ -453,24 +549,48 @@ export default function Courses() {
         negative: courseEvals.filter(e => e.sentiment === 'negative').length
       }
       
-      // Calculate overall rating from found evaluations
+      // Use backend-provided overallRating first, recalculate only if we have matching evaluations
       let calculatedOverallRating = course.overallRating || 0
+      console.log(`[COURSE DETAILS] Backend overallRating: ${course.overallRating}`)
+      
       if (courseEvals.length > 0) {
-        const totalRating = courseEvals.reduce((sum, e) => {
-          const ratings = Object.values(e.ratings || {})
-          const avgRating = ratings.length > 0 ? ratings.reduce((a, b) => a + b) / ratings.length : 0
-          return sum + avgRating
-        }, 0)
-        calculatedOverallRating = parseFloat((totalRating / courseEvals.length).toFixed(1))
-        console.log(`[COURSE DETAILS] Calculated overall rating: ${calculatedOverallRating} from ${courseEvals.length} evaluations`)
+        // Only recalculate if we found matching evaluations with ratings
+        const evalsWithRatings = courseEvals.filter(e => e.ratings || e.rating_overall)
+        if (evalsWithRatings.length > 0) {
+          const totalRating = evalsWithRatings.reduce((sum, e) => {
+            // Try different rating sources
+            if (e.rating_overall) {
+              return sum + e.rating_overall
+            } else if (e.ratings) {
+              const ratings = Object.values(e.ratings)
+              const avgRating = ratings.length > 0 ? ratings.reduce((a, b) => a + b) / ratings.length : 0
+              return sum + avgRating
+            }
+            return sum
+          }, 0)
+          calculatedOverallRating = parseFloat((totalRating / evalsWithRatings.length).toFixed(2))
+          console.log(`[COURSE DETAILS] Recalculated overall rating: ${calculatedOverallRating} from ${evalsWithRatings.length} evaluations with ratings`)
+        } else {
+          console.log(`[COURSE DETAILS] No evaluations with ratings found, using backend value: ${calculatedOverallRating}`)
+        }
+      } else {
+        console.log(`[COURSE DETAILS] No matching evaluations found, using backend value: ${calculatedOverallRating}`)
       }
+      
+      // Use backend's evaluation count if available (from API response), otherwise use filtered count
+      // The backend count from categoryAverages is more accurate as it counts all completed evaluations
+      const actualEvaluationCount = categoryData.length > 0 && categoryData[0]?.total_responses 
+        ? categoryData[0].total_responses 
+        : (course.evaluationCount || course.evaluations_count || courseEvals.length)
+      
+      console.log(`[COURSE DETAILS] Using evaluation count: ${actualEvaluationCount} (backend: ${categoryData[0]?.total_responses}, course: ${course.evaluationCount}, filtered: ${courseEvals.length})`)
       
       // Set the course details
       setCourseDetails({
         ...course,
         overallRating: calculatedOverallRating,
-        evaluationCount: courseEvals.length,
-        enrollmentCount: course.enrolledStudents || course.enrolled_students || 0,
+        evaluationCount: actualEvaluationCount,
+        enrollmentCount: course.enrollmentCount || course.enrolledStudents || course.enrolled_students || 0,
         criteriaRatings,
         sentimentBreakdown,
         evaluations: courseEvals.slice(0, 10), // Show recent 10
@@ -496,7 +616,7 @@ export default function Courses() {
     const { name, value } = e.target
     setNewSection(prev => ({
       ...prev,
-      [name]: name === 'semester' || name === 'max_students' || name === 'course_id' || name === 'instructor_id' 
+      [name]: name === 'semester' || name === 'max_students' || name === 'course_id'
         ? parseInt(value) || value
         : value
     }))
@@ -514,7 +634,6 @@ export default function Courses() {
     const errors = {}
     
     if (!newSection.course_id) errors.course_id = 'Please select a course'
-    if (!newSection.instructor_id) errors.instructor_id = 'Please select an instructor'
     if (!newSection.class_code?.trim()) errors.class_code = 'Class code is required'
     if (!newSection.academic_year?.trim()) errors.academic_year = 'Academic year is required'
     if (!newSection.max_students || newSection.max_students < 1) errors.max_students = 'Maximum students must be at least 1'
@@ -567,7 +686,6 @@ export default function Courses() {
         name: course.name || course.course_name || '',
         code: course.code || course.course_code || '',
         classCode: course.classCode || course.class_code || '',
-        instructor: course.instructor || course.instructor_name || 'N/A',
         program: course.program || 'N/A',
         yearLevel: course.yearLevel || course.year_level,
         enrolledStudents: course.enrolledStudents || course.enrolled_students || 0,
@@ -581,7 +699,6 @@ export default function Courses() {
       // Reset form
       setNewSection({
         course_id: '',
-        instructor_id: '',
         class_code: '',
         semester: 1,
         academic_year: '2024-2025',
@@ -602,7 +719,6 @@ export default function Courses() {
     setShowAddModal(false)
     setNewSection({
       course_id: '',
-      instructor_id: '',
       class_code: '',
       semester: 1,
       academic_year: '2024-2025',
@@ -672,7 +788,7 @@ export default function Courses() {
     <div className="min-h-screen lpu-background">
       {/* Enhanced Header */}
       <header className="lpu-header">
-        <div className="container mx-auto px-6 py-8">
+        <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-8 lg:py-10 max-w-screen-2xl">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
             <div className="mb-6 lg:mb-0">
               <div className="flex items-center space-x-3 mb-4">
@@ -690,9 +806,7 @@ export default function Courses() {
               </div>
               
               <p className="text-white/90 text-lg max-w-2xl leading-relaxed">
-                {currentUser?.role === 'instructor' 
-                  ? 'View your assigned courses, track student evaluations, and monitor class performance metrics.'
-                  : currentUser?.role === 'department_head'
+                {currentUser?.role === 'department_head'
                   ? 'Monitor department courses, track evaluation metrics, and analyze student feedback.'
                   : 'Monitor course performance, track evaluation metrics, and analyze student feedback across all academic programs.'}
               </p>
@@ -703,14 +817,12 @@ export default function Courses() {
                 <div className="flex items-center space-x-3">
                   <div className="text-right">
                     <p className="text-white/80 text-sm">
-                      {currentUser?.role === 'instructor' 
-                        ? 'Your Assigned Sections'
-                        : currentUser?.role === 'department_head'
+                      {currentUser?.role === 'department_head'
                         ? `${currentUser.department || 'Department'} Courses`
                         : 'System-wide Analysis'}
                     </p>
                     <p className="font-bold text-[#ffd700] text-lg">
-                      {activeCourses.length} {currentUser?.role === 'instructor' ? 'Active Sections' : 'Active Courses'}
+                      {activeCourses.length} Active Courses
                     </p>
                   </div>
                   <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
@@ -725,32 +837,27 @@ export default function Courses() {
         </div>
       </header>
 
-      <div className="container mx-auto px-6 py-8">
-        {/* Role-specific Info Banner */}
-        {currentUser?.role === 'instructor' && (
-          <div className="mb-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded-lg">
-            <div className="flex items-start">
-              <svg className="w-5 h-5 text-blue-500 mr-3 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-              </svg>
-              <div>
-                <h3 className="text-sm font-semibold text-blue-800 mb-1">Instructor View</h3>
-                <p className="text-sm text-blue-700">
-                  You are viewing only your assigned course sections ({activeCourses.length} active). 
-                  To view all courses, please contact your department head or system administrator.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+      <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-10 lg:py-12 max-w-screen-2xl">
         
+        {/* Show warning if no active period and no selection */}
+        {!activePeriod && !selectedPeriod ? (
+          <div className="lpu-card text-center py-16 mb-10">
+            <svg className="w-20 h-20 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <h3 className="text-xl font-semibold text-gray-700 mb-2">No Active Evaluation Period</h3>
+            <p className="text-gray-500 mb-4">There is currently no active evaluation period.</p>
+            <p className="text-gray-500">Please contact the administrator to activate an evaluation period, or select a specific period from the filter above.</p>
+          </div>
+        ) : (
+          <>
         {/* Enhanced Course Statistics */}
-        <div className="grid md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200">
+        <div className="grid md:grid-cols-4 gap-5 lg:gap-6 mb-12">
+          <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-white/90 mb-2">Total Courses</h3>
-                <p className="text-3xl font-bold text-white">{courses.length}</p>
+                <p className="text-4xl lg:text-5xl font-bold text-white">{courses.length}</p>
               </div>
               <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
                 <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -760,11 +867,16 @@ export default function Courses() {
             </div>
           </div>
           
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200">
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-white/90 mb-2">Total Students</h3>
-                <p className="text-3xl font-bold text-white">{courses.reduce((sum, course) => sum + (course.enrollmentCount || 0), 0)}</p>
+                <p className="text-4xl lg:text-5xl font-bold text-white">
+                  {enhancedCourses.reduce((sum, course) => sum + (course.evaluationCount || 0), 0)}
+                </p>
+                <p className="text-xs text-blue-100 mt-1">
+                  who evaluated / {enhancedCourses.reduce((sum, course) => sum + (course.enrollmentCount || 0), 0)} enrolled
+                </p>
               </div>
               <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
                 <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -774,12 +886,17 @@ export default function Courses() {
             </div>
           </div>
           
-          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200">
+          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-white/90 mb-2">Avg Rating</h3>
-                <p className="text-3xl font-bold text-white">
-                  {courses.length > 0 ? (courses.reduce((sum, course) => sum + (course.overallRating || 0), 0) / courses.length).toFixed(1) : '0.0'}
+                <p className="text-4xl lg:text-5xl font-bold text-white">
+                  {(() => {
+                    const coursesWithEvals = enhancedCourses.filter(c => c.overallRating > 0)
+                    return coursesWithEvals.length > 0
+                      ? (coursesWithEvals.reduce((sum, c) => sum + c.overallRating, 0) / coursesWithEvals.length).toFixed(2)
+                      : '0.00'
+                  })()}
                 </p>
               </div>
               <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
@@ -790,12 +907,16 @@ export default function Courses() {
             </div>
           </div>
           
-          <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200">
+          <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-white/90 mb-2">Response Rate</h3>
-                <p className="text-3xl font-bold text-white">
-                  {courses.length > 0 ? Math.round(courses.reduce((sum, course) => sum + (course.responseRate || 0), 0) / courses.length) : 0}%
+                <p className="text-4xl lg:text-5xl font-bold text-white">
+                  {(() => {
+                    const totalEnrolled = enhancedCourses.reduce((sum, c) => sum + (c.enrollmentCount || 0), 0)
+                    const totalEvaluated = enhancedCourses.reduce((sum, c) => sum + (c.evaluationCount || 0), 0)
+                    return totalEnrolled > 0 ? Math.round((totalEvaluated / totalEnrolled) * 100) : 0
+                  })()}%
                 </p>
               </div>
               <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
@@ -847,16 +968,16 @@ export default function Courses() {
               </svg>
               Search & Filter Courses
             </h2>
-            <p className="text-gray-600 text-sm mt-1">Find courses by name, code, instructor, or program</p>
+            <p className="text-gray-600 text-sm mt-1">Find courses by name, code, program, or section</p>
           </div>
           
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-4 gap-6">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Search Courses</label>
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="Search by course name, code, or instructor..."
+                  placeholder="Search by course name or code..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full px-4 py-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent transition-all duration-200"
@@ -868,12 +989,31 @@ export default function Courses() {
             </div>
             
             <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Evaluation Period</label>
+              <select
+                value={selectedPeriod || ''}
+                onChange={(e) => setSelectedPeriod(e.target.value ? parseInt(e.target.value) : null)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent bg-white transition-all duration-200"
+              >
+                <option value="">
+                  {activePeriod ? `${activePeriod.name} (${activePeriod.academic_year}) - Active` : 'Select Period'}
+                </option>
+                {evaluationPeriods.filter(p => p.status !== 'active').map(period => (
+                  <option key={period.id} value={period.id}>
+                    {period.name} ({period.academic_year})
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Filter by Program</label>
               <select
                 value={selectedProgram}
                 onChange={(e) => {
-                  console.log('[COURSES] Program filter changed to:', e.target.value)
                   setSelectedProgram(e.target.value)
+                  // Reset program section when program changes
+                  setSelectedProgramSection('all')
                 }}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent bg-white transition-all duration-200"
               >
@@ -894,6 +1034,67 @@ export default function Courses() {
                 })}
               </select>
             </div>
+            
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Filter by Program Section</label>
+              <select
+                value={selectedProgramSection}
+                onChange={(e) => {
+                  setSelectedProgramSection(e.target.value)
+                }}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent bg-white transition-all duration-200"
+              >
+                <option value="all">All Sections</option>
+                {programSections
+                  .filter(section => {
+                    // Filter sections by selected program if program filter is active
+                    if (selectedProgram === 'all') return true
+                    const sectionProgram = section.program_code || section.program_name || section.program || ''
+                    return sectionProgram.toLowerCase().includes(selectedProgram.toLowerCase()) ||
+                           selectedProgram.toLowerCase().includes(sectionProgram.toLowerCase())
+                  })
+                  .map(section => {
+                    // Build section display name from available data
+                    const programCode = section.program_code || section.program_name || section.program || 'N/A'
+                    const yearLevel = section.year_level || section.year || 'N/A'
+                    const semester = section.semester || 'N/A'
+                    const schoolYear = section.school_year || section.academic_year || 'N/A'
+                    const sectionName = section.section_name || section.name || ''
+                    
+                    // Build a more descriptive label
+                    let optionLabel = ''
+                    if (sectionName) {
+                      optionLabel = sectionName
+                    } else if (programCode !== 'N/A') {
+                      optionLabel = `${programCode}`
+                      if (yearLevel !== 'N/A') optionLabel += ` - Year ${yearLevel}`
+                    } else {
+                      optionLabel = `Section ${section.id}`
+                    }
+                    
+                    // Add additional details in parentheses if available
+                    const details = []
+                    if (yearLevel !== 'N/A') details.push(`Yr ${yearLevel}`)
+                    if (semester !== 'N/A') details.push(`Sem ${semester}`)
+                    if (schoolYear !== 'N/A') details.push(schoolYear)
+                    
+                    if (details.length > 0) {
+                      optionLabel += ` (${details.join(', ')})`
+                    }
+                    
+                    return (
+                      <option key={section.id} value={section.id}>
+                        {optionLabel}
+                      </option>
+                    )
+                  })}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                {programSections.length === 0 
+                  ? 'No program sections available' 
+                  : `${programSections.length} section${programSections.length !== 1 ? 's' : ''} available`}
+              </p>
+            </div>
           </div>
         </div>
 
@@ -902,14 +1103,14 @@ export default function Courses() {
           <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-[#7a0000]/5 to-[#ffd700]/5">
             <div className="flex justify-between items-center">
               <div>
-                <h2 className="text-xl font-bold text-[#7a0000] flex items-center">
+                <h2 className="text-2xl font-bold text-[#7a0000] flex items-center">
                   <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2-2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
                   </svg>
                   Active Courses
                 </h2>
                 <p className="text-gray-600 mt-1 font-medium">
-                  Showing {startIndex + 1}-{Math.min(endIndex, filteredCourses.length)} of {filteredCourses.length} courses (Page {currentPage} of {totalPages})
+                  Showing {filteredCourses.length > 0 ? startIndex + 1 : 0}-{Math.min(endIndex, filteredCourses.length)} of {filteredCourses.length} courses (Page {safeCurrentPage} of {totalPages})
                 </p>
               </div>
               <div className="flex items-center space-x-3">
@@ -925,7 +1126,6 @@ export default function Courses() {
               <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
                 <tr>
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Course</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Instructor</th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Students</th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Rating</th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Response Rate</th>
@@ -933,7 +1133,36 @@ export default function Courses() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">
-                {paginatedCourses.map((course) => (
+                {paginatedCourses.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="px-6 py-16 text-center">
+                      <div className="flex flex-col items-center justify-center">
+                        <svg className="w-16 h-16 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <h3 className="text-lg font-semibold text-gray-700 mb-2">No Courses Found</h3>
+                        <p className="text-gray-500 mb-4">
+                          {searchTerm || selectedProgram !== 'all' || selectedProgramSection !== 'all'
+                            ? 'No courses match your current filters. Try adjusting your search criteria.'
+                            : 'No courses are currently available.'}
+                        </p>
+                        {(searchTerm || selectedProgram !== 'all' || selectedProgramSection !== 'all') && (
+                          <button
+                            onClick={() => {
+                              setSearchTerm('')
+                              setSelectedProgram('all')
+                              setSelectedProgramSection('all')
+                            }}
+                            className="lpu-btn-secondary text-sm"
+                          >
+                            Clear All Filters
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedCourses.map((course) => (
                   <tr key={course.id} className="hover:bg-gradient-to-r hover:from-gray-50 hover:to-gray-25 transition-all duration-200 group">
                     <td className="px-6 py-4">
                       <div className="flex items-center">
@@ -949,10 +1178,6 @@ export default function Courses() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="font-medium text-gray-900">{course.instructor}</div>
-                      <div className="text-sm text-gray-500">Year {course.yearLevel} • {course.semester}</div>
-                    </td>
-                    <td className="px-6 py-4">
                       <div className="flex items-center">
                         <svg className="w-4 h-4 text-gray-400 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
@@ -964,7 +1189,7 @@ export default function Courses() {
                     <td className="px-6 py-4">
                       <div className="flex items-center">
                         <div className="flex mr-2">
-                          {[...Array(5)].map((_, i) => (
+                          {[...Array(4)].map((_, i) => (
                             <svg 
                               key={i} 
                               className={`w-4 h-4 ${i < Math.floor(course.overallRating) ? 'text-[#ffd700]' : 'text-gray-300'}`} 
@@ -975,7 +1200,7 @@ export default function Courses() {
                             </svg>
                           ))}
                         </div>
-                        <span className="font-bold text-gray-900">{course.overallRating || '0.0'}</span>
+                        <span className="font-bold text-gray-900">{course.overallRating ? course.overallRating.toFixed(2) : '0.00'}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -983,10 +1208,10 @@ export default function Courses() {
                         <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
                           <div 
                             className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] h-2 rounded-full transition-all duration-300" 
-                            style={{ width: `${course.responseRate || 0}%` }}
+                            style={{ width: `${Math.min(100, course.responseRate || 0)}%` }}
                           ></div>
                         </div>
-                        <span className="font-bold text-gray-900">{course.responseRate || 0}%</span>
+                        <span className="font-bold text-gray-900">{Math.min(100, course.responseRate || 0)}%</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -998,65 +1223,21 @@ export default function Courses() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                  ))
+                )}
               </tbody>
             </table>
           </div>
           
           {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-              <div className="text-sm text-gray-600">
-                Page {currentPage} of {totalPages} • {filteredCourses.length} total courses
-              </div>
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-                >
-                  Previous
-                </button>
-                
-                {/* Page Numbers */}
-                <div className="flex space-x-1">
-                  {[...Array(totalPages)].map((_, i) => {
-                    const pageNum = i + 1
-                    // Show first page, last page, current page, and pages around current
-                    if (
-                      pageNum === 1 ||
-                      pageNum === totalPages ||
-                      (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
-                    ) {
-                      return (
-                        <button
-                          key={pageNum}
-                          onClick={() => setCurrentPage(pageNum)}
-                          className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                            currentPage === pageNum
-                              ? 'bg-[#7a0000] text-white'
-                              : 'border border-gray-300 text-gray-700 hover:bg-gray-100'
-                          }`}
-                        >
-                          {pageNum}
-                        </button>
-                      )
-                    } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
-                      return <span key={pageNum} className="px-2 py-2 text-gray-500">...</span>
-                    }
-                    return null
-                  })}
-                </div>
-                
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
+          {totalPages > 1 && filteredCourses.length > 0 && (
+            <Pagination
+              currentPage={safeCurrentPage}
+              totalPages={totalPages}
+              totalItems={filteredCourses.length}
+              onPageChange={setCurrentPage}
+              itemLabel="courses"
+            />
           )}
           
           {filteredCourses.length === 0 && (
@@ -1069,6 +1250,8 @@ export default function Courses() {
           )}
         </div>
       </div>
+        </>
+        )}
 
       {/* Enhanced Course Detail Modal */}
       {selectedCourse && courseDetails && (
@@ -1145,10 +1328,10 @@ export default function Courses() {
                       <p className="text-sm text-gray-500 mb-4">Average across all evaluations</p>
                       <div className="text-center">
                         <div className="text-5xl font-bold text-blue-600 mb-2">
-                          {courseDetails.overallRating || '0.0'}
+                          {courseDetails.overallRating ? courseDetails.overallRating.toFixed(2) : '0.00'}
                         </div>
                         <div className="flex justify-center mb-3">
-                          {[...Array(5)].map((_, i) => (
+                          {[...Array(4)].map((_, i) => (
                             <svg 
                               key={i} 
                               className={`w-6 h-6 ${i < Math.floor(courseDetails.overallRating || 0) ? 'text-[#ffd700]' : 'text-gray-300'}`} 
@@ -1388,12 +1571,13 @@ export default function Courses() {
                                     </div>
                                     
                                     <div className="mt-3 pt-3 border-t border-gray-200">
-                                    <span className="text-xs text-gray-500">
-                                      Total responses: {question.total_responses}
-                                    </span>
+                                      <span className="text-xs text-gray-500">
+                                        Total responses: {question.total_responses}
+                                      </span>
+                                    </div>
                                   </div>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           </div>
                         );
@@ -1543,29 +1727,6 @@ export default function Courses() {
                     <p className="text-red-500 text-xs mt-1">{formErrors.class_code}</p>
                   )}
                   <p className="text-gray-500 text-xs mt-1">Unique section identifier</p>
-                </div>
-                
-                {/* Instructor Selection */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Assign Instructor <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="instructor_id"
-                    value={newSection.instructor_id}
-                    onChange={handleInputChange}
-                    className={`lpu-select ${formErrors.instructor_id ? 'border-red-500' : ''}`}
-                  >
-                    <option value="">-- Select Instructor --</option>
-                    {instructors.map(instructor => (
-                      <option key={instructor.id} value={instructor.id}>
-                        {instructor.first_name} {instructor.last_name} ({instructor.email})
-                      </option>
-                    ))}
-                  </select>
-                  {formErrors.instructor_id && (
-                    <p className="text-red-500 text-xs mt-1">{formErrors.instructor_id}</p>
-                  )}
                 </div>
                 
                 {/* Semester */}

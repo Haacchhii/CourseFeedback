@@ -13,26 +13,50 @@ from typing import Generator
 env_path = Path(__file__).parent.parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
-# Database URL configuration  
-# Reads from .env file first, falls back to Session Pooler
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", 
-    "postgresql+psycopg://postgres.esdohggqyckrtlpzbyhh:Napakabangis0518@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
-)
+# Database URL configuration
+# MUST be set in .env file - no fallback for security
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if not DATABASE_URL:
+    raise ValueError(
+        "DATABASE_URL environment variable is not set!\n"
+        "Please create a .env file in the Back/App directory with:\n"
+        "DATABASE_URL=postgresql+psycopg://username:password@host:port/database"
+    )
 
 # Alternative format if needed:
 # DATABASE_URL = "postgresql://username:password@localhost:5432/database_name"
 
-# Create SQLAlchemy engine with connection pooling limits
+# Create SQLAlchemy engine with optimized connection pooling
+# Connection Pool Configuration:
+# - pool_size: Number of permanent connections to maintain (5-10 recommended)
+# - max_overflow: Additional connections during high load (10-20 recommended)
+# - Total max connections = pool_size + max_overflow (15-30 typical)
+# - pool_recycle: Recycle connections after 600s to prevent stale connections
+# - pool_pre_ping: Test connections before use to handle network issues
+# - pool_timeout: Wait max 30s for connection before failing
+#
+# For production with 100+ concurrent users:
+# - Increase pool_size to 10-15
+# - Increase max_overflow to 20-30
+# - Monitor with: SELECT count(*) FROM pg_stat_activity WHERE datname='your_db';
+#
 engine = create_engine(
     DATABASE_URL,
-    pool_pre_ping=True,      # Verify connections before use
-    pool_recycle=300,        # Recycle connections every 5 minutes
-    pool_size=5,             # Maximum number of permanent connections (reduced for Supabase)
-    max_overflow=10,         # Maximum number of temporary connections
-    pool_timeout=30,         # Timeout for getting connection from pool
-    echo=False,              # Set to True for SQL debugging
-    connect_args={"prepare_threshold": None}  # Disable prepared statement cache to avoid DuplicatePreparedStatement errors
+    pool_pre_ping=True,      # Verify connections before use (detect stale connections)
+    pool_recycle=600,        # Recycle connections every 10 minutes (prevents timeout issues)
+    pool_size=10,            # Permanent connections (optimized for 50-100 concurrent users)
+    max_overflow=20,         # Maximum temporary connections during peak load
+    pool_timeout=30,         # Wait up to 30s for connection (prevents immediate failures)
+    echo=False,              # Set to True for SQL debugging (logs all queries)
+    connect_args={
+        "prepare_threshold": None,  # Disable prepared statement cache (Supabase compatibility)
+        "connect_timeout": 10,       # Connection timeout in seconds
+        "keepalives": 1,             # Enable TCP keepalive (detect dead connections)
+        "keepalives_idle": 30,       # Seconds before sending keepalive probes
+        "keepalives_interval": 10,   # Seconds between keepalive probes
+        "keepalives_count": 5        # Number of keepalive probes before giving up
+    }
 )
 
 # Create SessionLocal class

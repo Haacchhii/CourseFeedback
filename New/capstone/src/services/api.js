@@ -2,6 +2,7 @@
 // This file handles all HTTP requests to the FastAPI backend
 
 import axios from 'axios'
+import { rateLimiter } from '../utils/rateLimiter'
 
 // API Base URL - change this for production
 const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'
@@ -15,13 +16,33 @@ const apiClient = axios.create({
   timeout: 30000, // 30 second timeout for complex queries
 })
 
-// Request interceptor - Add auth token to all requests
+// Request interceptor - Add auth token and rate limiting
 apiClient.interceptors.request.use(
   (config) => {
+    // Add authentication token
     const token = localStorage.getItem('token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
+
+    // Apply rate limiting (only for non-GET requests to prevent spam)
+    if (config.method !== 'get') {
+      const endpoint = `${config.method}:${config.url}`
+      const rateLimitResult = rateLimiter.checkLimit(endpoint, {
+        maxRequests: 20, // 20 requests per minute
+        timeWindow: 60000, // 1 minute
+        blockDuration: 30000 // 30 second block
+      })
+
+      if (!rateLimitResult.allowed) {
+        // Rate limit exceeded - reject request
+        const error = new Error(rateLimitResult.reason)
+        error.code = 'RATE_LIMIT_EXCEEDED'
+        error.retryAfter = rateLimitResult.retryAfter
+        return Promise.reject(error)
+      }
+    }
+
     return config
   },
   (error) => {
@@ -246,6 +267,26 @@ export const adminAPI = {
   },
 
   /**
+   * Activate user (set is_active to true)
+   * @param {number} userId - User ID
+   * @returns {Promise} Success message
+   */
+  activateUser: async (userId) => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.put(`/admin/users/${userId}?current_user_id=${currentUser?.id}`, { is_active: true })
+  },
+
+  /**
+   * Deactivate user (set is_active to false)
+   * @param {number} userId - User ID
+   * @returns {Promise} Success message
+   */
+  deactivateUser: async (userId) => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.put(`/admin/users/${userId}?current_user_id=${currentUser?.id}`, { is_active: false })
+  },
+
+  /**
    * Get user statistics
    * @returns {Promise} User stats (total, by role, active/inactive)
    */
@@ -262,6 +303,14 @@ export const adminAPI = {
    * @returns {Promise} List of evaluation periods
    */
   getPeriods: async () => {
+    return apiClient.get('/admin/evaluation-periods')
+  },
+
+  /**
+   * Get all evaluation periods (alias for getPeriods)
+   * @returns {Promise} List of evaluation periods
+   */
+  getEvaluationPeriods: async () => {
     return apiClient.get('/admin/evaluation-periods')
   },
 
@@ -312,7 +361,7 @@ export const adminAPI = {
     }
     // Remove undefined values
     Object.keys(backendData).forEach(key => backendData[key] === undefined && delete backendData[key])
-    return apiClient.put(`/admin/evaluation-periods/${periodId}?current_user_id=${currentUser?.id}`, backendData)
+    return apiClient.patch(`/admin/evaluation-periods/${periodId}?current_user_id=${currentUser?.id}`, backendData)
   },
 
   /**
@@ -361,7 +410,7 @@ export const adminAPI = {
    */
   removePeriodEnrollment: async (periodId, enrollmentId) => {
     const currentUser = authAPI.getCurrentUser()
-    return apiClient.delete(`/admin/evaluation-periods/${periodId}/enrolled-sections/${enrollmentId}?current_user_id=${currentUser?.id}`)
+    return apiClient.delete(`/admin/evaluation-periods/${periodId}/enrolled-program-sections/${enrollmentId}?current_user_id=${currentUser?.id}`)
   },
 
   /**
@@ -411,25 +460,6 @@ export const adminAPI = {
   // ============================================
   // SYSTEM SETTINGS
   // ============================================
-
-  /**
-   * Get system settings by category
-   * @param {string} category - Settings category (general, email, security, backup)
-   * @returns {Promise} Settings for category
-   */
-  getSettings: async (category = 'general') => {
-    return apiClient.get(`/admin/settings/${category}`)
-  },
-
-  /**
-   * Update system settings
-   * @param {Object} data - {category: string, settings: object}
-   * @returns {Promise} Success message
-   */
-  updateSettings: async (data) => {
-    const currentUser = authAPI.getCurrentUser()
-    return apiClient.put(`/admin/settings?current_user_id=${currentUser?.id}`, data)
-  },
 
   // ============================================
   // AUDIT LOGS
@@ -503,6 +533,21 @@ export const adminAPI = {
    */
   getDashboardStats: async () => {
     return apiClient.get('/admin/dashboard-stats')
+  },
+
+  /**
+   * Get non-respondents (students who haven't completed evaluations)
+   * @param {Object} params - Optional filters (evaluation_period_id, program_id, year_level)
+   * @returns {Promise} Non-respondents data with statistics
+   */
+  getNonRespondents: async (params = {}) => {
+    const queryParams = new URLSearchParams()
+    if (params.evaluation_period_id) queryParams.append('evaluation_period_id', params.evaluation_period_id)
+    if (params.program_id) queryParams.append('program_id', params.program_id)
+    if (params.year_level) queryParams.append('year_level', params.year_level)
+    
+    const queryString = queryParams.toString()
+    return apiClient.get(`/admin/non-respondents${queryString ? `?${queryString}` : ''}`)
   },
 
   /**
@@ -611,8 +656,11 @@ export const adminAPI = {
     const queryParams = new URLSearchParams()
     if (params.search) queryParams.append('search', params.search)
     if (params.program_id) queryParams.append('program_id', params.program_id)
+    if (params.program_code) queryParams.append('program_code', params.program_code)
+    if (params.program_section_id) queryParams.append('program_section_id', params.program_section_id)
     if (params.year_level) queryParams.append('year_level', params.year_level)
     if (params.semester) queryParams.append('semester', params.semester)
+    if (params.period_id) queryParams.append('period_id', params.period_id)
     
     const query = queryParams.toString()
     return apiClient.get(`/admin/sections${query ? '?' + query : ''}`)
@@ -760,7 +808,7 @@ export const adminAPI = {
     if (currentUser?.id) params.append('user_id', currentUser.id)
     if (options.program) params.append('program', options.program)
     if (options.status) params.append('status', options.status)
-    if (options.yearLevel) params.append('year_level', options.yearLevel)
+    if (options.year_level) params.append('year_level', options.year_level)
     return apiClient.get(`/admin/export/courses?${params.toString()}`)
   },
 
@@ -874,11 +922,15 @@ export const adminAPI = {
 
   /**
    * Get completion rates for all courses
+   * @param {number} periodId - Optional evaluation period ID
    * @returns {Promise} Completion rates data with overall statistics and per-course breakdown
    */
-  getCompletionRates: async () => {
+  getCompletionRates: async (periodId = null) => {
     const currentUser = authAPI.getCurrentUser()
-    return apiClient.get(`/admin/completion-rates?user_id=${currentUser?.id}`)
+    const url = periodId 
+      ? `/admin/completion-rates?user_id=${currentUser?.id}&period_id=${periodId}`
+      : `/admin/completion-rates?user_id=${currentUser?.id}`
+    return apiClient.get(url)
   },
 
   /**
@@ -889,35 +941,6 @@ export const adminAPI = {
   submitSupportRequest: async (requestData) => {
     const currentUser = authAPI.getCurrentUser()
     return apiClient.post(`/admin/support-request?user_id=${currentUser?.id}`, requestData)
-  },
-
-  /**
-   * Schedule automatic data export
-   * @param {Object} scheduleData - Schedule configuration (frequency, time, format, recipients, etc.)
-   * @returns {Promise} Success response with schedule details
-   */
-  scheduleExport: async (scheduleData) => {
-    const currentUser = authAPI.getCurrentUser()
-    return apiClient.post(`/admin/export/schedule?user_id=${currentUser?.id}`, scheduleData)
-  },
-
-  /**
-   * Get all scheduled exports
-   * @returns {Promise} List of scheduled exports
-   */
-  getScheduledExports: async () => {
-    const currentUser = authAPI.getCurrentUser()
-    return apiClient.get(`/admin/export/schedules?user_id=${currentUser?.id}`)
-  },
-
-  /**
-   * Delete a scheduled export
-   * @param {number} scheduleId - Schedule ID to delete
-   * @returns {Promise} Success response
-   */
-  deleteScheduledExport: async (scheduleId) => {
-    const currentUser = authAPI.getCurrentUser()
-    return apiClient.delete(`/admin/export/schedule/${scheduleId}?user_id=${currentUser?.id}`)
   },
 
   /**
@@ -1073,6 +1096,100 @@ export const adminAPI = {
     return apiClient.delete(`/admin/program-sections/${sectionId}/students/${studentId}?current_user_id=${currentUser?.id}`)
   },
 
+  // ============================================
+  // STUDENT ADVANCEMENT & ENROLLMENT TRANSITIONS
+  // ============================================
+
+  /**
+   * Get advancement eligibility report
+   * @returns {Promise} Report showing students eligible for year advancement
+   */
+  getAdvancementEligibility: async () => {
+    return apiClient.get('/student-management/advancement/eligibility')
+  },
+
+  /**
+   * Advance students to next year level
+   * @param {Object} params - Advancement parameters
+   * @param {number} params.program_id - Optional: Filter by program
+   * @param {number} params.current_year_level - Optional: Filter by current year
+   * @param {boolean} params.dry_run - Whether to preview only (default true)
+   * @returns {Promise} Advancement results
+   */
+  advanceStudents: async (params = {}) => {
+    return apiClient.post('/student-management/advancement/advance-students', {
+      program_id: params.program_id,
+      current_year_level: params.current_year_level,
+      dry_run: params.dry_run !== undefined ? params.dry_run : true
+    })
+  },
+
+  /**
+   * Transition enrollments between evaluation periods
+   * @param {Object} params - Transition parameters
+   * @param {number} params.from_period_id - Source evaluation period ID
+   * @param {number} params.to_period_id - Target evaluation period ID
+   * @param {boolean} params.auto_advance_year - Whether to advance year level
+   * @param {boolean} params.dry_run - Whether to preview only (default true)
+   * @returns {Promise} Transition results
+   */
+  transitionEnrollments: async (params) => {
+    return apiClient.post('/student-management/advancement/transition-enrollments', {
+      from_period_id: params.from_period_id,
+      to_period_id: params.to_period_id,
+      auto_advance_year: params.auto_advance_year || false,
+      dry_run: params.dry_run !== undefined ? params.dry_run : true
+    })
+  },
+
+  /**
+   * Get students grouped by year level
+   * @param {Object} params - Query parameters
+   * @param {number} params.year_level - Optional: Filter by year level
+   * @param {number} params.program_id - Optional: Filter by program
+   * @returns {Promise} Students list grouped by year
+   */
+  getStudentsByYearLevel: async (params = {}) => {
+    const queryParams = new URLSearchParams()
+    if (params.year_level) queryParams.append('year_level', params.year_level)
+    if (params.program_id) queryParams.append('program_id', params.program_id)
+    
+    const queryString = queryParams.toString()
+    return apiClient.get(`/student-management/advancement/students-by-year${queryString ? '?' + queryString : ''}`)
+  },
+
+  /**
+   * List available advancement snapshots for rollback
+   * @param {number} limit - Maximum number of snapshots to return
+   * @returns {Promise} List of snapshots
+   */
+  getAdvancementSnapshots: async (limit = 10) => {
+    return apiClient.get(`/student-management/advancement/snapshots?limit=${limit}`)
+  },
+
+  /**
+   * Rollback student year levels to a previous snapshot
+   * @param {Object} params - Rollback parameters
+   * @param {number} params.snapshot_id - Optional: Specific snapshot ID (null = latest)
+   * @param {boolean} params.dry_run - Whether to preview only (default true)
+   * @returns {Promise} Rollback results
+   */
+  rollbackAdvancement: async (params = {}) => {
+    return apiClient.post('/student-management/advancement/rollback', {
+      snapshot_id: params.snapshot_id || null,
+      dry_run: params.dry_run !== undefined ? params.dry_run : true
+    })
+  },
+
+  /**
+   * Manually create a snapshot of current student year levels
+   * @param {string} description - Description of the snapshot
+   * @returns {Promise} Snapshot creation result
+   */
+  createAdvancementSnapshot: async (description = 'Manual snapshot') => {
+    return apiClient.post(`/student-management/advancement/create-snapshot?description=${encodeURIComponent(description)}`)
+  },
+
   /**
    * Bulk enroll all students from a program section into a class section
    * @param {number} classSectionId - Class section ID
@@ -1121,6 +1238,19 @@ export const studentAPI = {
   },
 
   /**
+   * Get student's evaluation history with period filtering
+   * @param {number} studentId - Student ID
+   * @param {number|null} periodId - Optional evaluation period ID filter
+   * @returns {Promise} List of evaluations with period information
+   */
+  getEvaluationHistory: async (studentId, periodId = null) => {
+    const url = periodId 
+      ? `/student/${studentId}/evaluation-history?period_id=${periodId}`
+      : `/student/${studentId}/evaluation-history`
+    return apiClient.get(url)
+  },
+
+  /**
    * Get course details
    * @param {number} courseId - Course ID
    * @returns {Promise} Course details
@@ -1165,12 +1295,17 @@ export const deptHeadAPI = {
 
   /**
    * Get department evaluations with filters
-   * @param {Object} params - Query parameters (semester, academic_year, course_id, etc.)
-   * @returns {Promise} Evaluations list
+   * @param {Object} params - Query parameters (page, page_size, semester, academic_year, course_id, etc.)
+   * @returns {Promise} Evaluations list with pagination
    */
   getEvaluations: async (params = {}) => {
     const currentUser = authAPI.getCurrentUser()
-    const queryParams = new URLSearchParams({ user_id: currentUser?.id, page_size: 100, ...params })
+    const queryParams = new URLSearchParams({ 
+      user_id: currentUser?.id, 
+      page: params.page || 1,
+      page_size: params.page_size || 15, 
+      ...params 
+    })
     return apiClient.get(`/dept-head/evaluations?${queryParams.toString()}`)
   },
 
@@ -1299,32 +1434,75 @@ export const deptHeadAPI = {
   },
 
   /**
+   * Get non-respondents (students who haven't completed evaluations)
+   * @param {Object} params - Optional filters (evaluation_period_id, program_id, year_level)
+   * @returns {Promise} Non-respondents data with statistics
+   */
+  getNonRespondents: async (params = {}) => {
+    const currentUser = authAPI.getCurrentUser()
+    const queryParams = new URLSearchParams({ user_id: currentUser?.id })
+    if (params.evaluation_period_id) queryParams.append('evaluation_period_id', params.evaluation_period_id)
+    if (params.program_id) queryParams.append('program_id', params.program_id)
+    if (params.year_level) queryParams.append('year_level', params.year_level)
+    
+    return apiClient.get(`/dept-head/non-respondents?${queryParams.toString()}`)
+  },
+
+  /**
    * Get category averages for a course (6 categories from 31 questions)
    * @param {number} courseId - Course ID
    * @param {number} userId - User ID
+   * @param {number} periodId - Optional evaluation period ID
    * @returns {Promise} Category averages data
    */
-  getCategoryAverages: async (courseId, userId) => {
-    return apiClient.get(`/dept-head/courses/${courseId}/category-averages?user_id=${userId}`)
+  getCategoryAverages: async (courseId, userId, periodId = null) => {
+    const url = periodId 
+      ? `/dept-head/courses/${courseId}/category-averages?user_id=${userId}&period_id=${periodId}`
+      : `/dept-head/courses/${courseId}/category-averages?user_id=${userId}`
+    return apiClient.get(url)
   },
 
   /**
    * Get question distribution for a course (all 31 questions)
    * @param {number} courseId - Course ID
    * @param {number} userId - User ID
+   * @param {number} periodId - Optional evaluation period ID
    * @returns {Promise} Question distribution data
    */
-  getQuestionDistribution: async (courseId, userId) => {
-    return apiClient.get(`/dept-head/courses/${courseId}/question-distribution?user_id=${userId}`)
+  getQuestionDistribution: async (courseId, userId, periodId = null) => {
+    const url = periodId 
+      ? `/dept-head/courses/${courseId}/question-distribution?user_id=${userId}&period_id=${periodId}`
+      : `/dept-head/courses/${courseId}/question-distribution?user_id=${userId}`
+    return apiClient.get(url)
   },
 
   /**
    * Get completion rates for all courses
+   * @param {number} periodId - Optional evaluation period ID
    * @returns {Promise} Completion rates data with overall statistics and per-course breakdown
    */
-  getCompletionRates: async () => {
+  getCompletionRates: async (periodId = null) => {
     const currentUser = authAPI.getCurrentUser()
-    return apiClient.get(`/dept-head/completion-rates?user_id=${currentUser?.id}`)
+    const url = periodId 
+      ? `/dept-head/completion-rates?user_id=${currentUser?.id}&period_id=${periodId}`
+      : `/dept-head/completion-rates?user_id=${currentUser?.id}`
+    return apiClient.get(url)
+  },
+
+  /**
+   * Get program sections
+   * @param {Object} filters - Filter parameters (program_id, year_level, semester, etc.)
+   * @returns {Promise} Program sections list
+   */
+  getProgramSections: async (filters = {}) => {
+    const queryParams = new URLSearchParams()
+    if (filters.program_id) queryParams.append('program_id', filters.program_id)
+    if (filters.year_level) queryParams.append('year_level', filters.year_level)
+    if (filters.semester) queryParams.append('semester', filters.semester)
+    if (filters.is_active !== undefined) queryParams.append('is_active', filters.is_active)
+    
+    const query = queryParams.toString()
+    return apiClient.get(`/admin/program-sections${query ? '?' + query : ''}`)
   },
 
   /**
@@ -1336,94 +1514,28 @@ export const deptHeadAPI = {
     const currentUser = authAPI.getCurrentUser()
     return apiClient.post(`/dept-head/support-request?user_id=${currentUser?.id}`, requestData)
   },
-}
 
-// ============================================
-// INSTRUCTOR API
-// ============================================
-
-export const instructorAPI = {
   /**
-   * Get instructor dashboard data
-   * @returns {Promise} Dashboard data with stats
+   * Get ML analysis results for a specific section
+   * @param {number} sectionId - Class section ID
+   * @returns {Promise} ML analysis results (sentiment, anomaly)
    */
-  getDashboard: async () => {
+  getMLAnalysis: async (sectionId) => {
     const currentUser = authAPI.getCurrentUser()
-    return apiClient.get(`/instructor/dashboard?user_id=${currentUser?.id}`)
+    return apiClient.get(`/dept-head/ml-analysis/${sectionId}?user_id=${currentUser?.id}`)
   },
 
   /**
-   * Get instructor courses
-   * @returns {Promise} List of courses taught
+   * Get ML insights summary across all sections
+   * @param {number} periodId - Optional evaluation period ID
+   * @returns {Promise} Summary of ML insights
    */
-  getCourses: async () => {
+  getMLInsightsSummary: async (periodId = null) => {
     const currentUser = authAPI.getCurrentUser()
-    return apiClient.get(`/instructor/courses?user_id=${currentUser?.id}`)
-  },
-
-  /**
-   * Get instructor evaluations
-   * @param {Object} params - Query parameters (class_section_id, etc.)
-   * @returns {Promise} Evaluations list
-   */
-  getEvaluations: async (params = {}) => {
-    const currentUser = authAPI.getCurrentUser()
-    const queryParams = new URLSearchParams({ user_id: currentUser?.id, ...params })
-    return apiClient.get(`/instructor/evaluations?${queryParams.toString()}`)
-  },
-
-  /**
-   * Get sentiment analysis (instructor view)
-   * @param {Object} params - Query parameters
-   * @returns {Promise} Sentiment analysis data
-   */
-  getSentimentAnalysis: async (params = {}) => {
-    const currentUser = authAPI.getCurrentUser()
-    const queryParams = new URLSearchParams({ user_id: currentUser?.id, ...params })
-    return apiClient.get(`/instructor/sentiment-analysis?${queryParams.toString()}`)
-  },
-
-  /**
-   * Get anomalies (instructor view)
-   * @param {Object} params - Query parameters
-   * @returns {Promise} Anomalies list
-   */
-  getAnomalies: async (params = {}) => {
-    const currentUser = authAPI.getCurrentUser()
-    const queryParams = new URLSearchParams({ user_id: currentUser?.id, ...params })
-    return apiClient.get(`/instructor/anomalies?${queryParams.toString()}`)
-  },
-
-  /**
-   * Get evaluation questions/form structure
-   * @returns {Promise} Question sets
-   */
-  getQuestions: async () => {
-    // Return mock question sets for now (instructors typically view, not edit)
-    return Promise.resolve({
-      success: true,
-      data: {
-        questionSets: []
-      }
-    })
-  },
-
-  /**
-   * Get programs list for filtering
-   * @returns {Promise} List of programs
-   */
-  getPrograms: async () => {
-    const currentUser = authAPI.getCurrentUser()
-    return apiClient.get(`/instructor/programs?user_id=${currentUser?.id}`)
-  },
-
-  /**
-   * Get year levels list for filtering
-   * @returns {Promise} List of year levels
-   */
-  getYearLevels: async () => {
-    const currentUser = authAPI.getCurrentUser()
-    return apiClient.get(`/instructor/year-levels?user_id=${currentUser?.id}`)
+    const url = periodId 
+      ? `/dept-head/ml-insights-summary?user_id=${currentUser?.id}&period_id=${periodId}`
+      : `/dept-head/ml-insights-summary?user_id=${currentUser?.id}`
+    return apiClient.get(url)
   },
 }
 
@@ -1535,6 +1647,20 @@ export const secretaryAPI = {
   },
 
   /**
+   * Get non-respondents (students who haven't completed evaluations)
+   * @param {Object} params - Optional filters (evaluation_period_id, year_level)
+   * @returns {Promise} Non-respondents data with statistics
+   */
+  getNonRespondents: async (params = {}) => {
+    const currentUser = authAPI.getCurrentUser()
+    const queryParams = new URLSearchParams({ user_id: currentUser?.id })
+    if (params.evaluation_period_id) queryParams.append('evaluation_period_id', params.evaluation_period_id)
+    if (params.year_level) queryParams.append('year_level', params.year_level)
+    
+    return apiClient.get(`/secretary/non-respondents?${queryParams.toString()}`)
+  },
+
+  /**
    * Get evaluations summary report
    * @param {Object} params - Query parameters (semester, academic_year)
    * @returns {Promise} Evaluations summary
@@ -1546,13 +1672,18 @@ export const secretaryAPI = {
   },
 
   /**
-   * Get evaluations list
-   * @param {Object} params - Query parameters
-   * @returns {Promise} Evaluations list
+   * Get evaluations list with pagination
+   * @param {Object} params - Query parameters (page, page_size, course_id, sentiment, etc.)
+   * @returns {Promise} Evaluations list with pagination (15 per page by default)
    */
   getEvaluations: async (params = {}) => {
     const currentUser = authAPI.getCurrentUser()
-    const queryParams = new URLSearchParams({ user_id: currentUser?.id, page_size: 100, ...params })
+    const queryParams = new URLSearchParams({ 
+      user_id: currentUser?.id, 
+      page: params.page || 1,
+      page_size: params.page_size || 15, 
+      ...params 
+    })
     return apiClient.get(`/secretary/evaluations?${queryParams.toString()}`)
   },
 
@@ -1605,29 +1736,57 @@ export const secretaryAPI = {
    * Get category averages for a course (6 categories from 31 questions)
    * @param {number} courseId - Course ID
    * @param {number} userId - User ID
+   * @param {number} periodId - Optional evaluation period ID
    * @returns {Promise} Category averages data
    */
-  getCategoryAverages: async (courseId, userId) => {
-    return apiClient.get(`/secretary/courses/${courseId}/category-averages?user_id=${userId}`)
+  getCategoryAverages: async (courseId, userId, periodId = null) => {
+    const url = periodId 
+      ? `/secretary/courses/${courseId}/category-averages?user_id=${userId}&period_id=${periodId}`
+      : `/secretary/courses/${courseId}/category-averages?user_id=${userId}`
+    return apiClient.get(url)
   },
 
   /**
    * Get question distribution for a course (all 31 questions)
    * @param {number} courseId - Course ID
    * @param {number} userId - User ID
+   * @param {number} periodId - Optional evaluation period ID
    * @returns {Promise} Question distribution data
    */
-  getQuestionDistribution: async (courseId, userId) => {
-    return apiClient.get(`/secretary/courses/${courseId}/question-distribution?user_id=${userId}`)
+  getQuestionDistribution: async (courseId, userId, periodId = null) => {
+    const url = periodId 
+      ? `/secretary/courses/${courseId}/question-distribution?user_id=${userId}&period_id=${periodId}`
+      : `/secretary/courses/${courseId}/question-distribution?user_id=${userId}`
+    return apiClient.get(url)
   },
 
   /**
    * Get completion rates for all courses
+   * @param {number} periodId - Optional evaluation period ID
    * @returns {Promise} Completion rates data with overall statistics and per-course breakdown
    */
-  getCompletionRates: async () => {
+  getCompletionRates: async (periodId = null) => {
     const currentUser = authAPI.getCurrentUser()
-    return apiClient.get(`/secretary/completion-rates?user_id=${currentUser?.id}`)
+    const url = periodId 
+      ? `/secretary/completion-rates?user_id=${currentUser?.id}&period_id=${periodId}`
+      : `/secretary/completion-rates?user_id=${currentUser?.id}`
+    return apiClient.get(url)
+  },
+
+  /**
+   * Get program sections
+   * @param {Object} filters - Filter parameters (program_id, year_level, semester, etc.)
+   * @returns {Promise} Program sections list
+   */
+  getProgramSections: async (filters = {}) => {
+    const queryParams = new URLSearchParams()
+    if (filters.program_id) queryParams.append('program_id', filters.program_id)
+    if (filters.year_level) queryParams.append('year_level', filters.year_level)
+    if (filters.semester) queryParams.append('semester', filters.semester)
+    if (filters.is_active !== undefined) queryParams.append('is_active', filters.is_active)
+    
+    const query = queryParams.toString()
+    return apiClient.get(`/admin/program-sections${query ? '?' + query : ''}`)
   },
 
   /**
@@ -1638,6 +1797,29 @@ export const secretaryAPI = {
   submitSupportRequest: async (requestData) => {
     const currentUser = authAPI.getCurrentUser()
     return apiClient.post(`/secretary/support-request?user_id=${currentUser?.id}`, requestData)
+  },
+
+  /**
+   * Get ML analysis results for a specific section
+   * @param {number} sectionId - Class section ID
+   * @returns {Promise} ML analysis results (sentiment, anomaly)
+   */
+  getMLAnalysis: async (sectionId) => {
+    const currentUser = authAPI.getCurrentUser()
+    return apiClient.get(`/secretary/ml-analysis/${sectionId}?user_id=${currentUser?.id}`)
+  },
+
+  /**
+   * Get ML insights summary across all sections
+   * @param {number} periodId - Optional evaluation period ID
+   * @returns {Promise} Summary of ML insights
+   */
+  getMLInsightsSummary: async (periodId = null) => {
+    const currentUser = authAPI.getCurrentUser()
+    const url = periodId 
+      ? `/secretary/ml-insights-summary?user_id=${currentUser?.id}&period_id=${periodId}`
+      : `/secretary/ml-insights-summary?user_id=${currentUser?.id}`
+    return apiClient.get(url)
   },
 }
 
@@ -1683,12 +1865,16 @@ export const legacyAdminAPI = {
   },
 
   /**
-   * Get all evaluations with filters
-   * @param {Object} params - Query parameters (semester, academic_year, student_id, etc.)
-   * @returns {Promise} Evaluations list
+   * Get all evaluations with filters and pagination
+   * @param {Object} params - Query parameters (page, page_size, semester, academic_year, student_id, etc.)
+   * @returns {Promise} Evaluations list with pagination (15 per page by default)
    */
   getEvaluations: async (params = {}) => {
-    const queryParams = new URLSearchParams(params)
+    const queryParams = new URLSearchParams({ 
+      page: params.page || 1,
+      page_size: params.page_size || 15,
+      ...params 
+    })
     return apiClient.get(`/admin/evaluations?${queryParams.toString()}`)
   },
 
@@ -1738,13 +1924,14 @@ export const formatDateForAPI = (date) => {
 }
 
 // Export default object with all APIs
+export { apiClient }
+
 export default {
   auth: authAPI,
   admin: adminAPI,
   student: studentAPI,
   deptHead: deptHeadAPI,
   secretary: secretaryAPI,
-  instructor: instructorAPI,
   legacyAdmin: legacyAdminAPI,
   utils: {
     downloadFile,

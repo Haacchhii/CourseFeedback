@@ -7,6 +7,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Index from './pages/common/Index'
 import Login from './pages/common/Login'
 import ForgotPassword from './pages/common/ForgotPassword'
+import ResetPassword from './pages/common/ResetPassword'
 import FirstTimeLogin from './pages/auth/FirstTimeLogin'
 import NotFound from './pages/common/NotFound'
 
@@ -15,16 +16,21 @@ import AdminDashboard from './pages/admin/AdminDashboard'
 import UserManagement from './pages/admin/UserManagement'
 import EvaluationPeriodManagement from './pages/admin/EvaluationPeriodManagement'
 import EnhancedCourseManagement from './pages/admin/EnhancedCourseManagement'
-import SystemSettings from './pages/admin/SystemSettings'
 import AuditLogViewer from './pages/admin/AuditLogViewer'
 import DataExportCenter from './pages/admin/DataExportCenter'
 import EmailNotifications from './pages/admin/EmailNotifications'
+import StudentManagement from './pages/admin/StudentManagement'
+import EnrollmentListManagement from './pages/admin/EnrollmentListManagement'
 
 // Staff Pages (Secretary/Dept Head)
 import StaffDashboard from './pages/staff/Dashboard'
 import StaffSentimentAnalysis from './pages/staff/SentimentAnalysis'
 import StaffCourses from './pages/staff/Courses'
 import StaffEvaluations from './pages/staff/Evaluations'
+import StaffNonRespondents from './pages/staff/NonRespondents'
+import StaffAnomalyDetection from './pages/staff/AnomalyDetection'
+import AdminNonRespondents from './pages/admin/NonRespondents'
+import ProgramSections from './pages/admin/ProgramSections'
 
 // Student Pages
 import StudentCourses from './pages/student/StudentCourses'
@@ -40,6 +46,7 @@ export default function App(){
         {/* Login Pages */}
         <Route path="/login" element={<Login/>} />
         <Route path="/forgot" element={<ForgotPassword/>} />
+        <Route path="/reset-password" element={<ResetPassword/>} />
         <Route path="/first-time-login" element={<FirstTimeLogin/>} />
 
         {/* Admin Dashboard (Full Control) - Protected */}
@@ -63,11 +70,6 @@ export default function App(){
             <EnhancedCourseManagement/>
           </ProtectedRoute>
         } />
-        <Route path="/admin/settings" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <SystemSettings/>
-          </ProtectedRoute>
-        } />
         <Route path="/admin/export" element={
           <ProtectedRoute allowedRoles={['admin']}>
             <DataExportCenter/>
@@ -81,6 +83,26 @@ export default function App(){
         <Route path="/admin/emails" element={
           <ProtectedRoute allowedRoles={['admin']}>
             <EmailNotifications/>
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/student-management" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <StudentManagement/>
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/enrollment-list" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <EnrollmentListManagement/>
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/non-respondents" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <AdminNonRespondents/>
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/program-sections" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <ProgramSections/>
           </ProtectedRoute>
         } />
 
@@ -103,6 +125,16 @@ export default function App(){
         <Route path="/evaluations" element={
           <ProtectedRoute allowedRoles={['secretary', 'department_head']}>
             <StaffEvaluations/>
+          </ProtectedRoute>
+        } />
+        <Route path="/non-respondents" element={
+          <ProtectedRoute allowedRoles={['secretary', 'department_head']}>
+            <StaffNonRespondents/>
+          </ProtectedRoute>
+        } />
+        <Route path="/anomalies" element={
+          <ProtectedRoute allowedRoles={['secretary', 'department_head']}>
+            <StaffAnomalyDetection/>
           </ProtectedRoute>
         } />
 

@@ -14,9 +14,24 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173")
     
     # JWT Configuration
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-here-change-in-production")
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Validate SECRET_KEY on initialization
+        if not self.SECRET_KEY:
+            raise ValueError(
+                "CRITICAL SECURITY ERROR: SECRET_KEY environment variable is not set!\n"
+                "Please set a strong SECRET_KEY in your .env file.\n"
+                "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+            )
+        if self.SECRET_KEY == "your-secret-key-here-change-in-production":
+            raise ValueError(
+                "CRITICAL SECURITY ERROR: SECRET_KEY is set to default value!\n"
+                "Please generate a strong SECRET_KEY with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+            )
     
     # ML Model Configuration
     SVM_MODEL_PATH: str = "models/svm_sentiment_model.pkl"
@@ -38,7 +53,12 @@ class Settings(BaseSettings):
         "http://localhost:8080"
     ]
     
-    # Email Configuration (SMTP)
+    # Email Configuration - Resend
+    RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
+    RESEND_FROM_EMAIL: str = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev")
+    RESEND_FROM_NAME: str = os.getenv("RESEND_FROM_NAME", "LPU Course Feedback System")
+    
+    # Backup: Email Configuration (SMTP)
     SMTP_SERVER: str = os.getenv("SMTP_SERVER", "smtp.gmail.com")
     SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
     SMTP_USERNAME: str = os.getenv("SMTP_USERNAME", "")

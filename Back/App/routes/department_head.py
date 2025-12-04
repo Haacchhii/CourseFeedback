@@ -9,12 +9,13 @@ Handles department head dashboard and analytics including:
 """
 
 from fastapi import APIRouter, HTTPException, Depends, Query
+from middleware.auth import require_staff
 from sqlalchemy.orm import Session
 from sqlalchemy import text, func, and_, or_, desc
 from database.connection import get_db
 from models.enhanced_models import (
     User, Student, Course, ClassSection, Evaluation,
-    DepartmentHead, Program, AnalysisResult
+    DepartmentHead, Program, AnalysisResult, EvaluationPeriod, Enrollment
 )
 from typing import Optional, List
 from pydantic import BaseModel
@@ -72,12 +73,12 @@ def get_dept_head_by_param(db: Session, user_id: Optional[int] = None, departmen
 async def get_department_head_dashboard(
     department: Optional[str] = Query(None),
     user_id: Optional[int] = Query(None),
+    period_id: Optional[int] = Query(None),
     db: Session = Depends(get_db)
 ):
-    """Get department head dashboard overview"""
+    """Get department head dashboard overview (defaults to active period)"""
     try:
         # Get department head info
-        # Support both department string and user_id for flexibility
         if user_id:
             dept_head = db.query(DepartmentHead).filter(DepartmentHead.user_id == user_id).first()
         elif department:
@@ -86,7 +87,6 @@ async def get_department_head_dashboard(
             raise HTTPException(status_code=400, detail="Either user_id or department must be provided")
         
         if not dept_head:
-            # Return empty dashboard instead of error
             return {
                 "success": True,
                 "data": {
@@ -99,23 +99,57 @@ async def get_department_head_dashboard(
                 }
             }
         
-        # Department-wide access (no program filtering) - merged with secretary role
-        # Department heads now have full department access like secretaries
-        logger.info(f"Department head accessing dashboard (department-wide access)")
+        # Get evaluation period (active by default)
+        if period_id:
+            period = db.query(EvaluationPeriod).filter(EvaluationPeriod.id == period_id).first()
+            if not period:
+                raise HTTPException(status_code=404, detail="Evaluation period not found")
+        else:
+            period = db.query(EvaluationPeriod).filter(EvaluationPeriod.status == 'active').first()
         
-        # Total courses - department-wide
+        # If no period, return empty dashboard
+        if not period:
+            return {
+                "success": True,
+                "data": {
+                    "department": dept_head.department,
+                    "period": None,
+                    "period_name": None,
+                    "total_courses": 0,
+                    "total_evaluations": 0,
+                    "total_enrolled_students": 0,
+                    "participation_rate": 0,
+                    "average_rating": 0.0,
+                    "sentiment": {"positive": 0, "neutral": 0, "negative": 0},
+                    "anomalies": 0,
+                    "message": "No active evaluation period"
+                }
+            }
+        
+        logger.info(f"Department head accessing dashboard for period: {period.name}")
+        
+        # Total courses
         total_courses = db.query(func.count(Course.id)).scalar() or 0
         
-        # Total evaluations - department-wide
-        total_evaluations = db.query(func.count(Evaluation.id)).scalar() or 0
+        # Total evaluations for THIS PERIOD ONLY (completed only)
+        total_evaluations = db.query(func.count(Evaluation.id)).filter(
+            Evaluation.evaluation_period_id == period.id,
+            Evaluation.status == 'completed'
+        ).scalar() or 0
         
-        # Average rating - department-wide
-        avg_rating = db.query(func.avg(Evaluation.rating_overall)).scalar() or 0.0
+        # Average rating for THIS PERIOD ONLY (completed only)
+        avg_rating = db.query(func.avg(Evaluation.rating_overall)).filter(
+            Evaluation.evaluation_period_id == period.id,
+            Evaluation.status == 'completed'
+        ).scalar() or 0.0
         
-        # Sentiment distribution - department-wide
+        # Sentiment distribution for THIS PERIOD ONLY (completed only)
         sentiment_dist = db.query(
             Evaluation.sentiment,
             func.count(Evaluation.id).label('count')
+        ).filter(
+            Evaluation.evaluation_period_id == period.id,
+            Evaluation.status == 'completed'
         ).group_by(Evaluation.sentiment).all()
         
         sentiment_data = {
@@ -127,18 +161,23 @@ async def get_department_head_dashboard(
             if sentiment:
                 sentiment_data[sentiment.lower()] = count
         
-        # Anomaly count - department-wide
+        # Anomaly count for THIS PERIOD ONLY (completed only)
         anomaly_count = db.query(func.count(Evaluation.id)).filter(
+            Evaluation.evaluation_period_id == period.id,
+            Evaluation.status == 'completed',
             Evaluation.is_anomaly == True
         ).scalar() or 0
         
-        # Calculate participation rate (students who submitted / total enrolled)
-        from models.enhanced_models import Enrollment
+        # Calculate participation rate for THIS PERIOD ONLY
         total_enrolled_students = db.query(func.count(Enrollment.id.distinct())).filter(
-            Enrollment.status == 'active'
+            Enrollment.status == 'active',
+            Enrollment.evaluation_period_id == period.id
         ).scalar() or 0
         
-        students_who_evaluated = db.query(func.count(Evaluation.student_id.distinct())).scalar() or 0
+        students_who_evaluated = db.query(func.count(Evaluation.student_id.distinct())).filter(
+            Evaluation.evaluation_period_id == period.id,
+            Evaluation.status == 'completed'
+        ).scalar() or 0
         
         participation_rate = round((students_who_evaluated / total_enrolled_students * 100), 1) if total_enrolled_students > 0 else 0
         
@@ -146,6 +185,13 @@ async def get_department_head_dashboard(
             "success": True,
             "data": {
                 "department": dept_head.department,
+                "period_id": period.id,
+                "period_name": period.name,
+                "period_status": period.status,
+                "period_dates": {
+                    "start": period.start_date.isoformat(),
+                    "end": period.end_date.isoformat()
+                },
                 "total_courses": total_courses,
                 "total_evaluations": total_evaluations,
                 "total_enrolled_students": total_enrolled_students,
@@ -170,20 +216,39 @@ async def get_department_head_dashboard(
 async def get_department_evaluations(
     user_id: int = Query(...),
     page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=100),
+    page_size: int = Query(10, ge=1, le=1000),
     course_id: Optional[int] = None,
     sentiment: Optional[str] = None,
     anomaly_only: bool = False,
+    period_id: Optional[int] = Query(None),
     db: Session = Depends(get_db)
 ):
-    """Get all evaluations (full system access - single department system)"""
+    """Get all evaluations (defaults to active period)"""
     try:
-        # Single department system - full access
-        # Build query without program filtering
+        # Get evaluation period (active by default)
+        if period_id:
+            period = db.query(EvaluationPeriod).filter(EvaluationPeriod.id == period_id).first()
+            if not period:
+                raise HTTPException(status_code=404, detail="Evaluation period not found")
+        else:
+            period = db.query(EvaluationPeriod).filter(EvaluationPeriod.status == 'active').first()
+        
+        # If no period, return empty
+        if not period:
+            return {
+                "success": True,
+                "data": [],
+                "pagination": {"page": page, "page_size": page_size, "total": 0, "total_pages": 0},
+                "message": "No active evaluation period"
+            }
+        
+        # Build query for evaluations in this period
         query = db.query(Evaluation).join(
             ClassSection, Evaluation.class_section_id == ClassSection.id
         ).join(
             Course, ClassSection.course_id == Course.id
+        ).filter(
+            Evaluation.evaluation_period_id == period.id
         )
         
         # Apply filters
@@ -228,6 +293,37 @@ async def get_department_evaluations(
             elif student:
                 student_name = student.student_number or "Unknown Student"
             
+            # Get ratings - prefer JSONB ratings column
+            ratings_data = e.ratings if hasattr(e, 'ratings') and e.ratings else {
+                "overall": e.rating_overall if e.rating_overall else 0,
+                "teaching": e.rating_teaching if e.rating_teaching else 0,
+                "content": e.rating_content if e.rating_content else 0,
+                "engagement": e.rating_engagement if e.rating_engagement else 0
+            }
+            
+            # Transform ratings from descriptive keys to question numbers for frontend
+            jsonb_key_mapping = {
+                "relevance_subject_knowledge": "1", "relevance_practical_skills": "2", "relevance_team_work": "3",
+                "relevance_leadership": "4", "relevance_communication": "5", "relevance_positive_attitude": "6",
+                "org_curriculum": "7", "org_ilos_known": "8", "org_ilos_clear": "9",
+                "org_ilos_relevant": "10", "org_no_overlapping": "11",
+                "teaching_tlas_useful": "12", "teaching_ila_useful": "13", "teaching_tlas_sequenced": "14",
+                "teaching_applicable": "15", "teaching_motivated": "16", "teaching_team_work": "17", "teaching_independent": "18",
+                "assessment_start": "19", "assessment_all_topics": "20", "assessment_number": "21",
+                "assessment_distribution": "22", "assessment_allocation": "23", "assessment_feedback": "24",
+                "environment_classrooms": "25", "environment_library": "26", "environment_laboratory": "27",
+                "environment_computer": "28", "environment_internet": "29", "environment_facilities_availability": "30",
+                "counseling_available": "31"
+            }
+            
+            # Convert ratings keys if they use descriptive names
+            if ratings_data and isinstance(ratings_data, dict):
+                transformed_ratings = {}
+                for key, value in ratings_data.items():
+                    new_key = jsonb_key_mapping.get(key, key)
+                    transformed_ratings[new_key] = value
+                ratings_data = transformed_ratings
+            
             eval_data.append({
                 "id": e.id,
                 "courseId": course.id if course else None,
@@ -241,12 +337,7 @@ async def get_department_evaluations(
                 "rating_teaching": e.rating_teaching if e.rating_teaching else 0,
                 "rating_content": e.rating_content if e.rating_content else 0,
                 "rating_engagement": e.rating_engagement if e.rating_engagement else 0,
-                "ratings": {
-                    "overall": e.rating_overall if e.rating_overall else 0,
-                    "teaching": e.rating_teaching if e.rating_teaching else 0,
-                    "content": e.rating_content if e.rating_content else 0,
-                    "engagement": e.rating_engagement if e.rating_engagement else 0
-                },
+                "ratings": ratings_data,
                 "sentiment": e.sentiment or "neutral",
                 "sentiment_score": e.sentiment_score if e.sentiment_score else 0,
                 "is_anomaly": e.is_anomaly if e.is_anomaly else False,
@@ -332,11 +423,32 @@ async def get_sentiment_analysis(
             for date, sentiments in sentiment_trends.items()
         ]
         
+        # Calculate overall statistics
+        sentiment_counts = db.query(
+            Evaluation.sentiment,
+            func.count(Evaluation.id).label('count')
+        ).filter(
+            Evaluation.submission_date >= start_date
+        ).group_by(Evaluation.sentiment).all()
+        
+        sentiment_summary = {
+            "positive": 0,
+            "neutral": 0,
+            "negative": 0
+        }
+        total_evals = 0
+        for sentiment, count in sentiment_counts:
+            total_evals += count
+            if sentiment:
+                sentiment_summary[sentiment.lower()] = count
+        
         return {
             "success": True,
             "data": {
                 "time_range": time_range,
-                "trends": trend_data
+                "trends": trend_data,
+                "summary": sentiment_summary,
+                "total_evaluations": total_evals
             }
         }
         
@@ -362,14 +474,13 @@ async def get_department_courses(
         # Return class sections (not just courses) to match expected format
         
         # Build query for class sections with course info
-        from models.enhanced_models import Enrollment
-        
         # Use subqueries to get counts efficiently
+        # Count all evaluations (not distinct students) as each evaluation is separate feedback
         eval_count_subq = db.query(
             Evaluation.class_section_id,
             func.count(Evaluation.id).label('eval_count'),
             func.avg(Evaluation.rating_overall).label('avg_rating')
-        ).group_by(Evaluation.class_section_id).subquery()
+        ).filter(Evaluation.status == 'completed').group_by(Evaluation.class_section_id).subquery()
         
         enroll_count_subq = db.query(
             Enrollment.class_section_id,
@@ -414,6 +525,11 @@ async def get_department_courses(
                 last = section.instructor.last_name or ""
                 instructor_full_name = f"{first} {last}".strip() or "N/A"
             
+            # Calculate response rate (cap at 100%)
+            enrolled = int(enrolled_count or 0)
+            evals = int(eval_count or 0)
+            response_rate = min(100, round((evals / enrolled * 100))) if enrolled > 0 else 0
+            
             courses_data.append({
                 "section_id": section.id,
                 "id": section.id,  # For compatibility
@@ -428,8 +544,12 @@ async def get_department_courses(
                 "year_level": course.year_level if course else 1,
                 "semester": section.semester or "Unknown",
                 "academic_year": section.academic_year or "Unknown",
-                "evaluations_count": int(eval_count or 0),
-                "enrolled_students": int(enrolled_count or 0),
+                "evaluationCount": evals,  # Frontend expects this field name
+                "evaluations_count": evals,  # Keep for compatibility
+                "enrollmentCount": enrolled,  # Frontend expects this field name
+                "enrolled_students": enrolled,  # Keep for compatibility
+                "enrolledStudents": enrolled,  # Also used by frontend
+                "responseRate": response_rate,  # Pre-calculated response rate
                 "status": "Active",  # Default status
                 "overallRating": float(avg_rating or 0.0)
             })
@@ -534,40 +654,90 @@ async def get_course_report(
 async def get_anomalies(
     user_id: int = Query(...),
     page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=50),
+    page_size: int = Query(10, ge=1, le=1000),
+    period_id: Optional[int] = Query(None),
     db: Session = Depends(get_db)
 ):
     """Get detected anomalies (full system access - single department)"""
     try:
+        # Get active period if not specified
+        if not period_id:
+            active_period = db.query(EvaluationPeriod).filter(
+                EvaluationPeriod.status == 'active'
+            ).first()
+            period_id = active_period.id if active_period else None
+        
         # Single department system - full access
-        # Query anomalous evaluations (all programs)
+        # Query evaluations with anomaly scores or low ratings/negative sentiment
         query = db.query(Evaluation).filter(
-            Evaluation.is_anomaly == True
+            Evaluation.evaluation_period_id == period_id,
+            Evaluation.status == 'completed'
+        ).filter(
+            or_(
+                Evaluation.is_anomaly == True,
+                Evaluation.anomaly_score != None,
+                and_(Evaluation.rating_overall != None, Evaluation.rating_overall <= 2),
+                Evaluation.sentiment == 'negative'
+            )
         )
         
         total = query.count()
         offset = (page - 1) * page_size
-        anomalies = query.order_by(Evaluation.anomaly_score.desc()).offset(offset).limit(page_size).all()
+        # Order by anomaly score if available, then by rating (lowest first)
+        anomalies = query.order_by(
+            Evaluation.anomaly_score.desc().nullslast(),
+            Evaluation.rating_overall.asc().nullslast(),
+            Evaluation.sentiment.desc()
+        ).offset(offset).limit(page_size).all()
         
         anomaly_data = []
         for e in anomalies:
             class_section = db.query(ClassSection).filter(ClassSection.id == e.class_section_id).first()
             course = db.query(Course).filter(Course.id == class_section.course_id).first() if class_section else None
+            student = db.query(Student).filter(Student.id == e.student_id).first()
             
             # Get instructor name from user relationship
             instructor_name = "N/A"
             if class_section and class_section.instructor:
                 instructor_name = f"{class_section.instructor.first_name} {class_section.instructor.last_name}"
             
+            # Calculate severity based on rating and sentiment
+            severity = "low"
+            if e.anomaly_score and e.anomaly_score > 0.7:
+                severity = "high"
+            elif e.rating_overall and e.rating_overall <= 1:
+                severity = "high"
+            elif e.sentiment == 'negative':
+                severity = "medium"
+            elif e.rating_overall and e.rating_overall <= 2:
+                severity = "medium"
+            
+            # Get student name from user relationship
+            student_name = "Unknown"
+            if student and student.user:
+                student_name = f"{student.user.first_name} {student.user.last_name}" if student.user.first_name and student.user.last_name else (student.user.email or "Unknown")
+            elif student:
+                student_name = student.student_number or "Unknown"
+            
             anomaly_data.append({
                 "id": e.id,
+                "courseId": course.id if course else None,
+                "courseName": course.subject_name if course else "N/A",
+                "courseCode": course.subject_code if course else "N/A",
                 "course_code": course.subject_code if course else "N/A",
                 "course_name": course.subject_name if course else "N/A",
+                "studentName": student_name,
                 "instructor": instructor_name,
+                "instructorName": instructor_name,
+                "rating": e.rating_overall,
                 "rating_overall": e.rating_overall,
+                "anomalyScore": e.anomaly_score,
                 "anomaly_score": e.anomaly_score,
-                "comments": e.comments,
+                "comment": e.text_feedback,
+                "comments": e.text_feedback,
                 "sentiment": e.sentiment,
+                "severity": severity,
+                "submittedAt": e.submission_date.isoformat() if e.submission_date else None,
                 "submission_date": e.submission_date.isoformat() if e.submission_date else None
             })
         
@@ -741,6 +911,7 @@ async def get_year_levels(
 async def get_course_category_averages(
     course_id: int,
     user_id: int = Query(...),
+    period_id: Optional[int] = Query(None),
     db: Session = Depends(get_db)
 ):
     """
@@ -756,6 +927,13 @@ async def get_course_category_averages(
     Note: Frontend sends section.id as course_id parameter
     """
     try:
+        # Get active period if not specified
+        if not period_id:
+            active_period = db.query(EvaluationPeriod).filter(
+                EvaluationPeriod.status == 'active'
+            ).first()
+            period_id = active_period.id if active_period else None
+        
         # Check if course_id is actually a section_id (frontend sends section.id as courseId)
         section = db.query(ClassSection).filter(ClassSection.id == course_id).first()
         
@@ -773,19 +951,37 @@ async def get_course_category_averages(
         if not course:
             raise HTTPException(status_code=404, detail="Course not found")
         
-        # Get evaluations for this section or all sections of the course
+        # Get evaluations for this section or all sections of the course, filtered by period
         if section_id:
-            # Get evaluations for specific section
-            evaluations = db.query(Evaluation).filter(
-                Evaluation.class_section_id == section_id
-            ).all()
-        else:
-            # Get all evaluations for this course
-            evaluations = db.query(Evaluation).join(
-                ClassSection, Evaluation.class_section_id == ClassSection.id
+            # Get evaluations for specific section with period filter
+            query = db.query(Evaluation).join(
+                Enrollment, and_(
+                    Evaluation.class_section_id == Enrollment.class_section_id,
+                    Evaluation.student_id == Enrollment.student_id
+                )
             ).filter(
-                ClassSection.course_id == actual_course_id
-            ).all()
+                Evaluation.class_section_id == section_id,
+                Evaluation.status == 'completed'  # Only completed evaluations
+            )
+            if period_id:
+                query = query.filter(Enrollment.evaluation_period_id == period_id)
+            evaluations = query.all()
+        else:
+            # Get all evaluations for this course with period filter
+            query = db.query(Evaluation).join(
+                ClassSection, Evaluation.class_section_id == ClassSection.id
+            ).join(
+                Enrollment, and_(
+                    Evaluation.class_section_id == Enrollment.class_section_id,
+                    Evaluation.student_id == Enrollment.student_id
+                )
+            ).filter(
+                ClassSection.course_id == actual_course_id,
+                Evaluation.status == 'completed'  # Only completed evaluations
+            )
+            if period_id:
+                query = query.filter(Enrollment.evaluation_period_id == period_id)
+            evaluations = query.all()
         
         if not evaluations:
             return {
@@ -797,6 +993,47 @@ async def get_course_category_averages(
                     "categories": []
                 }
             }
+        
+        # Map actual JSONB keys to question numbers
+        jsonb_key_mapping = {
+            # Relevance of Course (1-6)
+            "relevance_subject_knowledge": "1",
+            "relevance_practical_skills": "2",
+            "relevance_team_work": "3",
+            "relevance_leadership": "4",
+            "relevance_communication": "5",
+            "relevance_positive_attitude": "6",
+            # Course Organization (7-11)
+            "org_curriculum": "7",
+            "org_ilos_known": "8",
+            "org_ilos_clear": "9",
+            "org_ilos_relevant": "10",
+            "org_no_overlapping": "11",
+            # Teaching-Learning (12-18)
+            "teaching_tlas_useful": "12",
+            "teaching_ila_useful": "13",
+            "teaching_tlas_sequenced": "14",
+            "teaching_applicable": "15",
+            "teaching_motivated": "16",
+            "teaching_team_work": "17",
+            "teaching_independent": "18",
+            # Assessment (19-24)
+            "assessment_start": "19",
+            "assessment_all_topics": "20",
+            "assessment_number": "21",
+            "assessment_distribution": "22",
+            "assessment_allocation": "23",
+            "assessment_feedback": "24",
+            # Learning Environment (25-30)
+            "environment_classrooms": "25",
+            "environment_library": "26",
+            "environment_laboratory": "27",
+            "environment_computer": "28",
+            "environment_internet": "29",
+            "environment_facilities_availability": "30",
+            # Counseling (31)
+            "counseling_available": "31"
+        }
         
         # Define category question mappings
         categories = {
@@ -832,53 +1069,31 @@ async def get_course_category_averages(
             }
         }
         
-        # Helper function to generate 31 questions from basic ratings
-        def generate_full_ratings(eval_obj):
-            """Generate 31-question ratings from basic 4-field ratings"""
+        # Helper function to get real ratings from JSONB column
+        def get_real_ratings(eval_obj):
+            """Get actual ratings from JSONB ratings column and normalize keys"""
             if eval_obj.ratings and isinstance(eval_obj.ratings, dict) and len(eval_obj.ratings) > 0:
-                return eval_obj.ratings
-            
-            # Generate synthetic ratings based on the 4 basic fields
-            base_ratings = {
-                'relevance': eval_obj.rating_content or 3,
-                'organization': eval_obj.rating_overall or 3,
-                'teaching': eval_obj.rating_teaching or 3,
-                'engagement': eval_obj.rating_engagement or 3
-            }
-            
-            # Generate all 31 questions with slight variations
-            import random
-            random.seed(eval_obj.id)  # Consistent for same evaluation
-            
-            generated = {}
-            # Questions 1-6: Relevance of Course
-            for i in range(1, 7):
-                generated[str(i)] = max(1, min(4, base_ratings['relevance'] + random.choice([-1, 0, 0, 1])))
-            # Questions 7-11: Course Organization
-            for i in range(7, 12):
-                generated[str(i)] = max(1, min(4, base_ratings['organization'] + random.choice([-1, 0, 0, 1])))
-            # Questions 12-18: Teaching-Learning
-            for i in range(12, 19):
-                generated[str(i)] = max(1, min(4, base_ratings['teaching'] + random.choice([-1, 0, 0, 1])))
-            # Questions 19-24: Assessment
-            for i in range(19, 25):
-                generated[str(i)] = max(1, min(4, base_ratings['organization'] + random.choice([-1, 0, 0, 1])))
-            # Questions 25-30: Learning Environment
-            for i in range(25, 31):
-                generated[str(i)] = max(1, min(4, base_ratings['engagement'] + random.choice([-1, 0, 0, 1])))
-            # Question 31: Counseling
-            generated['31'] = max(1, min(4, base_ratings['teaching'] + random.choice([-1, 0, 1])))
-            
-            return generated
+                # Convert descriptive keys to question numbers
+                normalized = {}
+                for jsonb_key, rating_value in eval_obj.ratings.items():
+                    # Map jsonb key to question number
+                    question_num = jsonb_key_mapping.get(jsonb_key)
+                    if question_num:
+                        normalized[question_num] = rating_value
+                return normalized
+            else:
+                return {}
         
-        # Calculate averages for each category
+        # Calculate averages for each category using REAL data only
         category_results = []
+        total_students_evaluated = len(evaluations)
+        
         for cat_id, cat_info in categories.items():
             all_ratings = []
             
             for evaluation in evaluations:
-                # Get ratings (either from JSONB or generated)
-                eval_ratings = generate_full_ratings(evaluation)
+                # Get REAL ratings from JSONB column - no fake data
+                eval_ratings = get_real_ratings(evaluation)
                 
                 # Extract ratings for this category's questions
                 for q_num in cat_info["questions"]:
@@ -888,22 +1103,45 @@ async def get_course_category_averages(
             
             if all_ratings:
                 average = sum(all_ratings) / len(all_ratings)
+                # Calculate actual response count (total ratings / questions in category)
+                actual_responses = len(all_ratings) // len(cat_info["questions"]) if len(cat_info["questions"]) > 0 else 0
+                percentage = (actual_responses / total_students_evaluated * 100) if total_students_evaluated > 0 else 0
+                
                 category_results.append({
                     "category_id": cat_id,
                     "category_name": cat_info["name"],
                     "description": cat_info["description"],
                     "average": round(average, 2),
-                    "total_responses": len(all_ratings),
-                    "question_count": len(cat_info["questions"])
+                    "total_responses": actual_responses,  # Actual student count
+                    "question_count": len(cat_info["questions"]),
+                    "response_percentage": round(percentage, 1)
                 })
+        
+        # Calculate overall rating from actual evaluations
+        overall_rating = 0.0
+        if evaluations:
+            ratings = [e.rating_overall for e in evaluations if e.rating_overall is not None]
+            overall_rating = sum(ratings) / len(ratings) if ratings else 0.0
+        
+        # Get enrollment count for this section
+        enrolled_count = 0
+        if section_id:
+            enrolled_count = db.query(func.count(Enrollment.id)).filter(
+                Enrollment.class_section_id == section_id,
+                Enrollment.status == 'active'
+            ).scalar() or 0
         
         return {
             "success": True,
             "data": {
                 "course_id": course_id,
+                "section_id": section_id,
                 "course_name": course.subject_name,
                 "course_code": course.subject_code,
                 "total_evaluations": len(evaluations),
+                "enrolled_students": enrolled_count,
+                "response_rate": round((len(evaluations) / enrolled_count * 100), 0) if enrolled_count > 0 else 0,
+                "overall_rating": round(overall_rating, 2),
                 "categories": category_results
             }
         }
@@ -1070,15 +1308,26 @@ async def get_question_distribution(
 @router.get("/completion-rates")
 async def get_completion_rates(
     user_id: int = Query(...),
+    period_id: Optional[int] = Query(None),
     db: Session = Depends(get_db)
 ):
     """
     Get evaluation completion rates for all courses.
     Returns overall statistics and per-course breakdown.
+    Filters by evaluation period.
     """
     try:
-        # Get all class sections with enrollment and evaluation counts
-        sections_query = text("""
+        # Get active period if not specified
+        if not period_id:
+            active_period = db.query(EvaluationPeriod).filter(
+                EvaluationPeriod.status == 'active'
+            ).first()
+            period_id = active_period.id if active_period else None
+        
+        # Get all class sections with enrollment and evaluation counts, filtered by period
+        period_filter = f"AND en.evaluation_period_id = {period_id}" if period_id else ""
+        period_filter_eval = f"AND e.evaluation_period_id = {period_id}" if period_id else ""
+        sections_query = text(f"""
             SELECT 
                 cs.id as section_id,
                 cs.class_code,
@@ -1086,23 +1335,22 @@ async def get_completion_rates(
                 c.subject_code,
                 c.subject_name,
                 c.year_level,
-                COALESCE(CONCAT(u.first_name, ' ', u.last_name), 'No Instructor') as instructor_name,
+                'No Instructor' as instructor_name,
                 cs.semester,
                 cs.academic_year,
                 COUNT(DISTINCT en.student_id) as enrolled_students,
-                COUNT(DISTINCT e.id) as submitted_evaluations,
+                COUNT(DISTINCT e.student_id) as submitted_evaluations,
                 CASE 
                     WHEN COUNT(DISTINCT en.student_id) > 0 
-                    THEN ROUND((COUNT(DISTINCT e.id)::NUMERIC / COUNT(DISTINCT en.student_id) * 100), 1)
+                    THEN ROUND((COUNT(DISTINCT e.student_id)::NUMERIC / COUNT(DISTINCT en.student_id) * 100), 1)
                     ELSE 0
                 END as completion_rate
             FROM class_sections cs
             INNER JOIN courses c ON cs.course_id = c.id
-            LEFT JOIN users u ON cs.instructor_id = u.id
-            LEFT JOIN enrollments en ON cs.id = en.class_section_id AND en.status = 'active'
-            LEFT JOIN evaluations e ON cs.id = e.class_section_id AND en.student_id = e.student_id
+            LEFT JOIN enrollments en ON cs.id = en.class_section_id AND en.status = 'active' {period_filter}
+            LEFT JOIN evaluations e ON cs.id = e.class_section_id AND e.status = 'completed' {period_filter_eval}
             GROUP BY cs.id, cs.class_code, c.id, c.subject_code, c.subject_name, 
-                     c.year_level, u.first_name, u.last_name, cs.semester, cs.academic_year
+                     c.year_level, cs.semester, cs.academic_year
             ORDER BY completion_rate ASC, c.subject_name
         """)
         
@@ -1155,6 +1403,155 @@ async def get_completion_rates(
         
     except Exception as e:
         logger.error(f"Error calculating completion rates: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ===========================
+# ML ANALYSIS RESULTS
+# ===========================
+
+@router.get("/ml-analysis/{section_id}")
+async def get_ml_analysis_results(
+    section_id: int,
+    user_id: int = Query(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Get ML analysis results (sentiment, anomaly) for a specific class section.
+    Returns aggregated statistics and detailed results.
+    """
+    try:
+        # Get the class section
+        section = db.query(ClassSection).filter(ClassSection.id == section_id).first()
+        if not section:
+            raise HTTPException(status_code=404, detail="Section not found")
+        
+        # Get latest ML analysis results for this section
+        analysis_results = db.query(AnalysisResult).filter(
+            AnalysisResult.class_section_id == section_id
+        ).order_by(AnalysisResult.analysis_date.desc()).all()
+        
+        if not analysis_results:
+            return {
+                "success": True,
+                "data": {
+                    "section_id": section_id,
+                    "has_analysis": False,
+                    "message": "No ML analysis results available for this section"
+                }
+            }
+        
+        # Format analysis results
+        formatted_results = []
+        for result in analysis_results:
+            formatted_results.append({
+                "id": result.id,
+                "analysis_type": result.analysis_type,
+                "total_evaluations": result.total_evaluations,
+                "positive_count": result.positive_count,
+                "neutral_count": result.neutral_count,
+                "negative_count": result.negative_count,
+                "anomaly_count": result.anomaly_count,
+                "avg_overall_rating": result.avg_overall_rating,
+                "avg_sentiment_score": result.avg_sentiment_score,
+                "confidence_interval": result.confidence_interval,
+                "detailed_results": result.detailed_results,
+                "analysis_date": result.analysis_date.isoformat() if result.analysis_date else None,
+                "model_version": result.model_version,
+                "processing_time_ms": result.processing_time_ms
+            })
+        
+        return {
+            "success": True,
+            "data": {
+                "section_id": section_id,
+                "section_code": section.class_code,
+                "has_analysis": True,
+                "results": formatted_results
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching ML analysis results: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/ml-insights-summary")
+async def get_ml_insights_summary(
+    user_id: int = Query(...),
+    period_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Get summary of ML insights across all sections.
+    Shows overall sentiment trends and anomaly counts.
+    """
+    try:
+        # Get active period if not specified
+        if not period_id:
+            active_period = db.query(EvaluationPeriod).filter(
+                EvaluationPeriod.status == 'active'
+            ).first()
+            period_id = active_period.id if active_period else None
+        
+        # Get all analysis results for sections in this period
+        query = db.query(AnalysisResult).join(
+            ClassSection, AnalysisResult.class_section_id == ClassSection.id
+        ).join(
+            Enrollment, ClassSection.id == Enrollment.class_section_id
+        )
+        if period_id:
+            query = query.filter(Enrollment.evaluation_period_id == period_id)
+        
+        all_results = query.all()
+        
+        if not all_results:
+            return {
+                "success": True,
+                "data": {
+                    "has_data": False,
+                    "message": "No ML analysis data available"
+                }
+            }
+        
+        # Calculate summary statistics
+        total_positive = sum(r.positive_count for r in all_results)
+        total_neutral = sum(r.neutral_count for r in all_results)
+        total_negative = sum(r.negative_count for r in all_results)
+        total_anomalies = sum(r.anomaly_count for r in all_results)
+        total_evaluations = sum(r.total_evaluations for r in all_results)
+        
+        avg_sentiment = sum(r.avg_sentiment_score for r in all_results if r.avg_sentiment_score) / len(all_results) if all_results else 0
+        
+        return {
+            "success": True,
+            "data": {
+                "has_data": True,
+                "period_id": period_id,
+                "summary": {
+                    "total_evaluations_analyzed": total_evaluations,
+                    "sentiment_distribution": {
+                        "positive": total_positive,
+                        "neutral": total_neutral,
+                        "negative": total_negative,
+                        "positive_percentage": round((total_positive / total_evaluations * 100), 1) if total_evaluations > 0 else 0,
+                        "negative_percentage": round((total_negative / total_evaluations * 100), 1) if total_evaluations > 0 else 0
+                    },
+                    "anomaly_detection": {
+                        "total_anomalies": total_anomalies,
+                        "anomaly_rate": round((total_anomalies / total_evaluations * 100), 1) if total_evaluations > 0 else 0
+                    },
+                    "average_sentiment_score": round(avg_sentiment, 2),
+                    "sections_analyzed": len(all_results)
+                }
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching ML insights summary: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # ===========================
@@ -1222,4 +1619,173 @@ async def submit_support_request(
     except Exception as e:
         logger.error(f"Error submitting support request: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/non-respondents")
+async def get_non_respondents(
+    evaluation_period_id: Optional[int] = Query(None),
+    program_id: Optional[int] = Query(None),
+    year_level: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_staff)
+):
+    """
+    Get list of students who haven't completed evaluations for active period
+    Department Head can see non-respondents from all programs
+    """
+    try:
+        # Get active period if not specified
+        if not evaluation_period_id:
+            active_period = db.query(EvaluationPeriod).filter(
+                EvaluationPeriod.status == 'active'
+            ).first()
+            
+            if not active_period:
+                return {
+                    "total_students": 0,
+                    "responded": 0,
+                    "non_responded": 0,
+                    "response_rate": "0%",
+                    "non_respondents": []
+                }
+            
+            evaluation_period_id = active_period.id
+        
+        # Build query for non-respondents
+        query = text("""
+            WITH enrolled_students AS (
+                SELECT DISTINCT
+                    s.id as student_id,
+                    s.student_number,
+                    u.first_name,
+                    u.last_name,
+                    s.year_level,
+                    p.program_code,
+                    ps.section_name,
+                    ps.id as program_section_id,
+                    COUNT(DISTINCT e.class_section_id) as total_courses
+                FROM students s
+                JOIN users u ON s.user_id = u.id
+                LEFT JOIN program_sections ps ON s.section_id = ps.id
+                LEFT JOIN programs p ON ps.program_id = p.id
+                JOIN enrollments e ON s.id = e.student_id
+                WHERE u.is_active = true
+                    AND (:program_id IS NULL OR ps.program_id = :program_id)
+                    AND (:year_level IS NULL OR s.year_level = :year_level)
+                GROUP BY s.id, s.student_number, u.first_name, u.last_name, 
+                         s.year_level, p.program_code, ps.section_name, ps.id
+            ),
+            completed_evaluations AS (
+                SELECT 
+                    e.student_id,
+                    COUNT(DISTINCT e.class_section_id) as completed_courses
+                FROM evaluations e
+                WHERE e.evaluation_period_id = :period_id
+                GROUP BY e.student_id
+            )
+            SELECT 
+                es.student_id,
+                es.student_number,
+                es.first_name,
+                es.last_name,
+                es.year_level,
+                es.program_code,
+                es.section_name,
+                es.total_courses,
+                COALESCE(ce.completed_courses, 0) as completed_courses,
+                (es.total_courses - COALESCE(ce.completed_courses, 0)) as pending_count
+            FROM enrolled_students es
+            LEFT JOIN completed_evaluations ce ON es.student_id = ce.student_id
+            WHERE (es.total_courses - COALESCE(ce.completed_courses, 0)) > 0
+            ORDER BY pending_count DESC, es.student_number ASC
+        """)
+        
+        result = db.execute(query, {
+            "period_id": evaluation_period_id,
+            "program_id": program_id,
+            "year_level": year_level
+        }).fetchall()
+        
+        # Get pending courses for each non-respondent
+        non_respondents = []
+        for row in result:
+            courses_query = text("""
+                SELECT DISTINCT
+                    c.subject_code,
+                    c.subject_name,
+                    cs.id as section_id,
+                    cs.class_code
+                FROM enrollments e
+                JOIN class_sections cs ON e.class_section_id = cs.id
+                JOIN courses c ON cs.course_id = c.id
+                WHERE e.student_id = :student_id
+                    AND NOT EXISTS (
+                        SELECT 1 FROM evaluations ev
+                        WHERE ev.student_id = :student_id
+                            AND ev.class_section_id = cs.id
+                            AND ev.evaluation_period_id = :period_id
+                    )
+                ORDER BY c.subject_code
+            """)
+            
+            courses = db.execute(courses_query, {
+                "student_id": row.student_id,
+                "period_id": evaluation_period_id
+            }).fetchall()
+            
+            non_respondents.append({
+                "student_id": row.student_id,
+                "student_number": row.student_number,
+                "full_name": f"{row.first_name} {row.last_name}",
+                "program": row.program_code or "N/A",
+                "section": row.section_name or "N/A",
+                "year_level": row.year_level,
+                "pending_courses": [
+                    {
+                        "course_code": c.subject_code,
+                        "course_name": c.subject_name,
+                        "section_id": c.section_id,
+                        "class_code": c.class_code
+                    }
+                    for c in courses
+                ],
+                "pending_count": row.pending_count,
+                "completed_count": row.completed_courses,
+                "total_courses": row.total_courses
+            })
+        
+        # Calculate statistics
+        total_query = text("""
+            SELECT COUNT(DISTINCT s.id) as total
+            FROM students s
+            JOIN users u ON s.user_id = u.id
+            LEFT JOIN program_sections ps ON s.section_id = ps.id
+            JOIN enrollments e ON s.id = e.student_id
+            WHERE u.is_active = true
+                AND (:program_id IS NULL OR ps.program_id = :program_id)
+                AND (:year_level IS NULL OR s.year_level = :year_level)
+        """)
+        
+        total_students = db.execute(total_query, {
+            "program_id": program_id,
+            "year_level": year_level
+        }).scalar() or 0
+        
+        non_responded = len(non_respondents)
+        responded = total_students - non_responded
+        response_rate = f"{(responded / total_students * 100):.1f}%" if total_students > 0 else "0%"
+        
+        return {
+            "total_students": total_students,
+            "responded": responded,
+            "non_responded": non_responded,
+            "response_rate": response_rate,
+            "non_respondents": non_respondents
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching non-respondents: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch non-respondents: {str(e)}")
 

@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import { adminAPI, secretaryAPI, deptHeadAPI } from '../../services/api'
 import { isAdmin } from '../../utils/roleUtils'
 
-export default function CompletionTracker() {
+export default function CompletionTracker({ selectedPeriod = null }) {
   const { user: currentUser } = useAuth()
   const [completionData, setCompletionData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -11,7 +11,7 @@ export default function CompletionTracker() {
 
   useEffect(() => {
     fetchCompletionData()
-  }, [currentUser])
+  }, [currentUser, selectedPeriod])
 
   const fetchCompletionData = async () => {
     if (!currentUser) return
@@ -22,11 +22,11 @@ export default function CompletionTracker() {
 
       let response
       if (isAdmin(currentUser)) {
-        response = await adminAPI.getCompletionRates()
+        response = await adminAPI.getCompletionRates(selectedPeriod)
       } else if (currentUser.role === 'secretary') {
-        response = await secretaryAPI.getCompletionRates()
+        response = await secretaryAPI.getCompletionRates(selectedPeriod)
       } else if (currentUser.role === 'department_head') {
-        response = await deptHeadAPI.getCompletionRates()
+        response = await deptHeadAPI.getCompletionRates(selectedPeriod)
       }
 
       if (response?.success && response?.data) {
@@ -165,7 +165,7 @@ export default function CompletionTracker() {
             <div>
               <h4 className="text-sm font-semibold text-red-800">Action Required</h4>
               <p className="text-xs text-red-700 mt-1">
-                Completion rate is below 70%. Consider sending reminders to students.
+                Completion rate is below 70%. Additional follow-up may be needed.
               </p>
             </div>
           </div>

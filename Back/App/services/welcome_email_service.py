@@ -6,6 +6,14 @@ Sends welcome emails to new users with temporary password information
 from typing import Optional, Dict, Any
 import logging
 from datetime import datetime
+import smtplib
+import ssl
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +104,7 @@ async def send_welcome_email(
     school_id: str,
     role: str,
     temp_password: str,
-    login_url: str = "http://localhost:5173/login"
+    login_url: str = None
 ) -> Dict[str, Any]:
     """
     Send welcome email to newly created user
@@ -108,12 +116,17 @@ async def send_welcome_email(
         school_id: User's school ID number
         role: User's role (student, secretary, department_head, etc.)
         temp_password: Temporary password generated for user
-        login_url: URL to login page
+        login_url: URL to login page (defaults to FRONTEND_URL from .env)
         
     Returns:
         Dict with success status and message
     """
     try:
+        # Get frontend URL from environment
+        if login_url is None:
+            frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+            login_url = f"{frontend_url}/login"
+        
         # Format role for display
         role_display = {
             'student': 'Student',
@@ -136,41 +149,85 @@ async def send_welcome_email(
         
         subject = f"Welcome to Course Insight Guardian - Your Account is Ready!"
         
-        # TODO: Integrate with actual email service (SMTP, SendGrid, etc.)
-        # For now, just log the email content
-        logger.info(f"📧 Welcome email prepared for {email}")
-        logger.info(f"   Name: {first_name} {last_name}")
-        logger.info(f"   School ID: {school_id}")
-        logger.info(f"   Role: {role_display}")
-        logger.info(f"   Temp Password: {temp_password}")
-        logger.info(f"   Email would be sent with subject: {subject}")
+        # Get SMTP configuration from environment
+        smtp_server = os.getenv("SMTP_SERVER")
+        smtp_port = int(os.getenv("SMTP_PORT", 587))
+        smtp_username = os.getenv("SMTP_USERNAME")
+        smtp_password = os.getenv("SMTP_PASSWORD")
         
-        # In production, uncomment and configure SMTP or email service:
-        # import smtplib
-        # from email.mime.text import MIMEText
-        # from email.mime.multipart import MIMEMultipart
-        # 
-        # msg = MIMEMultipart('alternative')
-        # msg['Subject'] = subject
-        # msg['From'] = 'noreply@lpubatangas.edu.ph'
-        # msg['To'] = email
-        # msg.attach(MIMEText(email_html, 'html'))
-        # 
-        # with smtplib.SMTP('smtp.gmail.com', 587) as server:
-        #     server.starttls()
-        #     server.login('your-email@lpubatangas.edu.ph', 'your-app-password')
-        #     server.send_message(msg)
-        
-        return {
-            "success": True,
-            "message": f"Welcome email prepared for {email}",
-            "email_sent": False,  # Set to True when actual email service is configured
-            "details": {
-                "recipient": email,
-                "temp_password": temp_password,
-                "role": role_display
+        if not all([smtp_server, smtp_username, smtp_password]):
+            logger.warning(f"⚠️ SMTP not configured - welcome email for {email} not sent")
+            logger.info(f"📧 Welcome email prepared for {email}")
+            logger.info(f"   Name: {first_name} {last_name}")
+            logger.info(f"   School ID: {school_id}")
+            logger.info(f"   Role: {role_display}")
+            logger.info(f"   Temp Password: {temp_password}")
+            
+            return {
+                "success": True,
+                "message": f"Welcome email prepared for {email} (SMTP not configured)",
+                "email_sent": False,
+                "details": {
+                    "recipient": email,
+                    "temp_password": temp_password,
+                    "role": role_display
+                }
             }
-        }
+        
+        # Send email via Gmail SMTP
+        try:
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = subject
+            msg['From'] = smtp_username
+            msg['To'] = email
+            
+            # Attach HTML content
+            msg.attach(MIMEText(email_html, 'html'))
+            
+            # Create secure SSL context
+            context = ssl.create_default_context()
+            
+            # Send email
+            with smtplib.SMTP(smtp_server, smtp_port) as server:
+                server.starttls(context=context)
+                server.login(smtp_username, smtp_password)
+                server.send_message(msg)
+            
+            logger.info(f"✅ Welcome email sent successfully to {email}")
+            logger.info(f"   Name: {first_name} {last_name}")
+            logger.info(f"   School ID: {school_id}")
+            logger.info(f"   Role: {role_display}")
+            logger.info(f"   Temp Password: {temp_password}")
+            
+            return {
+                "success": True,
+                "message": f"Welcome email sent successfully to {email}",
+                "email_sent": True,
+                "details": {
+                    "recipient": email,
+                    "temp_password": temp_password,
+                    "role": role_display
+                }
+            }
+            
+        except Exception as email_error:
+            logger.error(f"❌ Failed to send welcome email to {email}: {str(email_error)}")
+            logger.info(f"📧 Email content prepared but not sent:")
+            logger.info(f"   Name: {first_name} {last_name}")
+            logger.info(f"   School ID: {school_id}")
+            logger.info(f"   Role: {role_display}")
+            logger.info(f"   Temp Password: {temp_password}")
+            
+            return {
+                "success": False,
+                "message": f"Failed to send welcome email: {str(email_error)}",
+                "email_sent": False,
+                "details": {
+                    "recipient": email,
+                    "temp_password": temp_password,
+                    "role": role_display
+                }
+            }
         
     except Exception as e:
         logger.error(f"Failed to send welcome email to {email}: {str(e)}")
@@ -182,14 +239,14 @@ async def send_welcome_email(
 
 async def send_bulk_welcome_emails(
     users: list[Dict[str, Any]],
-    login_url: str = "http://localhost:5173/login"
+    login_url: str = None
 ) -> Dict[str, Any]:
     """
     Send welcome emails to multiple users (for bulk import)
     
     Args:
         users: List of user dicts with email, first_name, last_name, school_id, role, temp_password
-        login_url: URL to login page
+        login_url: URL to login page (defaults to FRONTEND_URL from .env)
         
     Returns:
         Dict with summary of email sending results
@@ -208,8 +265,8 @@ async def send_bulk_welcome_emails(
             last_name=user['last_name'],
             school_id=user['school_id'],
             role=user['role'],
-            temp_password=user['temp_password'],
-            login_url=login_url
+            temp_password=user['temp_password']
+            # login_url will use FRONTEND_URL from .env
         )
         
         if result['success']:

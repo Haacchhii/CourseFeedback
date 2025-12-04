@@ -2,9 +2,10 @@ import React, { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { isSystemAdmin, getRoleDisplayName } from '../../utils/roleUtils'
 import { useAuth } from '../../context/AuthContext'
-import { adminAPI } from '../../services/api'
+import { adminAPI, apiClient } from '../../services/api'
 import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
 import ProgramSections from './ProgramSections'
+import Pagination from '../../components/Pagination'
 
 export default function UserManagement() {
   const navigate = useNavigate()
@@ -58,6 +59,12 @@ export default function UserManagement() {
     status: 'Active'
   })
 
+  // Enrollment validation state
+  const [enrollmentInfo, setEnrollmentInfo] = useState(null)
+  const [enrollmentValidation, setEnrollmentValidation] = useState(null)
+  const [lookingUpEnrollment, setLookingUpEnrollment] = useState(false)
+  const [enrollmentLookupDone, setEnrollmentLookupDone] = useState(false)
+
   // Use timeout hook for API call with pagination
   const { data: apiData, loading, error, retry } = useApiWithTimeout(
     async () => {
@@ -93,7 +100,12 @@ export default function UserManagement() {
   // Update allUsers and programs when data changes
   useEffect(() => {
     if (apiData) {
-      setAllUsers(apiData.users)
+      // Map is_active to status for display
+      const usersWithStatus = (apiData.users || []).map(user => ({
+        ...user,
+        status: user.is_active ? 'Active' : 'Inactive'
+      }))
+      setAllUsers(usersWithStatus)
       if (apiData.programs && apiData.programs.length > 0) {
         setPrograms(apiData.programs.map(p => p.code).sort())
       }
@@ -367,7 +379,18 @@ export default function UserManagement() {
   }
 
   const downloadCSVTemplate = () => {
-    const template = `email,first_name,last_name,school_id,role,program,year_level\niturraldejose@lpubatangas.edu.ph,Jose,Iturralde,23130778,student,BSIT,1\njuandelacruz@lpubatangas.edu.ph,Juan,Dela Cruz,23140001,student,BSCS,2\nsecretary@lpubatangas.edu.ph,Maria,Santos,20100001,secretary,,,\ndepthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,,\n`
+    const template = `email,first_name,last_name,school_id,role,program,year_level
+iturraldejose@lpubatangas.edu.ph,Jose,Iturralde,23130778,student,BSIT,1
+juandelacruz@lpubatangas.edu.ph,Juan,Dela Cruz,23140001,student,BSCS,2
+mariasantos@lpubatangas.edu.ph,Maria,Santos,23150001,student,BAPSY,3
+secretary@lpubatangas.edu.ph,Ana,Reyes,20100001,secretary,,
+depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
+
+# IMPORTANT: school_id is REQUIRED for all users
+# For students: Password will be auto-generated as lpub@{school_id}
+# Example: school_id "23130778" → password "lpub@23130778"
+# Students must change this password on first login
+`
     const blob = new Blob([template], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -394,7 +417,7 @@ export default function UserManagement() {
         setSubmitting(true)
         const response = await adminAPI.resetPassword(user.id, newPassword)
         alert(response?.data?.message || `Password for ${fullName} has been reset successfully!`)
-        await loadUsers() // Reload users to reflect any changes
+        retry() // Reload users to reflect any changes
       } catch (err) {
         console.error('Error resetting password:', err)
         const errorMsg = err.response?.data?.detail || err.message || 'Unknown error occurred'
@@ -405,8 +428,64 @@ export default function UserManagement() {
     }
   }
 
+  // Lookup enrollment information
+  const handleLookupEnrollment = async () => {
+    if (!formData.school_id || formData.school_id.trim() === '') {
+      alert('Please enter a student number first')
+      return
+    }
+
+    setLookingUpEnrollment(true)
+    setEnrollmentValidation(null)
+
+    try {
+      const response = await apiClient.get(`/admin/enrollment-list/student/${formData.school_id}`)
+      if (response) {
+        setEnrollmentInfo(response)
+        setEnrollmentLookupDone(true)
+        
+        // Auto-fill form with enrollment data
+        const fullName = `${response.first_name} ${response.middle_name ? response.middle_name + ' ' : ''}${response.last_name}`.trim()
+        setFormData(prev => ({
+          ...prev,
+          name: fullName,
+          email: response.email || prev.email,
+          program: response.program_code,
+          yearLevel: response.year_level
+        }))
+        
+        alert(`✅ Student found in enrollment list!\n\nName: ${fullName}\nProgram: ${response.program_code} - ${response.program_name}\nYear Level: ${response.year_level}\n\nForm has been auto-filled with enrollment data.`)
+      }
+    } catch (err) {
+      if (err.response?.status === 404) {
+        setEnrollmentLookupDone(true)
+        setEnrollmentInfo(null)
+        alert(`⚠️ Student number "${formData.school_id}" not found in enrollment list.\n\nPlease verify the student number or contact the registrar to add this student to the enrollment list first.`)
+      } else {
+        console.error('Error looking up enrollment:', err)
+        alert('Failed to lookup enrollment information. Please try again.')
+      }
+    } finally {
+      setLookingUpEnrollment(false)
+    }
+  }
+
   const handleSubmitAdd = async (e) => {
     e.preventDefault()
+    
+    // Validate enrollment for students
+    if (formData.role === 'student' && enrollmentInfo) {
+      // Check if program matches enrollment
+      if (enrollmentInfo.program_code !== formData.program) {
+        if (!confirm(`⚠️ PROGRAM MISMATCH WARNING\n\nEnrollment List: ${enrollmentInfo.program_code} - ${enrollmentInfo.program_name}\nSelected Program: ${formData.program}\n\nStudent "${formData.name}" is enrolled in ${enrollmentInfo.program_code}, not ${formData.program}.\n\nDo you want to correct the program to match the enrollment list?`)) {
+          return
+        }
+        // Auto-correct to enrolled program
+        setFormData(prev => ({ ...prev, program: enrollmentInfo.program_code }))
+        return // Stop submission, let user review the correction
+      }
+    }
+    
     try {
       setSubmitting(true)
       
@@ -462,14 +541,29 @@ export default function UserManagement() {
         assignedPrograms: [],
         status: 'Active'
       })
+      // Reset enrollment lookup state
+      setEnrollmentInfo(null)
+      setEnrollmentValidation(null)
+      setEnrollmentLookupDone(false)
     } catch (err) {
       console.error('Error creating user:', err)
-      const errorMsg = err.response?.data?.detail || err.message || 'Unknown error'
-      const validationErrors = err.response?.data?.errors || []
-      const fullError = validationErrors.length > 0 
-        ? `${errorMsg}\n${validationErrors.map(e => `- ${e.msg || e}`).join('\n')}`
-        : errorMsg
-      alert(`Failed to create user: ${fullError}`)
+      
+      // Handle program mismatch error specifically
+      if (err.response?.data?.error === 'PROGRAM_MISMATCH') {
+        const data = err.response.data
+        const enrolled = data.enrolled_program
+        const attempted = data.attempted_program
+        alert(`❌ PROGRAM MISMATCH ERROR\n\n${data.message}\n\nEnrolled in: ${enrolled.code} - ${enrolled.name}\nAttempted: ${attempted.code} - ${attempted.name}\n\n✅ Please use "${enrolled.code}" as the program for this student.`)
+      } else if (err.response?.data?.error === 'STUDENT_NOT_IN_ENROLLMENT_LIST') {
+        alert(`❌ ENROLLMENT VALIDATION ERROR\n\n${err.response.data.message}\n\n⚠️ This student must be added to the enrollment list by the registrar before creating their account.`)
+      } else {
+        const errorMsg = err.response?.data?.detail || err.message || 'Unknown error'
+        const validationErrors = err.response?.data?.errors || []
+        const fullError = validationErrors.length > 0 
+          ? `${errorMsg}\n${validationErrors.map(e => `- ${e.msg || e}`).join('\n')}`
+          : errorMsg
+        alert(`Failed to create user: ${fullError}`)
+      }
     } finally {
       setSubmitting(false)
     }
@@ -524,18 +618,50 @@ export default function UserManagement() {
       try {
         setSubmitting(true)
         
-        // Get user IDs from emails
-        const userIds = paginatedUsers
-          .filter(u => selectedUsers.includes(u.email))
-          .map(u => u.id)
+        // Get user IDs and data from emails
+        const selectedUserData = allUsers.filter(u => selectedUsers.includes(u.email))
+        const userIds = selectedUserData.map(u => u.id)
         
-        // Execute action based on type
+        console.log(`[BULK ACTION] ${action} for users:`, userIds)
+        
+        let successCount = 0
+        let failCount = 0
+        const errors = []
+        
+        // Execute action based on type with error handling for each
         if (action === 'Activate') {
-          await Promise.all(userIds.map(id => adminAPI.activateUser(id)))
+          for (const id of userIds) {
+            try {
+              await adminAPI.activateUser(id)
+              successCount++
+            } catch (err) {
+              failCount++
+              errors.push(`User ID ${id}: ${err.message}`)
+              console.error(`Failed to activate user ${id}:`, err)
+            }
+          }
         } else if (action === 'Deactivate') {
-          await Promise.all(userIds.map(id => adminAPI.deactivateUser(id)))
+          for (const id of userIds) {
+            try {
+              await adminAPI.deactivateUser(id)
+              successCount++
+            } catch (err) {
+              failCount++
+              errors.push(`User ID ${id}: ${err.message}`)
+              console.error(`Failed to deactivate user ${id}:`, err)
+            }
+          }
         } else if (action === 'Delete') {
-          await Promise.all(userIds.map(id => adminAPI.deleteUser(id)))
+          for (const id of userIds) {
+            try {
+              await adminAPI.deleteUser(id)
+              successCount++
+            } catch (err) {
+              failCount++
+              errors.push(`User ID ${id}: ${err.message}`)
+              console.error(`Failed to delete user ${id}:`, err)
+            }
+          }
         } else if (action === 'Reset Password') {
           const newPassword = window.prompt(`Enter new password for ${selectedUsers.length} users (minimum 8 characters):`, 'changeme123')
           if (!newPassword || newPassword.length < 8) {
@@ -543,17 +669,42 @@ export default function UserManagement() {
             setSubmitting(false)
             return
           }
-          await Promise.all(userIds.map(id => adminAPI.resetPassword(id, newPassword)))
+          for (const id of userIds) {
+            try {
+              await adminAPI.resetPassword(id, newPassword)
+              successCount++
+            } catch (err) {
+              failCount++
+              errors.push(`User ID ${id}: ${err.message}`)
+              console.error(`Failed to reset password for user ${id}:`, err)
+            }
+          }
         }
         
-        alert(`${action} completed for ${selectedUsers.length} users`)
+        // Show results
+        let message = `${action} completed: ${successCount} successful`
+        if (failCount > 0) {
+          message += `, ${failCount} failed`
+          if (errors.length > 0) {
+            console.error('Bulk action errors:', errors)
+            message += `\n\nErrors:\n${errors.slice(0, 5).join('\n')}`
+            if (errors.length > 5) {
+              message += `\n... and ${errors.length - 5} more`
+            }
+          }
+        }
+        alert(message)
+        
+        // Clear selection
         setSelectedUsers([])
         
-        // Reload users
-        retry()
+        // Force reload users data
+        console.log('[BULK ACTION] Refreshing user list...')
+        await retry()
+        
       } catch (err) {
         console.error('Bulk action error:', err)
-        alert(`Failed to ${action.toLowerCase()}: ${err.message}`)
+        alert(`Failed to ${action.toLowerCase()}: ${err.response?.data?.detail || err.message}`)
       } finally {
         setSubmitting(false)
       }
@@ -585,30 +736,28 @@ export default function UserManagement() {
   if (error) return <ErrorDisplay error={error} onRetry={retry} />
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-blue-600 to-blue-700 shadow-xl border-b-4 border-blue-800">
-        <div className="container mx-auto px-6 py-6">
-          <div className="flex justify-between items-center">
+    <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9]">
+      {/* Enhanced LPU Header */}
+      <header className="lpu-header">
+        <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-10 lg:py-12 max-w-screen-2xl">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
             <div className="flex items-center space-x-4">
-              <button onClick={() => navigate('/admin/dashboard')} className="w-12 h-12 bg-white/20 hover:bg-white/30 rounded-xl flex items-center justify-center transition-all">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
-                </svg>
-              </button>
+              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg">
+                <span className="text-[#7a0000] font-bold text-xl">LPU</span>
+              </div>
               <div>
-                <h1 className="text-3xl font-bold text-white">User Management</h1>
-                <p className="text-blue-100 text-sm mt-1">Manage all system users and permissions</p>
+                <h1 className="lpu-header-title text-3xl">User Management</h1>
+                <p className="lpu-header-subtitle text-lg">Manage all system users and permissions</p>
               </div>
             </div>
             <div className="flex space-x-3">
-              <button onClick={() => setShowBulkImportModal(true)} className="bg-white hover:bg-blue-50 text-blue-600 font-semibold px-6 py-3 rounded-xl shadow-lg transition-all flex items-center space-x-2">
+              <button onClick={() => setShowBulkImportModal(true)} className="bg-white hover:bg-white/90 text-[#7a0000] font-semibold px-6 py-3 rounded-button shadow-card hover:shadow-card-hover transition-all duration-250 flex items-center space-x-2">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
                 </svg>
                 <span>Bulk Import</span>
               </button>
-              <button onClick={handleAddUser} className="bg-white hover:bg-blue-50 text-blue-600 font-semibold px-6 py-3 rounded-xl shadow-lg transition-all flex items-center space-x-2">
+              <button onClick={handleAddUser} className="bg-[#ffd700] hover:bg-[#ffed4e] text-[#7a0000] font-semibold px-6 py-3 rounded-xl shadow-lg transition-all flex items-center space-x-2">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
                 </svg>
@@ -619,7 +768,7 @@ export default function UserManagement() {
         </div>
       </header>
 
-      <div className="container mx-auto px-6 py-8">
+      <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-10 lg:py-12 max-w-screen-2xl">
         {/* Tab Navigation */}
         <div className="bg-white rounded-xl shadow-md mb-6">
           <div className="flex border-b">
@@ -651,58 +800,58 @@ export default function UserManagement() {
           <ProgramSections />
         ) : (
           <>
-        {/* Stats Cards */}
-        <div className="grid md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-md p-6">
+        {/* Enhanced Statistics Cards */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Users</p>
-                <p className="text-3xl font-bold text-gray-900">{userStats.total_users}</p>
+                <h3 className="text-xs lg:text-sm font-bold text-white/80 uppercase tracking-wide mb-3">Total Users</h3>
+                <p className="text-4xl lg:text-5xl font-bold text-white">{userStats.total_users}</p>
               </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
+                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
                 </svg>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-md p-6">
+          <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200 group">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Students</p>
-                <p className="text-3xl font-bold text-green-600">{userStats.students}</p>
+                <p className="text-xs lg:text-sm font-bold text-white/80 uppercase tracking-wide mb-3">Students</p>
+                <p className="text-4xl lg:text-5xl font-bold text-white">{userStats.students}</p>
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center group-hover:bg-white/30 transition-all duration-200">
+                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
                 </svg>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-md p-6">
+          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200 group">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Dept Heads</p>
-                <p className="text-3xl font-bold text-purple-600">{userStats.dept_heads}</p>
+                <p className="text-xs lg:text-sm font-bold text-white/80 uppercase tracking-wide mb-3">Dept Heads</p>
+                <p className="text-4xl lg:text-5xl font-bold text-white">{userStats.dept_heads}</p>
               </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center group-hover:bg-white/30 transition-all duration-200">
+                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
                 </svg>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-md p-6">
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200 group">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Staff Members</p>
-                <p className="text-3xl font-bold text-red-600">{userStats.secretaries + userStats.admins}</p>
+                <p className="text-xs lg:text-sm font-bold text-white/80 uppercase tracking-wide mb-3">Staff Members</p>
+                <p className="text-4xl lg:text-5xl font-bold text-white">{userStats.secretaries + userStats.admins}</p>
               </div>
-              <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center group-hover:bg-white/30 transition-all duration-200">
+                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
                 </svg>
               </div>
@@ -911,51 +1060,22 @@ export default function UserManagement() {
           </div>
 
           {/* Pagination */}
-          <div className="bg-gray-50 px-6 py-4 flex items-center justify-between border-t border-gray-200">
-            <div className="text-sm text-gray-600">
-              Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalUsers)} of {totalUsers} users
-            </div>
-            <div className="flex space-x-2">
-              <button
-                onClick={() => setCurrentPage(1)}
-                disabled={currentPage === 1}
-                className={`px-4 py-2 text-sm rounded-lg ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border border-gray-300 hover:bg-gray-50'}`}
-              >
-                First
-              </button>
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className={`px-4 py-2 rounded-lg ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border border-gray-300 hover:bg-gray-50'}`}
-              >
-                Previous
-              </button>
-              <span className="px-4 py-2 text-sm text-gray-700">
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage >= totalPages}
-                className={`px-4 py-2 rounded-lg ${currentPage >= totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border border-gray-300 hover:bg-gray-50'}`}
-              >
-                Next
-              </button>
-              <button
-                onClick={() => setCurrentPage(totalPages)}
-                disabled={currentPage >= totalPages}
-                className={`px-4 py-2 text-sm rounded-lg ${currentPage >= totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border border-gray-300 hover:bg-gray-50'}`}
-              >
-                Last
-              </button>
-            </div>
+          <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalUsers}
+              onPageChange={setCurrentPage}
+              itemLabel="users"
+            />
           </div>
         </div>
 
       {/* Add User Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6 border-b-4 border-blue-800">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl">
+            <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6 border-b-4 border-blue-800 flex-shrink-0">
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-white">➕ Add New User</h2>
                 <button onClick={() => setShowAddModal(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
@@ -966,7 +1086,7 @@ export default function UserManagement() {
               </div>
             </div>
             
-            <form onSubmit={handleSubmitAdd} className="p-6 space-y-4">
+            <form onSubmit={handleSubmitAdd} className="flex-1 overflow-y-auto p-6 space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name *</label>
                 <input
@@ -993,17 +1113,85 @@ export default function UserManagement() {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">School ID Number *</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.school_id}
-                  onChange={(e) => setFormData({...formData, school_id: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="e.g., 23130778"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    required
+                    value={formData.school_id}
+                    onChange={(e) => {
+                      setFormData({...formData, school_id: e.target.value})
+                      setEnrollmentLookupDone(false)
+                      setEnrollmentInfo(null)
+                    }}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="e.g., 2022-00001"
+                  />
+                  {formData.role === 'student' && (
+                    <button
+                      type="button"
+                      onClick={handleLookupEnrollment}
+                      disabled={lookingUpEnrollment || !formData.school_id}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      {lookingUpEnrollment ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Looking up...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                          </svg>
+                          Lookup
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  This will be used to generate the temporary password: <span className="font-mono font-semibold">lpub@{formData.school_id || 'schoolid'}</span>
+                  {formData.role === 'student' ? (
+                    <>Click "Lookup" to auto-fill from enrollment list. Password: <span className="font-mono font-semibold">lpub@{formData.school_id || 'studentid'}</span></>
+                  ) : (
+                    <>This will be used to generate the temporary password: <span className="font-mono font-semibold">lpub@{formData.school_id || 'schoolid'}</span></>
+                  )}
                 </p>
+                
+                {/* Enrollment Info Display */}
+                {enrollmentInfo && formData.role === 'student' && (
+                  <div className="mt-2 bg-green-50 border border-green-200 rounded-lg p-3">
+                    <div className="flex items-start gap-2">
+                      <svg className="w-5 h-5 text-green-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                      </svg>
+                      <div className="flex-1 text-sm">
+                        <p className="font-semibold text-green-800 mb-1">✅ Found in Enrollment List</p>
+                        <div className="text-green-700 space-y-1">
+                          <p><span className="font-medium">Name:</span> {enrollmentInfo.first_name} {enrollmentInfo.middle_name || ''} {enrollmentInfo.last_name}</p>
+                          <p><span className="font-medium">Program:</span> {enrollmentInfo.program_code} - {enrollmentInfo.program_name}</p>
+                          <p><span className="font-medium">Year Level:</span> {enrollmentInfo.year_level}</p>
+                          <p><span className="font-medium">College:</span> {enrollmentInfo.college_code} - {enrollmentInfo.college_name}</p>
+                          {enrollmentInfo.email && <p><span className="font-medium">Email:</span> {enrollmentInfo.email}</p>}
+                        </div>
+                        <p className="text-xs text-green-600 mt-2">⚠️ Program is locked to enrollment record. Cannot be changed.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {enrollmentLookupDone && !enrollmentInfo && formData.role === 'student' && (
+                  <div className="mt-2 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <div className="flex items-start gap-2">
+                      <svg className="w-5 h-5 text-yellow-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                      </svg>
+                      <div className="text-sm text-yellow-800">
+                        <p className="font-semibold mb-1">⚠️ Not in Enrollment List</p>
+                        <p>This student must be added to the enrollment list by the registrar before account creation.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -1057,16 +1245,26 @@ export default function UserManagement() {
               {formData.role === 'student' && (
                 <>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Program *</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Program * {enrollmentInfo && <span className="text-green-600 text-xs ml-2">🔒 Locked to enrollment</span>}
+                    </label>
                     <select
                       value={formData.program}
                       onChange={(e) => setFormData({...formData, program: e.target.value})}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      disabled={enrollmentInfo !== null}
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        enrollmentInfo ? 'bg-gray-100 cursor-not-allowed border-gray-200' : 'border-gray-300'
+                      }`}
                     >
                       {programs.map(prog => (
                         <option key={prog} value={prog}>{prog}</option>
                       ))}
                     </select>
+                    {enrollmentInfo && (
+                      <p className="text-xs text-gray-600 mt-1">
+                        ✅ Program is automatically set from enrollment list and cannot be changed
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Year Level *</label>
@@ -1142,7 +1340,7 @@ export default function UserManagement() {
               </div>
             </div>
             
-            <form onSubmit={handleSubmitEdit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmitEdit} className="flex-1 overflow-y-auto p-6 space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name *</label>
                 <input
@@ -1285,47 +1483,87 @@ export default function UserManagement() {
       {/* Bulk Import Modal */}
       {showBulkImportModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="bg-gradient-to-r from-green-600 to-green-700 p-6 border-b-4 border-green-800">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h2 className="text-2xl font-bold text-white">📤 Bulk Import Users</h2>
-                  <p className="text-green-100 text-sm mt-1">Upload a CSV file to import multiple users at once</p>
-                </div>
-                <button onClick={() => setShowBulkImportModal(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl">
+            <div className="bg-gradient-to-r from-yellow-600 to-amber-600 px-5 py-3 flex items-center justify-between flex-shrink-0 rounded-t-2xl">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
                   </svg>
-                </button>
+                </div>
+                <h2 className="text-lg font-bold text-white">Bulk Import Users</h2>
               </div>
+              <button onClick={() => setShowBulkImportModal(false)} className="text-white hover:text-gray-200 transition-colors">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
             </div>
-            
-            <div className="p-6 space-y-6">
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {/* Download Template */}
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-blue-900 mb-1">📋 CSV Template Required</p>
-                    <p className="text-sm text-blue-700 mb-3">Download the template file to see the required format and column headers.</p>
-                    <p className="text-xs text-blue-600 mb-2"><strong>Required columns:</strong> email, first_name, last_name, role</p>
-                    <p className="text-xs text-blue-600"><strong>Optional columns:</strong> program, year_level, student_number, password (defaults to "changeme123")</p>
-                  </div>
-                  <button
-                    onClick={downloadCSVTemplate}
-                    className="ml-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all flex items-center space-x-2"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-10 h-10 bg-yellow-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                     </svg>
-                    <span>Download Template</span>
-                  </button>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900">CSV Template</h3>
+                    <p className="text-xs text-gray-600">Step 1: Download the template first</p>
+                  </div>
+                </div>
+                
+                <button
+                  onClick={downloadCSVTemplate}
+                  className="w-full px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2 mb-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                  </svg>
+                  <span>Download Template</span>
+                </button>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Required Columns</p>
+                    <ul className="space-y-0.5 text-xs text-gray-700">
+                      <li>• email</li>
+                      <li>• first_name</li>
+                      <li>• last_name</li>
+                      <li>• school_id <span className="text-red-600 font-semibold">(REQUIRED)</span></li>
+                      <li>• role</li>
+                    </ul>
+                  </div>
+                  
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Optional Columns</p>
+                    <ul className="space-y-0.5 text-xs text-gray-700 mb-2">
+                      <li>• program</li>
+                      <li>• year_level</li>
+                    </ul>
+                    <div className="bg-orange-50 border border-orange-200 rounded p-2">
+                      <p className="text-xs font-semibold text-orange-800">🔐 Password Generation</p>
+                      <p className="text-xs text-orange-700">Password: lpub@{'{school_id}'}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* File Upload */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Upload CSV File *</label>
-                <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-green-500 transition-all">
+              <div className="bg-white border border-gray-200 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-10 h-10 bg-yellow-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <span className="text-white font-bold">2</span>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900">Upload Your CSV File</h3>
+                    <p className="text-xs text-gray-600">Select the filled CSV file to import</p>
+                  </div>
+                </div>
+                
+                <div className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${bulkImportFile ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-gray-400'}`}>
                   <input
                     type="file"
                     accept=".csv"
@@ -1333,67 +1571,125 @@ export default function UserManagement() {
                     className="hidden"
                     id="bulk-import-file"
                   />
-                  <label htmlFor="bulk-import-file" className="cursor-pointer">
-                    <svg className="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
-                    </svg>
-                    <p className="text-sm font-semibold text-gray-700">{bulkImportFile ? bulkImportFile.name : 'Click to upload or drag and drop'}</p>
-                    <p className="text-xs text-gray-500 mt-1">CSV file only</p>
+                  <label htmlFor="bulk-import-file" className="cursor-pointer block">
+                    {bulkImportFile ? (
+                      <>
+                        <svg className="w-12 h-12 text-green-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <p className="text-sm font-bold text-green-900 mb-1">{bulkImportFile.name}</p>
+                        <p className="text-xs text-green-700">File uploaded successfully!</p>
+                        <p className="text-xs text-gray-500 mt-1">Click to change file</p>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-12 h-12 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                        </svg>
+                        <p className="text-sm font-semibold text-gray-700 mb-1">Click to upload or drag and drop</p>
+                        <p className="text-xs text-gray-500">CSV file only</p>
+                      </>
+                    )}
                   </label>
                 </div>
               </div>
 
               {/* Validation Errors */}
               {bulkImportErrors.length > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-                  <p className="text-sm font-semibold text-red-900 mb-2">⚠️ Found {bulkImportErrors.length} error(s) in CSV:</p>
-                  <div className="max-h-40 overflow-y-auto space-y-1">
-                    {bulkImportErrors.slice(0, 10).map((err, idx) => (
-                      <p key={idx} className="text-xs text-red-700">
-                        • Row {err.row}: {err.errors.join(', ')}
-                      </p>
-                    ))}
-                    {bulkImportErrors.length > 10 && (
-                      <p className="text-xs text-red-600 font-semibold">... and {bulkImportErrors.length - 10} more errors</p>
-                    )}
+                <div className="bg-gradient-to-br from-red-50 to-orange-50 border-2 border-red-300 rounded-xl p-5 shadow-sm">
+                  <div className="flex items-start space-x-3">
+                    <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-base font-bold text-red-900 mb-3">⚠️ Found {bulkImportErrors.length} Validation Error(s)</p>
+                      <div className="bg-white border border-red-200 rounded-lg p-4 max-h-48 overflow-y-auto">
+                        <div className="space-y-2">
+                          {bulkImportErrors.slice(0, 10).map((err, idx) => (
+                            <div key={idx} className="flex items-start space-x-2 pb-2 border-b border-red-100 last:border-0">
+                              <span className="text-red-600 font-bold text-xs mt-0.5">•</span>
+                              <p className="text-sm text-red-800 flex-1">
+                                <span className="font-bold">Row {err.row}:</span> {err.errors.join(', ')}
+                              </p>
+                            </div>
+                          ))}
+                          {bulkImportErrors.length > 10 && (
+                            <p className="text-sm text-red-700 font-bold bg-red-100 px-3 py-2 rounded-lg text-center">
+                              + {bulkImportErrors.length - 10} more errors
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
 
               {/* Preview Table */}
               {bulkImportPreview.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-3">Preview (First 5 rows)</h3>
-                  <div className="border border-gray-200 rounded-xl overflow-hidden">
+                <div className="bg-white border-2 border-gray-200 rounded-xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center">
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900">Data Preview</h3>
+                        <p className="text-sm text-gray-600">Showing first 5 rows</p>
+                      </div>
+                    </div>
+                    <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm font-semibold">
+                      {bulkImportPreview.length} rows
+                    </span>
+                  </div>
+                  
+                  <div className="border-2 border-gray-200 rounded-lg overflow-hidden shadow-sm">
                     <div className="overflow-x-auto">
                       <table className="w-full">
-                        <thead className="bg-gray-50 border-b border-gray-200">
+                        <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
                           <tr>
-                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Row</th>
-                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Email</th>
-                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">First Name</th>
-                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Last Name</th>
-                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Role</th>
-                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Program</th>
-                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Status</th>
+                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Row</th>
+                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Email</th>
+                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">First Name</th>
+                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Last Name</th>
+                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Role</th>
+                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">School ID</th>
+                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Program</th>
+                            <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-200">
+                        <tbody className="bg-white divide-y divide-gray-200">
                           {bulkImportPreview.map((row, idx) => (
-                            <tr key={idx} className={row.hasErrors ? 'bg-red-50' : 'bg-white'}>
-                              <td className="px-4 py-2 text-xs text-gray-600">{row.rowNumber}</td>
-                              <td className="px-4 py-2 text-xs text-gray-900">{row.email}</td>
-                              <td className="px-4 py-2 text-xs text-gray-900">{row.first_name}</td>
-                              <td className="px-4 py-2 text-xs text-gray-900">{row.last_name}</td>
-                              <td className="px-4 py-2 text-xs text-gray-900">{row.role}</td>
-                              <td className="px-4 py-2 text-xs text-gray-600">{row.program || 'N/A'}</td>
-                              <td className="px-4 py-2">
+                            <tr key={idx} className={`${row.hasErrors ? 'bg-red-50' : 'hover:bg-gray-50'} transition-colors`}>
+                              <td className="px-4 py-3 text-xs text-gray-600 font-semibold">{row.rowNumber}</td>
+                              <td className="px-4 py-3 text-xs text-gray-900 font-medium">{row.email}</td>
+                              <td className="px-4 py-3 text-xs text-gray-900">{row.first_name}</td>
+                              <td className="px-4 py-3 text-xs text-gray-900">{row.last_name}</td>
+                              <td className="px-4 py-3">
+                                <span className="inline-flex px-2 py-1 rounded-md text-xs font-semibold bg-gray-100 text-gray-800">
+                                  {row.role}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-xs text-gray-900 font-mono font-bold">{row.school_id || <span className="text-gray-400">N/A</span>}</td>
+                              <td className="px-4 py-3 text-xs text-gray-600">{row.program || <span className="text-gray-400">N/A</span>}</td>
+                              <td className="px-4 py-3 text-center">
                                 {row.hasErrors ? (
-                                  <span className="inline-flex px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+                                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800">
+                                    <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"></path>
+                                    </svg>
                                     Invalid
                                   </span>
                                 ) : (
-                                  <span className="inline-flex px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800">
+                                    <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
+                                    </svg>
                                     Valid
                                   </span>
                                 )}
@@ -1420,14 +1716,16 @@ export default function UserManagement() {
                   <p className="text-xs text-blue-700 mt-1">{importProgress.current} / {importProgress.total}</p>
                 </div>
               )}
+            </div>
 
-              {/* Action Buttons */}
-              <div className="flex space-x-4 pt-4">
+            {/* Footer with Action Buttons - Fixed at bottom */}
+            <div className="border-t border-gray-200 p-4 bg-gray-50 flex-shrink-0 rounded-b-2xl">
+              <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => setShowBulkImportModal(false)}
                   disabled={submitting}
-                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-semibold transition-all disabled:opacity-50"
+                  className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 bg-white rounded-lg hover:bg-gray-50 text-sm font-semibold transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -1435,7 +1733,7 @@ export default function UserManagement() {
                   type="button"
                   onClick={handleBulkImport}
                   disabled={submitting || !bulkImportFile || bulkImportPreview.length === 0}
-                  className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  className="flex-1 px-4 py-2.5 bg-yellow-600 hover:bg-amber-700 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {submitting ? (
                     <>
