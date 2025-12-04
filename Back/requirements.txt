@@ -6,6 +6,7 @@ python-multipart==0.0.6
 # Database - Using psycopg v3 (supports Python 3.13)
 psycopg[binary]>=3.2.0
 psycopg-binary>=3.2.0
+psycopg2-binary>=2.9.9
 sqlalchemy>=2.0.36
 alembic==1.12.1
 
