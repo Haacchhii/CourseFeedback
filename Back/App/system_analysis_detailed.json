@@ -1,0 +1,12 @@
+{
+  "critical": [],
+  "high": [],
+  "medium": [],
+  "low": [
+    "\u2139\ufe0f 349 courses have no class sections (might be inactive)"
+  ],
+  "warnings": [
+    "\u2139\ufe0f No active evaluation period (normal if between periods)",
+    "\u2139\ufe0f Very few evaluations with text feedback for ML training"
+  ]
+}

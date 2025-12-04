@@ -1,0 +1,36 @@
+{
+  "passed": 52,
+  "failed": 5,
+  "issues": [
+    {
+      "category": "System State",
+      "description": "No active evaluation period - students cannot submit evaluations",
+      "severity": "MEDIUM"
+    },
+    {
+      "category": "Enrollment System",
+      "description": "54 enrollments not linked to evaluation periods",
+      "severity": "HIGH"
+    },
+    {
+      "category": "System Usage",
+      "description": "No completed evaluations - system may not be in use",
+      "severity": "LOW"
+    },
+    {
+      "category": "Course Management",
+      "description": "349 courses have no class sections",
+      "severity": "MEDIUM"
+    },
+    {
+      "category": "Course Management",
+      "description": "27 class sections have no instructor assigned",
+      "severity": "HIGH"
+    },
+    {
+      "category": "Missing Feature",
+      "description": "ML sentiment analysis model not trained",
+      "severity": "LOW"
+    }
+  ]
+}
