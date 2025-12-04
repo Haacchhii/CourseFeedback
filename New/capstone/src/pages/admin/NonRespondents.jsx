@@ -406,7 +406,7 @@ export default function NonRespondents() {
                 totalPages={totalPages}
                 totalItems={filteredData.length}
                 onPageChange={setCurrentPage}
-                itemLabel=\"students\"
+                itemLabel="students"
               />
             </>
           )}
