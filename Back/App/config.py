@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     # Database Configuration
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres:password@localhost/course_feedback_db")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres:[Napakabangis0518]@db.esdohggqyckrtlpzbyhh.supabase.co:5432/postgres")
     
     # Debug Configuration
     DEBUG: bool = os.getenv("DEBUG", "False").lower() == "true"
@@ -47,11 +47,21 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Course Feedback System"
     
     # CORS Configuration
+    # For Railway: Don't read from env, use hardcoded defaults + CORS_ORIGINS
     BACKEND_CORS_ORIGINS: list = [
         "http://localhost:3000",
         "http://localhost:5173",
         "http://localhost:8080"
     ]
+    
+    def get_cors_origins(self) -> list:
+        """Get CORS origins from environment or use defaults"""
+        cors_env = os.getenv("CORS_ORIGINS", "")
+        if cors_env:
+            # Split comma-separated string
+            additional_origins = [origin.strip() for origin in cors_env.split(",")]
+            return list(set(self.BACKEND_CORS_ORIGINS + additional_origins))
+        return self.BACKEND_CORS_ORIGINS
     
     # Email Configuration - Resend
     RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
