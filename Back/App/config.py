@@ -47,21 +47,25 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Course Feedback System"
     
     # CORS Configuration
-    # For Railway: Don't read from env, use hardcoded defaults + CORS_ORIGINS
-    BACKEND_CORS_ORIGINS: list = [
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://localhost:8080"
-    ]
+    # Don't use list type for env vars - causes JSON parsing issues in Railway
+    # BACKEND_CORS_ORIGINS will be ignored from env vars
     
     def get_cors_origins(self) -> list:
         """Get CORS origins from environment or use defaults"""
+        # Default origins
+        default_origins = [
+            "http://localhost:3000",
+            "http://localhost:5173",
+            "http://localhost:8080"
+        ]
+        
+        # Check for additional origins from CORS_ORIGINS env var
         cors_env = os.getenv("CORS_ORIGINS", "")
         if cors_env:
             # Split comma-separated string
-            additional_origins = [origin.strip() for origin in cors_env.split(",")]
-            return list(set(self.BACKEND_CORS_ORIGINS + additional_origins))
-        return self.BACKEND_CORS_ORIGINS
+            additional_origins = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
+            return list(set(default_origins + additional_origins))
+        return default_origins
     
     # Email Configuration - Resend
     RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")

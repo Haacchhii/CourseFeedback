@@ -1,8 +1,35 @@
 {
   "version": 2,
-  "buildCommand": "cd New/capstone && npm install && npm run build",
-  "outputDirectory": "New/capstone/dist",
-  "installCommand": "cd New/capstone && npm install",
-  "framework": null,
-  "devCommand": "cd New/capstone && npm run dev"
+  "builds": [
+    {
+      "src": "Back/App/main.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "New/capstone/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "New/capstone/dist"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "Back/App/main.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "New/capstone/dist/$1"
+    }
+  ],
+  "env": {
+    "DATABASE_URL": "postgresql://postgres.esdohggqyckrtlpzbyhh:Napakabangis0518@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres",
+    "SECRET_KEY": "bi7Mqp89qPyvXFqp0dlbhmTCuL8NfSazk3GHnFT3WB0"
+  },
+  "build": {
+    "env": {
+      "VITE_API_BASE_URL": "/api"
+    }
+  }
 }

@@ -157,20 +157,14 @@ except ImportError:
 # GZIP Compression middleware (compress responses > 1KB)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# CORS middleware - Updated to point to New/capstone frontend
+# CORS middleware - Load from config (supports env vars)
+from config import settings
+cors_origins = settings.get_cors_origins()
+print(f"[CORS] Configured origins: {cors_origins}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",  # Vite default for New/capstone frontend
-        "http://localhost:5174",  # Alternate port
-        "http://localhost:5175",  # Alternate port
-        "http://localhost:5176",  # Alternate port
-        "http://127.0.0.1:5173",
-        "http://localhost:5174",  # Alternate Vite port
-        "http://127.0.0.1:5174",
-        # Add production domain here when deploying
-        # "https://your-domain.com"
-    ],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
