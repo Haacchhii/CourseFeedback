@@ -25,12 +25,28 @@ from datetime import datetime, timedelta, date, timezone
 import logging
 import bcrypt
 import json
+import asyncio
 from config import now_local
 from services.welcome_email_service import send_welcome_email, send_bulk_welcome_emails
 from utils.validation import InputValidator, validate_export_filters, ValidationError
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# Helper function for background email sending
+def send_email_background(email: str, first_name: str, last_name: str, school_id: str, role: str, temp_password: str):
+    """Wrapper to run async send_welcome_email in background tasks"""
+    try:
+        asyncio.run(send_welcome_email(
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+            school_id=school_id,
+            role=role,
+            temp_password=temp_password
+        ))
+    except Exception as e:
+        logger.error(f"Background email failed for {email}: {e}")
 
 # ===========================
 # Pydantic Models for Requests
@@ -612,7 +628,7 @@ async def bulk_import_users(
                 # Queue welcome email to be sent in background (don't block import)
                 if must_change_password and school_id:
                     background_tasks.add_task(
-                        send_welcome_email,
+                        send_email_background,
                         email=user_data.email,
                         first_name=user_data.first_name,
                         last_name=user_data.last_name,
