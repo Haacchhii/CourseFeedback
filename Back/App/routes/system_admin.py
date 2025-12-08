@@ -463,7 +463,7 @@ async def bulk_import_users(
         
         # Pre-fetch programs once for all users
         programs = db.query(Program).all()
-        program_map = {p.code: p for p in programs}
+        program_map = {p.program_code: p for p in programs}
         program_id_map = {p.id: p for p in programs}
         
         # Check enrollment list availability once
