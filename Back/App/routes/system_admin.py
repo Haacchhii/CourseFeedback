@@ -33,18 +33,19 @@ from utils.validation import InputValidator, validate_export_filters, Validation
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Helper function for background email sending
-def send_email_background(email: str, first_name: str, last_name: str, school_id: str, role: str, temp_password: str):
-    """Wrapper to run async send_welcome_email in background tasks"""
+# Helper function for background email sending (sync wrapper)
+async def send_email_background_async(email: str, first_name: str, last_name: str, school_id: str, role: str, temp_password: str):
+    """Async wrapper for background email sending"""
     try:
-        asyncio.run(send_welcome_email(
+        result = await send_welcome_email(
             email=email,
             first_name=first_name,
             last_name=last_name,
             school_id=school_id,
             role=role,
             temp_password=temp_password
-        ))
+        )
+        logger.info(f"Background email result for {email}: {result.get('message', 'Unknown')}")
     except Exception as e:
         logger.error(f"Background email failed for {email}: {e}")
 
@@ -628,7 +629,7 @@ async def bulk_import_users(
                 # Queue welcome email to be sent in background (don't block import)
                 if must_change_password and school_id:
                     background_tasks.add_task(
-                        send_email_background,
+                        send_email_background_async,
                         email=user_data.email,
                         first_name=user_data.first_name,
                         last_name=user_data.last_name,
