@@ -356,52 +356,31 @@ export default function UserManagement() {
 
       setImportProgress({ current: 0, total: validUsers.length, status: 'Importing users...' })
 
-      // Import users in batches
-      const batchSize = 10
-      let imported = 0
-      const failedUsers = []
+      // Prepare users for bulk import
+      const usersToImport = validUsers.map(userData => ({
+        email: userData.email,
+        first_name: userData.first_name,
+        last_name: userData.last_name,
+        role: userData.role.toLowerCase(),
+        password: userData.password || 'changeme123',
+        department: userData.department || null,
+        program: userData.program || null,
+        program_id: null, // Backend will resolve this
+        year_level: userData.year_level ? parseInt(userData.year_level) : 1,
+        school_id: userData.school_id || null
+      }))
 
-      for (let i = 0; i < validUsers.length; i += batchSize) {
-        const batch = validUsers.slice(i, i + batchSize)
-        
-        await Promise.all(batch.map(async (userData) => {
-          try {
-            // Normalize role to lowercase
-            const normalizedRole = userData.role.toLowerCase()
-            
-            // Get program ID if role is student
-            let programId = null
-            if (normalizedRole === 'student' && userData.program) {
-              const programsResponse = await adminAPI.getPrograms()
-              const matchingProgram = programsResponse?.data?.find(p => p.code === userData.program)
-              programId = matchingProgram?.id
-            }
-
-            await adminAPI.createUser({
-              email: userData.email,
-              first_name: userData.first_name,
-              last_name: userData.last_name,
-              role: normalizedRole,
-              password: userData.password || 'changeme123',
-              department: userData.department || null,
-              program_id: programId,
-              year_level: userData.year_level ? parseInt(userData.year_level) : 1,
-              school_id: userData.school_id || null
-            })
-            imported++
-          } catch (err) {
-            failedUsers.push({ email: userData.email, error: err.message })
-          }
-        }))
-
-        setImportProgress({ current: i + batch.length, total: validUsers.length, status: `Imported ${imported}/${validUsers.length}...` })
-      }
+      // Use bulk import endpoint (single API call)
+      const response = await apiClient.post('/admin/users/bulk-import', usersToImport)
+      
+      const imported = response.data?.success || 0
+      const failedUsers = response.data?.errors || []
 
       // Show results
       const message = `Bulk import complete!\n\n` +
         `✅ Successfully imported: ${imported} users\n` +
         `❌ Failed: ${failedUsers.length} users` +
-        (failedUsers.length > 0 ? `\n\nFailed users:\n${failedUsers.slice(0, 5).map(f => `${f.email}: ${f.error}`).join('\n')}` : '')
+        (failedUsers.length > 0 ? `\n\nFailed users:\n${failedUsers.slice(0, 5).map(f => `Row ${f.row}: ${f.email} - ${f.error}`).join('\n')}` : '')
       
       showAlert(message, failedUsers.length > 0 ? 'Partial Success' : 'Success', failedUsers.length > 0 ? 'warning' : 'success')
       

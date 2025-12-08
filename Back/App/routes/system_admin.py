@@ -447,6 +447,184 @@ async def create_user(
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/users/bulk-import")
+async def bulk_import_users(
+    users: List[UserCreate],
+    current_user: dict = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Bulk import multiple users in a single transaction for better performance.
+    Processes all users in one database session with batch commits.
+    """
+    try:
+        from services.enrollment_validation import EnrollmentValidationService
+        current_user_id = current_user['id']
+        
+        # Pre-fetch programs once for all users
+        programs = db.query(Program).all()
+        program_map = {p.code: p for p in programs}
+        program_id_map = {p.id: p for p in programs}
+        
+        # Check enrollment list availability once
+        enrollment_service = EnrollmentValidationService()
+        has_enrollment_list = enrollment_service.check_enrollment_list_exists(db)
+        
+        results = {
+            "success": 0,
+            "failed": 0,
+            "errors": []
+        }
+        
+        for idx, user_data in enumerate(users):
+            try:
+                # Check if email already exists
+                existing_user = db.query(User).filter(User.email == user_data.email).first()
+                if existing_user:
+                    results["failed"] += 1
+                    results["errors"].append({
+                        "row": idx + 1,
+                        "email": user_data.email,
+                        "error": "Email already exists"
+                    })
+                    continue
+                
+                # Validate students against enrollment list
+                if user_data.role == "student" and has_enrollment_list:
+                    if not user_data.school_id:
+                        results["failed"] += 1
+                        results["errors"].append({
+                            "row": idx + 1,
+                            "email": user_data.email,
+                            "error": "Student number (school_id) is required"
+                        })
+                        continue
+                    
+                    validation = enrollment_service.validate_student_enrollment(
+                        db,
+                        student_number=user_data.school_id,
+                        program_id=user_data.program_id,
+                        first_name=user_data.first_name,
+                        last_name=user_data.last_name
+                    )
+                    
+                    if not validation["valid"]:
+                        results["failed"] += 1
+                        results["errors"].append({
+                            "row": idx + 1,
+                            "email": user_data.email,
+                            "error": validation["message"]
+                        })
+                        continue
+                    
+                    # Use enrollment data
+                    enrollment_info = validation["enrollment"]
+                    user_data.first_name = enrollment_info["first_name"]
+                    user_data.last_name = enrollment_info["last_name"]
+                    user_data.program_id = enrollment_info["program_id"]
+                    user_data.year_level = enrollment_info["year_level"]
+                
+                # Generate password
+                must_change_password = False
+                first_login = False
+                actual_password = user_data.password
+                school_id = user_data.school_id
+                
+                if user_data.role == "student":
+                    if not school_id and user_data.email:
+                        school_id = user_data.email.split('@')[0]
+                    if school_id:
+                        actual_password = f"lpub@{school_id}"
+                        must_change_password = True
+                        first_login = True
+                elif user_data.role in ["secretary", "department_head"]:
+                    first_login = True
+                    must_change_password = True
+                    if school_id:
+                        actual_password = f"lpub@{school_id}"
+                
+                # Hash password
+                from passlib.context import CryptContext
+                pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+                hashed_password = pwd_context.hash(actual_password)
+                
+                # Create user
+                new_user = User(
+                    email=user_data.email,
+                    password_hash=hashed_password,
+                    first_name=user_data.first_name,
+                    last_name=user_data.last_name,
+                    role=user_data.role.lower(),
+                    department=user_data.department,
+                    is_active=True,
+                    must_change_password=must_change_password,
+                    first_login=first_login,
+                    created_at=now_local(),
+                    updated_at=now_local()
+                )
+                db.add(new_user)
+                db.flush()  # Get user ID without committing
+                
+                # Create role-specific record
+                if user_data.role == "student":
+                    program_id = user_data.program_id
+                    if not program_id and user_data.program:
+                        prog = program_map.get(user_data.program)
+                        if prog:
+                            program_id = prog.id
+                    
+                    student = Student(
+                        user_id=new_user.id,
+                        student_number=school_id,
+                        program_id=program_id,
+                        year_level=user_data.year_level or 1
+                    )
+                    db.add(student)
+                elif user_data.role == "instructor":
+                    instructor = Instructor(user_id=new_user.id)
+                    db.add(instructor)
+                elif user_data.role == "secretary":
+                    secretary = Secretary(user_id=new_user.id)
+                    db.add(secretary)
+                elif user_data.role == "department_head":
+                    dept_head = DepartmentHead(user_id=new_user.id)
+                    db.add(dept_head)
+                
+                results["success"] += 1
+                
+                # Commit every 50 users for better performance
+                if (idx + 1) % 50 == 0:
+                    db.commit()
+                
+            except Exception as user_error:
+                results["failed"] += 1
+                results["errors"].append({
+                    "row": idx + 1,
+                    "email": user_data.email,
+                    "error": str(user_error)
+                })
+                logger.error(f"Error importing user {user_data.email}: {user_error}")
+        
+        # Final commit
+        db.commit()
+        
+        # Log audit event
+        await create_audit_log(
+            db, current_user_id, "BULK_USER_IMPORT", "User Management",
+            details={"total": len(users), "success": results["success"], "failed": results["failed"]}
+        )
+        
+        return {
+            "success": True,
+            "message": f"Bulk import completed: {results['success']} succeeded, {results['failed']} failed",
+            "data": results
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in bulk import: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.put("/users/{user_id}")
 async def update_user(
     user_id: int,
@@ -751,6 +929,19 @@ async def create_evaluation_period(
     """Create a new evaluation period"""
     try:
         current_user_id = current_user['id']
+        
+        # Check for duplicate period names (prevent confusion)
+        existing_period = db.query(EvaluationPeriod).filter(
+            EvaluationPeriod.name == period_data.name,
+            EvaluationPeriod.semester == period_data.semester,
+            EvaluationPeriod.academic_year == period_data.academic_year
+        ).first()
+        
+        if existing_period:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Period '{period_data.name}' already exists for {period_data.semester} {period_data.academic_year}"
+            )
         
         # Get total students for this period
         total_students = db.query(func.count(Student.id)).scalar() or 0
@@ -1964,6 +2155,20 @@ async def create_course(
                 semester_int = 2
             else:
                 raise HTTPException(status_code=400, detail="Invalid semester. Use 'First Semester', 'Second Semester', '1', or '2'")
+        
+        # Check if course already exists (prevent duplicates)
+        existing_course = db.query(Course).filter(
+            Course.subject_code == course_data.classCode,
+            Course.program_id == program.id,
+            Course.year_level == course_data.yearLevel,
+            Course.semester == semester_int
+        ).first()
+        
+        if existing_course:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Course '{course_data.classCode}' already exists for {course_data.program} Year {course_data.yearLevel} Semester {semester_int}"
+            )
         
         # Create course (Note: academic_year is stored in class_sections, not courses)
         new_course = Course(
