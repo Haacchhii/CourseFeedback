@@ -78,8 +78,8 @@ class EnrollmentValidationService:
         enrolled_year_level = enrollment[7]
         enrolled_college = enrollment[8]
         
-        # Validate program matches
-        if enrolled_program_id != program_id:
+        # Validate program matches (skip if program_id is None - accept enrolled program)
+        if program_id is not None and enrolled_program_id != program_id:
             # Get the program they're trying to assign
             program_result = db.execute(text("""
                 SELECT program_code, program_name

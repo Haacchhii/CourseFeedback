@@ -500,10 +500,11 @@ async def bulk_import_users(
                         })
                         continue
                     
+                    # Don't pass program_id if it's None - let validation accept enrolled program
                     validation = enrollment_service.validate_student_enrollment(
                         db,
                         student_number=user_data.school_id,
-                        program_id=user_data.program_id,
+                        program_id=user_data.program_id if user_data.program_id else None,
                         first_name=user_data.first_name,
                         last_name=user_data.last_name
                     )
