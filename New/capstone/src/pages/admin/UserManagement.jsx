@@ -771,7 +771,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
             }
           }
         }
-        showAlert(message, failedUsers.length > 0 ? 'Partial Success' : 'Success', failedUsers.length > 0 ? 'warning' : 'success')
+        showAlert(message, errors.length > 0 ? 'Partial Success' : 'Success', errors.length > 0 ? 'warning' : 'success')
         
         // Clear selection
         setSelectedUsers([])
