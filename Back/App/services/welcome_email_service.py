@@ -149,11 +149,33 @@ async def send_welcome_email(
         
         subject = f"Welcome to Course Insight Guardian - Your Account is Ready!"
         
+        # Check if email is enabled
+        email_enabled = os.getenv("EMAIL_ENABLED", "false").lower() == "true"
+        
         # Get SMTP configuration from environment
         smtp_server = os.getenv("SMTP_SERVER")
         smtp_port = int(os.getenv("SMTP_PORT", 587))
         smtp_username = os.getenv("SMTP_USERNAME")
         smtp_password = os.getenv("SMTP_PASSWORD")
+        
+        if not email_enabled:
+            logger.warning(f"⚠️ EMAIL_ENABLED is false - welcome email for {email} not sent")
+            logger.info(f"📧 Welcome email prepared for {email}")
+            logger.info(f"   Name: {first_name} {last_name}")
+            logger.info(f"   School ID: {school_id}")
+            logger.info(f"   Role: {role_display}")
+            logger.info(f"   Temp Password: {temp_password}")
+            
+            return {
+                "success": True,
+                "message": f"Welcome email prepared for {email} (EMAIL_ENABLED is false)",
+                "email_sent": False,
+                "details": {
+                    "recipient": email,
+                    "temp_password": temp_password,
+                    "role": role_display
+                }
+            }
         
         if not all([smtp_server, smtp_username, smtp_password]):
             logger.warning(f"⚠️ SMTP not configured - welcome email for {email} not sent")

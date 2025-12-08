@@ -286,6 +286,7 @@ export default function UserManagement() {
           // Validate row
           const rowErrors = []
           if (!row.email || !row.email.includes('@')) rowErrors.push('Invalid email')
+          if (row.email && !row.email.toLowerCase().endsWith('@lpubatangas.edu.ph')) rowErrors.push('Email must be @lpubatangas.edu.ph')
           if (!row.first_name) rowErrors.push('Missing first name')
           if (!row.last_name) rowErrors.push('Missing last name')
           if (!row.school_id || row.school_id.trim() === '') rowErrors.push('Missing school_id')
@@ -346,6 +347,9 @@ export default function UserManagement() {
 
         // Skip invalid rows
         if (!row.email || !row.email.includes('@') || !row.first_name || !row.last_name) continue
+        
+        // Validate email domain
+        if (!row.email.toLowerCase().endsWith('@lpubatangas.edu.ph')) continue
         
         // Normalize role to lowercase for validation
         row.role = row.role.toLowerCase()
@@ -578,6 +582,37 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
     
     try {
       setSubmitting(true)
+      
+      // Validate email domain
+      if (!formData.email.toLowerCase().endsWith('@lpubatangas.edu.ph')) {
+        showAlert('Email must be from @lpubatangas.edu.ph domain', 'Validation Error', 'error')
+        return
+      }
+      
+      // Validate password for non-student users
+      if (formData.role !== 'student' && formData.password) {
+        const password = formData.password
+        if (password.length < 8) {
+          showAlert('Password must be at least 8 characters long', 'Validation Error', 'error')
+          return
+        }
+        if (!/[A-Z]/.test(password)) {
+          showAlert('Password must contain at least one uppercase letter', 'Validation Error', 'error')
+          return
+        }
+        if (!/[a-z]/.test(password)) {
+          showAlert('Password must contain at least one lowercase letter', 'Validation Error', 'error')
+          return
+        }
+        if (!/[0-9]/.test(password)) {
+          showAlert('Password must contain at least one number', 'Validation Error', 'error')
+          return
+        }
+        if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+          showAlert('Password must contain at least one special character (!@#$%^&*(),.?":{}|<>)', 'Validation Error', 'error')
+          return
+        }
+      }
       
       // Split name into first and last name
       const nameParts = formData.name.trim().split(' ')

@@ -74,6 +74,26 @@ export default function FirstTimeLogin() {
       return
     }
 
+    if (!/[A-Z]/.test(formData.newPassword)) {
+      setError('Password must contain at least one uppercase letter')
+      return
+    }
+
+    if (!/[a-z]/.test(formData.newPassword)) {
+      setError('Password must contain at least one lowercase letter')
+      return
+    }
+
+    if (!/[0-9]/.test(formData.newPassword)) {
+      setError('Password must contain at least one number')
+      return
+    }
+
+    if (!/[^a-zA-Z0-9]/.test(formData.newPassword)) {
+      setError('Password must contain at least one special character')
+      return
+    }
+
     if (formData.newPassword !== formData.confirmPassword) {
       setError('Passwords do not match')
       return

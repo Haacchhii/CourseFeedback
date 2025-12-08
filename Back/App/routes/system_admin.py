@@ -317,6 +317,22 @@ async def create_user(
                 
                 logger.info(f"✅ Student validated against enrollment list: {user_data.school_id} -> {enrollment_info['program_code']}")
         
+        # Validate password for non-student roles (students get auto-generated passwords)
+        if user_data.role not in ["student", "secretary", "department_head"]:
+            # Validate password strength for instructors and admins
+            if user_data.password:
+                pwd = user_data.password
+                if len(pwd) < 8:
+                    raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+                if not any(c.isupper() for c in pwd):
+                    raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter")
+                if not any(c.islower() for c in pwd):
+                    raise HTTPException(status_code=400, detail="Password must contain at least one lowercase letter")
+                if not any(c.isdigit() for c in pwd):
+                    raise HTTPException(status_code=400, detail="Password must contain at least one digit")
+                if not any(c in '!@#$%^&*(),.?\":{}|<>' for c in pwd):
+                    raise HTTPException(status_code=400, detail="Password must contain at least one special character")
+        
         # Determine school_id and auto-generate password for students
         must_change_password = False
         first_login = False

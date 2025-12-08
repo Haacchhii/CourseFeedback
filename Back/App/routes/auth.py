@@ -339,6 +339,19 @@ async def reset_password(request: ResetPasswordRequest, db = Depends(get_db)):
                 message="Reset token has expired. Please request a new one."
             )
         
+        # Validate new password strength
+        pwd = request.new_password
+        if len(pwd) < 8:
+            return ForgotPasswordResponse(success=False, message="Password must be at least 8 characters")
+        if not any(c.isupper() for c in pwd):
+            return ForgotPasswordResponse(success=False, message="Password must contain at least one uppercase letter")
+        if not any(c.islower() for c in pwd):
+            return ForgotPasswordResponse(success=False, message="Password must contain at least one lowercase letter")
+        if not any(c.isdigit() for c in pwd):
+            return ForgotPasswordResponse(success=False, message="Password must contain at least one digit")
+        if not any(c in '!@#$%^&*(),.?\":{}|<>' for c in pwd):
+            return ForgotPasswordResponse(success=False, message="Password must contain at least one special character")
+        
         # Hash new password
         password_hash = bcrypt.hashpw(request.new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         

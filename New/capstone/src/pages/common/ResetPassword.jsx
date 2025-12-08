@@ -26,6 +26,8 @@ export default function ResetPassword() {
   // Password validation criteria
   const passwordCriteria = {
     minLength: newPassword.length >= 8,
+    hasUpper: /[A-Z]/.test(newPassword),
+    hasLower: /[a-z]/.test(newPassword),
     hasNumber: /\d/.test(newPassword),
     hasSpecial: /[!@#$%^&*(),.?":{}|<>]/.test(newPassword),
   }
@@ -170,6 +172,44 @@ export default function ResetPassword() {
                       passwordCriteria.minLength ? 'text-green-700 font-medium' : 'text-gray-600'
                     }`}>
                       At least 8 characters
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <div className={`w-5 h-5 rounded flex items-center justify-center ${
+                      passwordCriteria.hasUpper 
+                        ? 'bg-green-500 text-white' 
+                        : 'bg-gray-300 text-gray-500'
+                    }`}>
+                      {passwordCriteria.hasUpper && (
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                      )}
+                    </div>
+                    <span className={`text-sm ${
+                      passwordCriteria.hasUpper ? 'text-green-700 font-medium' : 'text-gray-600'
+                    }`}>
+                      At least 1 uppercase letter (A-Z)
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <div className={`w-5 h-5 rounded flex items-center justify-center ${
+                      passwordCriteria.hasLower 
+                        ? 'bg-green-500 text-white' 
+                        : 'bg-gray-300 text-gray-500'
+                    }`}>
+                      {passwordCriteria.hasLower && (
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                      )}
+                    </div>
+                    <span className={`text-sm ${
+                      passwordCriteria.hasLower ? 'text-green-700 font-medium' : 'text-gray-600'
+                    }`}>
+                      At least 1 lowercase letter (a-z)
                     </span>
                   </div>
                   
