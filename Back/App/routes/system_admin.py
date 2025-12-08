@@ -607,6 +607,22 @@ async def bulk_import_users(
                     dept_head = DepartmentHead(user_id=new_user.id)
                     db.add(dept_head)
                 
+                # Send welcome email if password was generated
+                if must_change_password and school_id:
+                    try:
+                        email_result = await send_welcome_email(
+                            email=user_data.email,
+                            first_name=user_data.first_name,
+                            last_name=user_data.last_name,
+                            school_id=school_id,
+                            role=user_data.role,
+                            temp_password=actual_password
+                        )
+                        logger.info(f"Welcome email sent to {user_data.email}: {email_result.get('message', 'Success')}")
+                    except Exception as email_error:
+                        logger.warning(f"Failed to send welcome email to {user_data.email}: {email_error}")
+                        # Don't fail the import if email fails
+                
                 results["success"] += 1
                 
                 # Commit every 50 users for better performance
