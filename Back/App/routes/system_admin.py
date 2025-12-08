@@ -9,7 +9,7 @@ Handles all system-level administrative functions including:
 - Data Export
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Query, Body
+from fastapi import APIRouter, HTTPException, Depends, Query, Body, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import text, func, and_, or_
 from database.connection import get_db
@@ -466,12 +466,14 @@ async def create_user(
 @router.post("/users/bulk-import")
 async def bulk_import_users(
     users: List[UserCreate],
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
     """
     Bulk import multiple users in a single transaction for better performance.
     Processes all users in one database session with batch commits.
+    Sends welcome emails asynchronously in the background.
     """
     try:
         from services.enrollment_validation import EnrollmentValidationService
@@ -607,21 +609,17 @@ async def bulk_import_users(
                     dept_head = DepartmentHead(user_id=new_user.id)
                     db.add(dept_head)
                 
-                # Send welcome email if password was generated
+                # Queue welcome email to be sent in background (don't block import)
                 if must_change_password and school_id:
-                    try:
-                        email_result = await send_welcome_email(
-                            email=user_data.email,
-                            first_name=user_data.first_name,
-                            last_name=user_data.last_name,
-                            school_id=school_id,
-                            role=user_data.role,
-                            temp_password=actual_password
-                        )
-                        logger.info(f"Welcome email sent to {user_data.email}: {email_result.get('message', 'Success')}")
-                    except Exception as email_error:
-                        logger.warning(f"Failed to send welcome email to {user_data.email}: {email_error}")
-                        # Don't fail the import if email fails
+                    background_tasks.add_task(
+                        send_welcome_email,
+                        email=user_data.email,
+                        first_name=user_data.first_name,
+                        last_name=user_data.last_name,
+                        school_id=school_id,
+                        role=user_data.role,
+                        temp_password=actual_password
+                    )
                 
                 results["success"] += 1
                 
