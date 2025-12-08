@@ -373,8 +373,8 @@ export default function UserManagement() {
       // Use bulk import endpoint (single API call)
       const response = await apiClient.post('/admin/users/bulk-import', usersToImport)
       
-      const imported = response.data?.data?.success || 0
-      const failedUsers = response.data?.data?.errors || []
+      const imported = response.data?.success || 0
+      const failedUsers = response.data?.errors || []
 
       // Show results
       const message = `Bulk import complete!\n\n` +
