@@ -731,12 +731,11 @@ const ProgramSections = () => {
                 Close
               </button>
             </div>
-            </div>
           </div>
         </div>
-      )}
       </div>
-    </div>
+      )}
+
       {/* Alert Modal */}
       <AlertModal
         isOpen={showAlertModal}
