@@ -248,11 +248,13 @@ export const adminAPI = {
   /**
    * Delete user
    * @param {number} userId - User ID to delete
+   * @param {boolean} force - Force delete (removes all related data)
    * @returns {Promise} Success message
    */
-  deleteUser: async (userId) => {
+  deleteUser: async (userId, force = false) => {
     const currentUser = authAPI.getCurrentUser()
-    return apiClient.delete(`/admin/users/${userId}?current_user_id=${currentUser?.id}`)
+    const forceParam = force ? '&force=true' : ''
+    return apiClient.delete(`/admin/users/${userId}?current_user_id=${currentUser?.id}${forceParam}`)
   },
 
   /**

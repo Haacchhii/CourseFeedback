@@ -695,6 +695,7 @@ async def update_user(
 @router.delete("/users/{user_id}")
 async def delete_user(
     user_id: int,
+    force: bool = False,
     current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
@@ -702,6 +703,7 @@ async def delete_user(
     Delete a user - performs hard delete if no data exists, soft delete otherwise.
     - Hard delete: User has no evaluations, enrollments, or audit logs (newly created)
     - Soft delete: User has related data (preserves data integrity)
+    - Force delete: Permanently removes user and all related data (use with caution)
     """
     try:
         current_user_id = current_user['id']
@@ -732,6 +734,47 @@ async def delete_user(
         
         # Determine delete type
         has_data = has_evaluations or has_enrollments or has_audit_logs
+        
+        # Force delete overrides normal logic
+        if force:
+            # Force delete - remove ALL related data first
+            if has_evaluations:
+                db.query(Evaluation).filter(Evaluation.student_id == user_id).delete()
+            if has_enrollments:
+                db.query(Enrollment).filter(Enrollment.student_id == user_id).delete()
+            # Note: Keep audit logs for compliance, just mark user as deleted
+            
+            # Delete role-specific records
+            if student_record:
+                db.delete(student_record)
+            if dept_head_record:
+                db.delete(dept_head_record)
+            if secretary_record:
+                db.delete(secretary_record)
+            
+            # Delete the user
+            db.delete(user)
+            db.commit()
+            
+            # Log audit event
+            await create_audit_log(
+                db, current_user_id, "USER_FORCE_DELETED", "User Management",
+                details={
+                    "user_id": user_id,
+                    "email": user.email,
+                    "delete_type": "force",
+                    "had_evaluations": has_evaluations,
+                    "had_enrollments": has_enrollments,
+                    "reason": "Force deleted by administrator"
+                }
+            )
+            
+            return {
+                "success": True,
+                "message": "User and all related data permanently deleted (force delete)",
+                "delete_type": "force"
+            }
+        
         delete_type = "soft" if has_data else "hard"
         
         if delete_type == "hard":
