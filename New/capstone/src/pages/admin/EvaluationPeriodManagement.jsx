@@ -10,6 +10,10 @@ export default function EvaluationPeriodManagement() {
   const navigate = useNavigate()
   const { user: currentUser } = useAuth()
   
+  // Helper function to check if period is open (backend uses "Open", frontend checks both)
+  const isOpen = (status) => status === 'Open' || status === 'active'
+  const isClosed = (status) => status === 'Closed' || status === 'closed'
+  
   // State
   const [currentPeriod, setCurrentPeriod] = useState(null)
   const [pastPeriods, setPastPeriods] = useState([])
@@ -54,8 +58,8 @@ export default function EvaluationPeriodManagement() {
   useEffect(() => {
     if (periodsData?.data) {
       const periods = periodsData.data
-      const current = periods.find(p => p.status === 'active') || null
-      const past = periods.filter(p => p.status === 'closed')
+      const current = periods.find(p => p.status === 'Open' || isOpen(p.status)) || null
+      const past = periods.filter(p => isClosed(p.status) || isClosed(p.status))
       setCurrentPeriod(current)
       setPastPeriods(past)
     }
@@ -131,8 +135,8 @@ export default function EvaluationPeriodManagement() {
           // Refresh periods
           const response = await adminAPI.getPeriods()
           const periods = response?.data || []
-          const current = periods.find(p => p.status === 'active') || null
-          const past = periods.filter(p => p.status === 'closed')
+          const current = periods.find(p => isOpen(p.status)) || null
+          const past = periods.filter(p => isClosed(p.status))
           setCurrentPeriod(current)
           setPastPeriods(past)
           
@@ -162,8 +166,8 @@ export default function EvaluationPeriodManagement() {
           // Refresh periods
           const response = await adminAPI.getPeriods()
           const periods = response?.data || []
-          const current = periods.find(p => p.status === 'active') || null
-          const past = periods.filter(p => p.status === 'closed')
+          const current = periods.find(p => isOpen(p.status)) || null
+          const past = periods.filter(p => isClosed(p.status))
           setCurrentPeriod(current)
           setPastPeriods(past)
           
@@ -193,7 +197,7 @@ export default function EvaluationPeriodManagement() {
       return
     }
 
-    const confirmMsg = targetPeriod.status === 'closed'
+    const confirmMsg = isClosed(targetPeriod.status)
       ? `Extend and Reopen "${targetPeriod.name}"?\n\nThis will:\n• Extend the period to ${formData.endDate}\n• Reopen the period for new submissions\n• Send notifications to all enrolled students`
       : `Extend "${targetPeriod.name}" to ${formData.endDate}?\n\nThis will send notifications to all enrolled students.`
 
@@ -217,19 +221,19 @@ export default function EvaluationPeriodManagement() {
       await adminAPI.updatePeriod(targetPeriod.id, { endDate: formData.endDate })
       
       // If period is closed, reopen it
-      if (targetPeriod.status === 'closed') {
+      if (isClosed(targetPeriod.status)) {
         await adminAPI.updatePeriodStatus(targetPeriod.id, 'active')
       }
 
       // Refresh periods
       const response = await adminAPI.getPeriods()
       const periods = response?.data || []
-      const current = periods.find(p => p.status === 'active') || null
-      const past = periods.filter(p => p.status === 'closed')
+      const current = periods.find(p => isOpen(p.status)) || null
+      const past = periods.filter(p => isClosed(p.status))
       setCurrentPeriod(current)
       setPastPeriods(past)
       
-      showAlert(`Period extended successfully to ${formData.endDate}${targetPeriod.status === 'closed' ? ' and reopened' : ''}.`, 'Success', 'success')
+      showAlert(`Period extended successfully to ${formData.endDate}${isClosed(targetPeriod.status) ? ' and reopened' : ''}.`, 'Success', 'success')
       setShowExtendModal(false)
       setPeriodToExtend(null)
     } catch (err) {
@@ -253,7 +257,7 @@ export default function EvaluationPeriodManagement() {
 
   const handleCreatePeriod = async (e) => {
     e.preventDefault()
-    if (currentPeriod && currentPeriod.status === 'active') {
+    if (currentPeriod && isOpen(currentPeriod.status)) {
       showAlert('Please close the current period before creating a new one.', 'Cannot Create Period', 'warning')
       return
     }
@@ -291,8 +295,8 @@ export default function EvaluationPeriodManagement() {
       // Refresh periods
       const response = await adminAPI.getPeriods()
       const periods = response?.data || []
-      const current = periods.find(p => p.status === 'active') || null
-      const past = periods.filter(p => p.status === 'closed')
+      const current = periods.find(p => isOpen(p.status)) || null
+      const past = periods.filter(p => isClosed(p.status))
       setCurrentPeriod(current)
       setPastPeriods(past)
 
@@ -358,8 +362,8 @@ export default function EvaluationPeriodManagement() {
         // Reload period statistics and enrolled sections
         const periodsResponse = await adminAPI.getPeriods()
         const periods = periodsResponse?.data || []
-        const current = periods.find(p => p.status === 'active') || null
-        const past = periods.filter(p => p.status === 'closed')
+        const current = periods.find(p => isOpen(p.status)) || null
+        const past = periods.filter(p => isClosed(p.status))
         setCurrentPeriod(current)
         setPastPeriods(past)
         
@@ -410,8 +414,8 @@ export default function EvaluationPeriodManagement() {
           // Reload period statistics and enrolled sections
           const periodsResponse = await adminAPI.getPeriods()
           const periods = periodsResponse?.data || []
-          const current = periods.find(p => p.status === 'active') || null
-          const past = periods.filter(p => p.status === 'closed')
+          const current = periods.find(p => isOpen(p.status)) || null
+          const past = periods.filter(p => isClosed(p.status))
           setCurrentPeriod(current)
           setPastPeriods(past)
           
@@ -439,8 +443,8 @@ export default function EvaluationPeriodManagement() {
           // Refresh periods
           const response = await adminAPI.getPeriods()
           const periods = response?.data || []
-          const current = periods.find(p => p.status === 'active') || null
-          const past = periods.filter(p => p.status === 'closed')
+          const current = periods.find(p => isOpen(p.status)) || null
+          const past = periods.filter(p => isClosed(p.status))
           setCurrentPeriod(current)
           setPastPeriods(past)
           
@@ -494,11 +498,11 @@ export default function EvaluationPeriodManagement() {
                   <div className="flex items-center space-x-3 mb-2">
                     <h2 className="text-2xl font-bold text-white">{currentPeriod.name}</h2>
                   <span className={`px-4 py-1 rounded-full text-sm font-bold ${
-                    currentPeriod.status === 'active'
+                    isOpen(currentPeriod.status)
                       ? 'bg-yellow-400 text-yellow-900'
                       : 'bg-gray-300 text-gray-700'
                   }`}>
-                    {currentPeriod.status === 'active' ? '🟢 OPEN' : '⚫ CLOSED'}
+                    {isOpen(currentPeriod.status) ? '🟢 OPEN' : '⚫ CLOSED'}
                   </span>
                 </div>
                 <p className="text-yellow-100">
@@ -506,7 +510,7 @@ export default function EvaluationPeriodManagement() {
                 </p>
               </div>
               <div className="flex space-x-2">
-                {currentPeriod.status === 'active' ? (
+                {isOpen(currentPeriod.status) ? (
                   <>
                     <button onClick={() => openExtendModal(currentPeriod)} className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-all font-semibold">
                       Extend
@@ -567,7 +571,7 @@ export default function EvaluationPeriodManagement() {
             </div>
 
             {/* Warning/Info Messages */}
-            {currentPeriod.status === 'active' && currentPeriod.daysRemaining <= 5 && (
+            {isOpen(currentPeriod.status) && currentPeriod.daysRemaining <= 5 && (
               <div className="bg-orange-50 border-l-4 border-yellow-500 p-4 mb-6 rounded-lg">
                 <div className="flex items-center">
                   <svg className="w-6 h-6 text-yellow-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -581,7 +585,7 @@ export default function EvaluationPeriodManagement() {
               </div>
             )}
 
-            {currentPeriod.participationRate < 50 && currentPeriod.status === 'active' && (
+            {currentPeriod.participationRate < 50 && isOpen(currentPeriod.status) && (
               <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-lg">
                 <div className="flex items-center">
                   <svg className="w-6 h-6 text-red-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -889,7 +893,7 @@ export default function EvaluationPeriodManagement() {
       {showExtendModal && (periodToExtend || currentPeriod) && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full max-h-[85vh] flex flex-col shadow-2xl">
-            <div className={`bg-gradient-to-r ${(periodToExtend || currentPeriod).status === 'closed' ? 'from-red-800 to-red-900 border-yellow-700' : 'from-yellow-600 to-amber-700 border-orange-700'} px-5 py-4 border-b-4 flex-shrink-0`}>
+            <div className={`bg-gradient-to-r ${isClosed((periodToExtend || currentPeriod).status) ? 'from-red-800 to-red-900 border-yellow-700' : 'from-yellow-600 to-amber-700 border-orange-700'} px-5 py-4 border-b-4 flex-shrink-0`}>
               <div className="flex justify-between items-center">
                 <div>
                   <h2 className="text-lg font-bold text-white">⏰ Extend Period</h2>
@@ -904,7 +908,7 @@ export default function EvaluationPeriodManagement() {
             </div>
             
             <form onSubmit={handleExtendPeriod} className="flex-1 overflow-y-auto p-6 space-y-4">
-              {(periodToExtend || currentPeriod).status === 'closed' && (
+              {isClosed((periodToExtend || currentPeriod).status) && (
                 <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded">
                   <p className="text-sm text-red-900">
                     <strong>ℹ️ Note:</strong> This period is currently closed. Extending it will automatically reopen the period for new submissions.
