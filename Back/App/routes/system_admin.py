@@ -1036,10 +1036,14 @@ async def create_evaluation_period(
             "period_id": new_period.id
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error creating evaluation period: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to create evaluation period: {str(e)}")
 
 @router.patch("/evaluation-periods/{period_id}")
 async def update_evaluation_period(

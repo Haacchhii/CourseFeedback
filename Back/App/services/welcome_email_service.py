@@ -11,9 +11,19 @@ import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import os
-from dotenv import load_dotenv
+from pathlib import Path
 
-load_dotenv()
+# Try to load .env file if it exists (for local development)
+try:
+    from dotenv import load_dotenv
+    env_path = Path(__file__).parent.parent.parent / '.env'
+    if env_path.exists():
+        load_dotenv(env_path)
+        logger = logging.getLogger(__name__)
+        logger.info("Loaded .env file for local development")
+except Exception as e:
+    # In production (Railway), environment variables are set directly
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -157,6 +167,14 @@ async def send_welcome_email(
         smtp_port = int(os.getenv("SMTP_PORT", 587))
         smtp_username = os.getenv("SMTP_USERNAME")
         smtp_password = os.getenv("SMTP_PASSWORD")
+        
+        # Debug logging for production troubleshooting
+        logger.info(f"📧 Email Configuration Check:")
+        logger.info(f"   EMAIL_ENABLED: {email_enabled}")
+        logger.info(f"   SMTP_SERVER: {smtp_server or 'NOT SET'}")
+        logger.info(f"   SMTP_PORT: {smtp_port}")
+        logger.info(f"   SMTP_USERNAME: {smtp_username or 'NOT SET'}")
+        logger.info(f"   SMTP_PASSWORD: {'SET' if smtp_password else 'NOT SET'}")
         
         if not email_enabled:
             logger.warning(f"⚠️ EMAIL_ENABLED is false - welcome email for {email} not sent")
