@@ -383,7 +383,7 @@ export default function Dashboard() {
                     <option value="">Select Period</option>
                     {evaluationPeriods.map((period) => (
                       <option key={period.id} value={period.id}>
-                        {period.name} {period.status === 'active' || period.status === 'Active' ? '(Active)' : ''}
+                        {period.name} {period.status === 'Open' || period.status === 'active' || period.status === 'Active' ? '(Active)' : ''}
                       </option>
                     ))}
                   </select>

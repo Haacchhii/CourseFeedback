@@ -88,7 +88,7 @@ export default function SentimentAnalysis() {
         }
         if (periodsResponse?.data) {
           setEvaluationPeriods(periodsResponse.data)
-          const active = periodsResponse.data.find(p => p.status === 'active' || p.status === 'Active')
+          const active = periodsResponse.data.find(p => p.status === 'Open' || p.status === 'active' || p.status === 'Active')
           if (active) {
             setActivePeriod(active.id)
             setSelectedPeriod(active.id)
@@ -517,7 +517,7 @@ export default function SentimentAnalysis() {
                     <option value="">Select Period</option>
                     {evaluationPeriods.map((period) => (
                       <option key={period.id} value={period.id}>
-                        {period.name} {period.status === 'active' || period.status === 'Active' ? '(Active)' : ''}
+                        {period.name} {period.status === 'Open' || period.status === 'active' || period.status === 'Active' ? '(Active)' : ''}
                       </option>
                     ))}
                   </select>

@@ -70,7 +70,7 @@ export default function Evaluations() {
         }
         if (periodsResponse?.data) {
           setEvaluationPeriods(periodsResponse.data)
-          const active = periodsResponse.data.find(p => p.status === 'active')
+          const active = periodsResponse.data.find(p => p.status === 'Open' || p.status === 'active')
           if (active) {
             setActivePeriod(active)
           }
@@ -674,12 +674,10 @@ export default function Evaluations() {
                 onChange={(e) => setSelectedPeriod(e.target.value ? parseInt(e.target.value) : null)}
                 className="lpu-select"
               >
-                <option value="">
-                  {activePeriod ? `${activePeriod.name} (${activePeriod.academic_year}) - Active` : 'Select Period'}
-                </option>
-                {evaluationPeriods.filter(p => p.status !== 'active').map(period => (
+                <option value="">All Periods</option>
+                {evaluationPeriods.map(period => (
                   <option key={period.id} value={period.id}>
-                    {period.name} ({period.academic_year})
+                    {period.name} ({period.academic_year}) {period.status === 'Open' || period.status === 'active' ? '- Active' : ''}
                   </option>
                 ))}
               </select>

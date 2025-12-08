@@ -24,15 +24,11 @@ The system replaces traditional paper-based evaluation forms with a secure, effi
 
 ## Intended Users
 
-**System Administrator** – Manages all users, evaluation periods, courses, system settings, and generates system-wide reports.
+**System Administrator** – Manages all users, evaluation periods and courses
 
-**Department Head** – Views department-specific analytics, evaluation results, and instructor performance reports.
+**Department Head/Secretary** – Views department-specific analytics and evaluation results
 
-**Secretary** – Manages student enrollments, checks evaluation status, and provides administrative support.
-
-**Instructor** – Views evaluation results for assigned courses after the evaluation period closes.
-
-**Student** – Submits anonymous evaluations for enrolled courses during active evaluation periods.
+**Student** – Submits evaluations for enrolled courses during active evaluation periods.
 
 ---
 
@@ -90,7 +86,7 @@ If you are logging in for the first time:
 1. **Receive Welcome Email**
    - Check your @lpubatangas.edu.ph email inbox
    - Look for subject: *"Welcome to Course Insight Guardian - Your Account is Ready!"*
-   - Note your temporary password (format: `lpub@[student_number]` for students)
+   - Note your temporary password (format: `lpub@[school_id_Number]`)
 
 2. **Initial Login**
    - Go to the login page
@@ -143,10 +139,10 @@ The system implements role-based access control to ensure appropriate access lev
 - View all analytics, reports, and dashboards
 - Configure system settings
 - Access complete audit logs
-- Export data and generate system-wide reports
+- Export 
 - Force delete users and all related data
 
-### Department Head
+### Department Head/Secretary
 **Department-level management and reporting**
 
 **Permissions:**
@@ -156,40 +152,15 @@ The system implements role-based access control to ensure appropriate access lev
 - Generate department reports
 - Compare course evaluations across the department
 - Monitor evaluation completion rates within department
-
-### Secretary
-**Administrative support and data management**
-
-**Permissions:**
-- Manage student enrollments in class sections
 - View evaluation status and completion rates
-- Support bulk import operations
-- Generate enrollment and completion reports
-- Verify student information
-- Assist with evaluation period setup
-
-### Instructor
-**Course-level access to evaluation results**
-
-**Permissions:**
-- View assigned courses and class sections
-- Access evaluation results for own courses (after period closes)
-- View anonymous student feedback and ratings
-- Generate course-specific reports
-- Track evaluation completion rates per course
-- Update personal profile information
-
-**Note**: Instructors cannot see evaluation results while the period is active, ensuring student anonymity.
 
 ### Student
 **Evaluation submission and personal profile management**
 
 **Permissions:**
 - View list of enrolled courses
-- Submit anonymous evaluations during active periods
+- Submit evaluations during active periods
 - View evaluation history (own submissions)
-- Track evaluation deadlines
-- Update personal profile and password
 - View courses requiring evaluation
 
 ---
@@ -212,7 +183,6 @@ The navigation sidebar provides quick access to:
 - Programs and Sections
 - Reports and Analytics
 - Audit Logs
-- System Settings
 
 ### User Management
 
