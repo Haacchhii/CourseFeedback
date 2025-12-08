@@ -59,7 +59,7 @@ export default function DataExportCenter() {
   const showAlert = (message, title = 'Notification', type = 'info') => {
     setAlertConfig({ title, message, type })
     setShowAlertModal(true)
-  })
+  }
   
   // API State
   const [exportHistory, setExportHistory] = useState([])
