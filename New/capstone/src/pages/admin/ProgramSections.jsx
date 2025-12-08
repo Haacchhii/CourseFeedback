@@ -760,6 +760,7 @@ const ProgramSections = () => {
         variant="danger"
       />
     </div>
+    </div>
   );
 };
 
