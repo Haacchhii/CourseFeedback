@@ -164,9 +164,11 @@ export default function NonRespondents() {
       <header className="lpu-header">
         <div className="container mx-auto px-6 sm:px-8 lg:px-10 py-8 lg:py-10 max-w-screen-2xl">
           <div className="flex items-center space-x-5">
-            <div className="w-14 h-14 lg:w-16 lg:h-16 bg-white rounded-full flex items-center justify-center shadow-lg flex-shrink-0">
-              <Users className="w-8 h-8 text-[#7a0000]" />
-            </div>
+            <img 
+              src="/lpu-logo.png" 
+              alt="University Logo" 
+              className="w-32 h-32 object-contain"
+            />
             <div>
               <h1 className="lpu-header-title text-3xl lg:text-4xl">Non-Respondent Tracking</h1>
               <p className="lpu-header-subtitle text-base lg:text-lg mt-1">
@@ -196,12 +198,12 @@ export default function NonRespondents() {
             <p className="text-4xl font-bold text-white">{data?.total_students || 0}</p>
           </div>
           
-          <div className="bg-gradient-to-br from-[#10b981] to-[#059669] rounded-card shadow-card p-6">
+          <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-card shadow-card p-6">
             <h3 className="text-sm font-semibold text-white/80 mb-2">Responded</h3>
             <p className="text-4xl font-bold text-white">{data?.responded || 0}</p>
           </div>
           
-          <div className="bg-gradient-to-br from-[#ef4444] to-[#dc2626] rounded-card shadow-card p-6">
+          <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-card shadow-card p-6">
             <h3 className="text-sm font-semibold text-white/80 mb-2">Non-Responded</h3>
             <p className="text-4xl font-bold text-white">{data?.non_responded || 0}</p>
           </div>

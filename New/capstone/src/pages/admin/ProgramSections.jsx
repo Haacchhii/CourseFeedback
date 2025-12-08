@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { adminAPI } from '../../services/api';
+import { AlertModal, ConfirmModal } from '../../components/Modal';
 
 const ProgramSections = () => {
   const [sections, setSections] = useState([]);
@@ -32,6 +33,23 @@ const ProgramSections = () => {
   const [assignedStudents, setAssignedStudents] = useState([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
 
+  // Modal State
+  const [showAlertModal, setShowAlertModal] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({ title: '', message: '', type: 'info' });
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState({ title: '', message: '', onConfirm: () => {}, confirmText: 'Confirm', cancelText: 'Cancel' });
+
+  // Modal Helper Functions
+  const showAlert = (message, title = 'Notification', type = 'info') => {
+    setAlertConfig({ title, message, type });
+    setShowAlertModal(true);
+  };
+
+  const showConfirm = (message, onConfirm, title = 'Confirm Action', confirmText = 'Confirm', cancelText = 'Cancel') => {
+    setConfirmConfig({ title, message, onConfirm, confirmText, cancelText });
+    setShowConfirmModal(true);
+  };
+
   useEffect(() => {
     loadSections();
     loadPrograms();
@@ -50,7 +68,7 @@ const ProgramSections = () => {
       setSections(response.data || []);
     } catch (error) {
       console.error('Failed to load sections:', error);
-      alert('Failed to load program sections');
+      showAlert('Failed to load program sections', 'Error', 'error');
     } finally {
       setLoading(false);
     }
@@ -75,7 +93,7 @@ const ProgramSections = () => {
       setAvailableStudents(response.data || []);
     } catch (error) {
       console.error('Failed to load students:', error);
-      alert('Failed to load students');
+      showAlert('Failed to load students', 'Error', 'error');
     } finally {
       setLoadingStudents(false);
     }
@@ -87,7 +105,7 @@ const ProgramSections = () => {
       setAssignedStudents(response.data || []);
     } catch (error) {
       console.error('Failed to load assigned students:', error);
-      alert('Failed to load section students');
+      showAlert('Failed to load section students', 'Error', 'error');
     }
   };
 
@@ -117,18 +135,22 @@ const ProgramSections = () => {
   };
 
   const handleDeleteSection = async (section) => {
-    if (!confirm(`Are you sure you want to delete section "${section.sectionName}"? This will remove all student assignments.`)) {
-      return;
-    }
-
-    try {
-      await adminAPI.deleteProgramSection(section.id);
-      alert('Section deleted successfully');
-      loadSections();
-    } catch (error) {
-      console.error('Failed to delete section:', error);
-      alert('Failed to delete section');
-    }
+    showConfirm(
+      `Are you sure you want to delete section "${section.sectionName}"? This will remove all student assignments.`,
+      async () => {
+        try {
+          await adminAPI.deleteProgramSection(section.id);
+          showAlert('Section deleted successfully', 'Success', 'success');
+          loadSections();
+        } catch (error) {
+          console.error('Failed to delete section:', error);
+          showAlert('Failed to delete section', 'Error', 'error');
+        }
+      },
+      'Delete Section',
+      'Delete',
+      'Cancel'
+    );
   };
 
   const handleSubmit = async (e) => {
@@ -137,7 +159,7 @@ const ProgramSections = () => {
     // Validate required fields
     if (!formData.sectionName || !formData.programId || !formData.yearLevel || 
         !formData.semester || !formData.schoolYear) {
-      alert('Please fill in all required fields');
+      showAlert('Please fill in all required fields', 'Validation Error', 'warning');
       return;
     }
     
@@ -151,23 +173,23 @@ const ProgramSections = () => {
 
     // Validate parsed values
     if (isNaN(data.programId) || isNaN(data.yearLevel) || isNaN(data.semester)) {
-      alert('Invalid numeric values');
+      showAlert('Invalid numeric values', 'Validation Error', 'warning');
       return;
     }
 
     try {
       if (modalMode === 'create') {
         await adminAPI.createProgramSection(data);
-        alert('Section created successfully');
+        showAlert('Section created successfully', 'Success', 'success');
       } else {
         await adminAPI.updateProgramSection(selectedSection.id, data);
-        alert('Section updated successfully');
+        showAlert('Section updated successfully', 'Success', 'success');
       }
       setShowModal(false);
       loadSections();
     } catch (error) {
       console.error('Failed to save section:', error);
-      alert(error.response?.data?.detail || 'Failed to save section');
+      showAlert(error.response?.data?.detail || 'Failed to save section', 'Error', 'error');
     }
   };
 
@@ -209,35 +231,39 @@ const ProgramSections = () => {
 
   const handleAssignStudents = async () => {
     if (selectedStudents.length === 0) {
-      alert('Please select at least one student');
+      showAlert('Please select at least one student', 'Validation Error', 'warning');
       return;
     }
 
     try {
       const response = await adminAPI.assignStudentsToSection(selectedSection.id, selectedStudents);
-      alert(response.message);
+      showAlert(response.message, 'Success', 'success');
       setShowStudentModal(false);
       loadSections();
     } catch (error) {
       console.error('Failed to assign students:', error);
-      alert('Failed to assign students');
+      showAlert('Failed to assign students', 'Error', 'error');
     }
   };
 
   const handleRemoveStudent = async (studentId) => {
-    if (!confirm('Are you sure you want to remove this student from the section?')) {
-      return;
-    }
-
-    try {
-      await adminAPI.removeStudentFromSection(selectedSection.id, studentId);
-      alert('Student removed successfully');
-      loadAssignedStudents(selectedSection.id);
-      loadSections();
-    } catch (error) {
-      console.error('Failed to remove student:', error);
-      alert('Failed to remove student');
-    }
+    showConfirm(
+      'Are you sure you want to remove this student from the section?',
+      async () => {
+        try {
+          await adminAPI.removeStudentFromSection(selectedSection.id, studentId);
+          showAlert('Student removed successfully', 'Success', 'success');
+          loadAssignedStudents(selectedSection.id);
+          loadSections();
+        } catch (error) {
+          console.error('Failed to remove student:', error);
+          showAlert('Failed to remove student', 'Error', 'error');
+        }
+      },
+      'Remove Student',
+      'Remove',
+      'Cancel'
+    );
   };
 
   useEffect(() => {
@@ -266,9 +292,11 @@ const ProgramSections = () => {
         <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-8 lg:py-10 max-w-screen-2xl">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg">
-                <span className="text-[#7a0000] font-bold text-xl">LPU</span>
-              </div>
+              <img 
+                src="/lpu-logo.png" 
+                alt="University Logo" 
+                className="w-32 h-32 object-contain"
+              />
               <div>
                 <h1 className="lpu-header-title text-3xl">Program Sections Management</h1>
                 <p className="lpu-header-subtitle text-lg">Manage program sections and student assignments</p>
@@ -708,6 +736,30 @@ const ProgramSections = () => {
         </div>
       )}
       </div>
+    </div>
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={showAlertModal}
+        onClose={() => setShowAlertModal(false)}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        variant={alertConfig.type === 'error' ? 'danger' : alertConfig.type}
+      />
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={() => {
+          confirmConfig.onConfirm();
+          setShowConfirmModal(false);
+        }}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmText={confirmConfig.confirmText}
+        cancelText={confirmConfig.cancelText}
+        variant="danger"
+      />
     </div>
   );
 };

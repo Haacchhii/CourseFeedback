@@ -61,7 +61,7 @@ export default function Dashboard() {
         }
         
         if (programsResponse?.data) {
-          setProgramOptions(programsResponse.data)
+          setProgramOptions(transformPrograms(programsResponse.data))
         }
         if (yearLevelsResponse?.data) {
           setYearLevelOptions(yearLevelsResponse.data)
@@ -242,9 +242,11 @@ export default function Dashboard() {
         <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-8 lg:py-10 max-w-screen-2xl">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
             <div className="flex items-center space-x-5">
-              <div className="w-14 h-14 lg:w-16 lg:h-16 bg-white rounded-full flex items-center justify-center shadow-lg flex-shrink-0">
-                <span className="text-[#7a0000] font-bold text-xl lg:text-2xl">LPU</span>
-              </div>
+              <img 
+                src="/lpu-logo.png" 
+                alt="University Logo" 
+                className="w-32 h-32 object-contain"
+              />
               <div>
                 <h1 className="lpu-header-title text-3xl lg:text-4xl">Course Insight Guardian</h1>
                 <p className="lpu-header-subtitle text-base lg:text-lg mt-1">
@@ -274,7 +276,11 @@ export default function Dashboard() {
             </svg>
             <h3 className="text-xl font-semibold text-gray-700 mb-2">No Active Evaluation Period</h3>
             <p className="text-gray-500 mb-4">There is currently no active evaluation period.</p>
-            <p className="text-gray-500">Please contact the administrator to activate an evaluation period, or select a specific period from the filter below.</p>
+            {evaluationPeriods.length > 0 ? (
+              <p className="text-gray-500">Select a past evaluation period from the filters below to view historical data.</p>
+            ) : (
+              <p className="text-gray-500">Please contact the administrator to create and activate an evaluation period.</p>
+            )}
           </div>
         ) : (
           <>

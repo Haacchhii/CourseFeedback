@@ -6,6 +6,9 @@ import { adminAPI, apiClient } from '../../services/api'
 import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
 import ProgramSections from './ProgramSections'
 import Pagination from '../../components/Pagination'
+import { useDebounce } from '../../hooks/useDebounce'
+import { transformPrograms, toDisplayCode } from '../../utils/programMapping'
+import { DeleteUserModal, DeleteResultModal, AlertModal, ConfirmModal } from '../../components/Modal'
 
 export default function UserManagement() {
   const navigate = useNavigate()
@@ -13,6 +16,20 @@ export default function UserManagement() {
   
   // Tab state
   const [activeTab, setActiveTab] = useState('users')
+  
+  // Modal states
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, user: null })
+  const [resultModal, setResultModal] = useState({ isOpen: false, userName: '', deleteType: '', reason: '' })
+  const [errorModal, setErrorModal] = useState({ isOpen: false, message: '' })
+  const [showAlertModal, setShowAlertModal] = useState(false)
+  const [alertConfig, setAlertConfig] = useState({ title: '', message: '', type: 'info' })
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [confirmConfig, setConfirmConfig] = useState({ title: '', message: '', onConfirm: null, confirmText: 'Confirm', cancelText: 'Cancel' })
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false)
+  const [resetPasswordUser, setResetPasswordUser] = useState(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [showBulkPasswordModal, setShowBulkPasswordModal] = useState(false)
+  const [bulkPassword, setBulkPassword] = useState('')
   
   // State
   const [allUsers, setAllUsers] = useState([])
@@ -25,6 +42,7 @@ export default function UserManagement() {
     admins: 0
   })
   const [searchTerm, setSearchTerm] = useState('')
+  const debouncedSearchTerm = useDebounce(searchTerm, 500) // Debounce search
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [programFilter, setProgramFilter] = useState('all')
@@ -76,7 +94,7 @@ export default function UserManagement() {
           status: statusFilter !== 'all' ? statusFilter : undefined,
           program: programFilter !== 'all' ? programFilter : undefined,
           year_level: yearLevelFilter !== 'all' ? parseInt(yearLevelFilter) : undefined,
-          search: searchTerm || undefined
+          search: debouncedSearchTerm || undefined
         }),
         adminAPI.getPrograms(),
         adminAPI.getUserStats()
@@ -94,7 +112,7 @@ export default function UserManagement() {
         pagination: usersResponse?.pagination || {}
       }
     },
-    [currentUser?.id, currentUser?.role, currentPage, pageSize, roleFilter, statusFilter, programFilter, yearLevelFilter, searchTerm]
+    [currentUser?.id, currentUser?.role, currentPage, pageSize, roleFilter, statusFilter, programFilter, yearLevelFilter, debouncedSearchTerm]
   )
 
   // Update allUsers and programs when data changes
@@ -107,7 +125,7 @@ export default function UserManagement() {
       }))
       setAllUsers(usersWithStatus)
       if (apiData.programs && apiData.programs.length > 0) {
-        setPrograms(apiData.programs.map(p => p.code).sort())
+        setPrograms(transformPrograms(apiData.programs || []).map(p => p.code).sort())
       }
       if (apiData.stats) {
         setUserStats(apiData.stats)
@@ -134,6 +152,17 @@ export default function UserManagement() {
       setYearLevelFilter('all')
     }
   }, [roleFilter])
+
+  // Modal helper functions
+  const showAlert = (message, title = 'Notification', type = 'info') => {
+    setAlertConfig({ title, message, type })
+    setShowAlertModal(true)
+  }
+
+  const showConfirm = (message, onConfirm, title = 'Confirm Action', confirmText = 'Confirm', cancelText = 'Cancel') => {
+    setConfirmConfig({ title, message, onConfirm, confirmText, cancelText })
+    setShowConfirmModal(true)
+  }
 
   // Reset to page 1 when filters change
   useEffect(() => {
@@ -174,21 +203,40 @@ export default function UserManagement() {
     setShowEditModal(true)
   }
 
-  const handleDeleteUser = async (user) => {
+  const handleDeleteUser = (user) => {
+    setDeleteModal({ isOpen: true, user })
+  }
+
+  const confirmDeleteUser = async () => {
+    const user = deleteModal.user
     const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim()
-    if (window.confirm(`Are you sure you want to delete ${fullName}?\n\nThis action cannot be undone. All evaluation data will be anonymized and preserved.`)) {
-      try {
-        setSubmitting(true)
-        await adminAPI.deleteUser(user.id)
-        // Trigger data reload
-        retry()
-        alert(`User ${fullName} deleted successfully!`)
-      } catch (err) {
-        console.error('Error deleting user:', err)
-        alert(`Failed to delete user: ${err.message}`)
-      } finally {
-        setSubmitting(false)
-      }
+    
+    try {
+      setSubmitting(true)
+      const response = await adminAPI.deleteUser(user.id)
+      // Trigger data reload
+      retry()
+      
+      // Show result modal based on delete type
+      const deleteType = response.delete_type || 'soft'
+      const reason = deleteType === 'hard' 
+        ? 'No related data found (newly created user)' 
+        : 'User has related data (evaluations/enrollments). Account preserved for data integrity'
+      
+      setResultModal({
+        isOpen: true,
+        userName: fullName,
+        deleteType,
+        reason
+      })
+    } catch (err) {
+      console.error('Error deleting user:', err)
+      setErrorModal({
+        isOpen: true,
+        message: `Failed to delete user: ${err.message}`
+      })
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -274,19 +322,12 @@ export default function UserManagement() {
 
   const handleBulkImport = async () => {
     if (!bulkImportFile) {
-      alert('Please select a CSV file first')
+      showAlert('Please select a CSV file first', 'Warning', 'warning')
       return
     }
 
-    if (bulkImportErrors.length > 0) {
-      const proceed = window.confirm(
-        `Found ${bulkImportErrors.length} error(s) in the CSV file.\n\n` +
-        `Do you want to skip invalid rows and import only valid ones?`
-      )
-      if (!proceed) return
-    }
-
-    try {
+    const processBulkImport = async () => {
+      try {
       setSubmitting(true)
       setImportProgress({ current: 0, total: 0, status: 'Reading file...' })
 
@@ -362,7 +403,7 @@ export default function UserManagement() {
         `❌ Failed: ${failedUsers.length} users` +
         (failedUsers.length > 0 ? `\n\nFailed users:\n${failedUsers.slice(0, 5).map(f => `${f.email}: ${f.error}`).join('\n')}` : '')
       
-      alert(message)
+      showAlert(message, failedUsers.length > 0 ? 'Partial Success' : 'Success', failedUsers.length > 0 ? 'warning' : 'success')
       
       // Refresh user list and close modal
       retry()
@@ -371,10 +412,22 @@ export default function UserManagement() {
       setBulkImportPreview([])
       setBulkImportErrors([])
       setImportProgress({ current: 0, total: 0, status: '' })
-    } catch (err) {
-      alert(`Bulk import failed: ${err.message}`)
-    } finally {
-      setSubmitting(false)
+      } catch (err) {
+        showAlert(`Bulk import failed: ${err.message}`, 'Error', 'error')
+      } finally {
+        setSubmitting(false)
+      }
+    }
+
+    if (bulkImportErrors.length > 0) {
+      showConfirm(
+        `Found ${bulkImportErrors.length} error(s) in the CSV file.\n\nDo you want to skip invalid rows and import only valid ones?`,
+        processBulkImport,
+        'Validation Errors',
+        'Import Valid Rows'
+      )
+    } else {
+      processBulkImport()
     }
   }
 
@@ -400,38 +453,91 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
     URL.revokeObjectURL(url)
   }
 
-  const handleResetPassword = async (user) => {
-    const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim()
-    const newPassword = window.prompt(
-      `Reset password for ${fullName}\n\nEnter new password (minimum 8 characters):`,
-      'changeme123'
-    )
+  const handleResetPassword = (user) => {
+    setResetPasswordUser(user)
+    setNewPassword('changeme123')
+    setShowResetPasswordModal(true)
+  }
+
+  const handleConfirmResetPassword = async () => {
+    const fullName = `${resetPasswordUser.first_name || ''} ${resetPasswordUser.last_name || ''}`.trim()
     
-    if (newPassword && newPassword.trim()) {
-      if (newPassword.length < 8) {
-        alert('Password must be at least 8 characters long')
-        return
+    if (newPassword.length < 8) {
+      showAlert('Password must be at least 8 characters long', 'Warning', 'warning')
+      return
+    }
+    
+    try {
+      setSubmitting(true)
+      const response = await adminAPI.resetPassword(resetPasswordUser.id, newPassword)
+      showAlert(response?.data?.message || `Password for ${fullName} has been reset successfully!`, 'Success', 'success')
+      setShowResetPasswordModal(false)
+      setNewPassword('')
+      setResetPasswordUser(null)
+      retry() // Reload users to reflect any changes
+    } catch (err) {
+      console.error('Error resetting password:', err)
+      const errorMsg = err.response?.data?.detail || err.message || 'Unknown error occurred'
+      showAlert(`Failed to reset password: ${errorMsg}`, 'Error', 'error')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleConfirmBulkPasswordReset = async () => {
+    if (!bulkPassword || bulkPassword.length < 8) {
+      showAlert('Password must be at least 8 characters long', 'Warning', 'warning')
+      return
+    }
+
+    try {
+      setSubmitting(true)
+      setShowBulkPasswordModal(false)
+      
+      const userIds = selectedUsers
+      let successCount = 0
+      let failCount = 0
+      const errors = []
+      
+      for (const id of userIds) {
+        try {
+          await adminAPI.resetPassword(id, bulkPassword)
+          successCount++
+        } catch (err) {
+          failCount++
+          errors.push(`User ID ${id}: ${err.message}`)
+          console.error(`Failed to reset password for user ${id}:`, err)
+        }
       }
       
-      try {
-        setSubmitting(true)
-        const response = await adminAPI.resetPassword(user.id, newPassword)
-        alert(response?.data?.message || `Password for ${fullName} has been reset successfully!`)
-        retry() // Reload users to reflect any changes
-      } catch (err) {
-        console.error('Error resetting password:', err)
-        const errorMsg = err.response?.data?.detail || err.message || 'Unknown error occurred'
-        alert(`Failed to reset password: ${errorMsg}`)
-      } finally {
-        setSubmitting(false)
+      // Show results
+      let message = `Password reset completed: ${successCount} successful`
+      if (failCount > 0) {
+        message += `, ${failCount} failed`
+        if (errors.length > 0) {
+          console.error('Bulk password reset errors:', errors)
+          message += `\n\nErrors:\n${errors.slice(0, 5).join('\n')}`
+          if (errors.length > 5) {
+            message += `\n...and ${errors.length - 5} more`
+          }
+        }
       }
+      
+      showAlert(message, successCount > 0 && failCount === 0 ? 'Success' : 'Completed with Errors', successCount > 0 && failCount === 0 ? 'success' : 'warning')
+      setSelectedUsers([])
+      setBulkPassword('')
+      retry()
+    } catch (err) {
+      showAlert(err.message, 'Error', 'error')
+    } finally {
+      setSubmitting(false)
     }
   }
 
   // Lookup enrollment information
   const handleLookupEnrollment = async () => {
     if (!formData.school_id || formData.school_id.trim() === '') {
-      alert('Please enter a student number first')
+      showAlert('Please enter a student number first', 'Warning', 'warning')
       return
     }
 
@@ -454,16 +560,16 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
           yearLevel: response.year_level
         }))
         
-        alert(`✅ Student found in enrollment list!\n\nName: ${fullName}\nProgram: ${response.program_code} - ${response.program_name}\nYear Level: ${response.year_level}\n\nForm has been auto-filled with enrollment data.`)
+        showAlert(`✅ Student found in enrollment list!\n\nName: ${fullName}\nProgram: ${response.program_code} - ${response.program_name}\nYear Level: ${response.year_level}\n\nForm has been auto-filled with enrollment data.`, 'Success', 'success')
       }
     } catch (err) {
       if (err.response?.status === 404) {
         setEnrollmentLookupDone(true)
         setEnrollmentInfo(null)
-        alert(`⚠️ Student number "${formData.school_id}" not found in enrollment list.\n\nPlease verify the student number or contact the registrar to add this student to the enrollment list first.`)
+        showAlert(`⚠️ Student number "${formData.school_id}" not found in enrollment list.\n\nPlease verify the student number or contact the registrar to add this student to the enrollment list first.`, 'Warning', 'warning')
       } else {
         console.error('Error looking up enrollment:', err)
-        alert('Failed to lookup enrollment information. Please try again.')
+        showAlert('Failed to lookup enrollment information. Please try again.', 'Error', 'error')
       }
     } finally {
       setLookingUpEnrollment(false)
@@ -477,11 +583,16 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
     if (formData.role === 'student' && enrollmentInfo) {
       // Check if program matches enrollment
       if (enrollmentInfo.program_code !== formData.program) {
-        if (!confirm(`⚠️ PROGRAM MISMATCH WARNING\n\nEnrollment List: ${enrollmentInfo.program_code} - ${enrollmentInfo.program_name}\nSelected Program: ${formData.program}\n\nStudent "${formData.name}" is enrolled in ${enrollmentInfo.program_code}, not ${formData.program}.\n\nDo you want to correct the program to match the enrollment list?`)) {
-          return
-        }
-        // Auto-correct to enrolled program
-        setFormData(prev => ({ ...prev, program: enrollmentInfo.program_code }))
+        showConfirm(
+          `⚠️ PROGRAM MISMATCH WARNING\n\nEnrollment List: ${enrollmentInfo.program_code} - ${enrollmentInfo.program_name}\nSelected Program: ${formData.program}\n\nStudent "${formData.name}" is enrolled in ${enrollmentInfo.program_code}, not ${formData.program}.\n\nDo you want to correct the program to match the enrollment list?`,
+          () => {
+            // Auto-correct to enrolled program
+            setFormData(prev => ({ ...prev, program: enrollmentInfo.program_code }))
+          },
+          'Program Mismatch Warning',
+          'Correct Program',
+          'Cancel'
+        )
         return // Stop submission, let user review the correction
       }
     }
@@ -524,9 +635,9 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
       
       // Show success message with generated password for students
       if (formData.role === 'student' && response.generated_password) {
-        alert(`✅ Student created successfully!\n\nTemporary Password: ${response.generated_password}\n\n⚠️ IMPORTANT: Share this password with the student. They will be required to change it on first login.`)
+        showAlert(`✅ Student created successfully!\n\nTemporary Password: ${response.generated_password}\n\n⚠️ IMPORTANT: Share this password with the student. They will be required to change it on first login.`, 'Success', 'success')
       } else {
-        alert(`User ${formData.name} created successfully!`)
+        showAlert(`User ${formData.name} created successfully!`, 'Success', 'success')
       }
       
       setShowAddModal(false)
@@ -553,16 +664,16 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
         const data = err.response.data
         const enrolled = data.enrolled_program
         const attempted = data.attempted_program
-        alert(`❌ PROGRAM MISMATCH ERROR\n\n${data.message}\n\nEnrolled in: ${enrolled.code} - ${enrolled.name}\nAttempted: ${attempted.code} - ${attempted.name}\n\n✅ Please use "${enrolled.code}" as the program for this student.`)
+        showAlert(`❌ PROGRAM MISMATCH ERROR\n\n${data.message}\n\nEnrolled in: ${enrolled.code} - ${enrolled.name}\nAttempted: ${attempted.code} - ${attempted.name}\n\n✅ Please use "${enrolled.code}" as the program for this student.`, 'Error', 'error')
       } else if (err.response?.data?.error === 'STUDENT_NOT_IN_ENROLLMENT_LIST') {
-        alert(`❌ ENROLLMENT VALIDATION ERROR\n\n${err.response.data.message}\n\n⚠️ This student must be added to the enrollment list by the registrar before creating their account.`)
+        showAlert(`❌ ENROLLMENT VALIDATION ERROR\n\n${err.response.data.message}\n\n⚠️ This student must be added to the enrollment list by the registrar before creating their account.`, 'Error', 'error')
       } else {
         const errorMsg = err.response?.data?.detail || err.message || 'Unknown error'
         const validationErrors = err.response?.data?.errors || []
         const fullError = validationErrors.length > 0 
           ? `${errorMsg}\n${validationErrors.map(e => `- ${e.msg || e}`).join('\n')}`
           : errorMsg
-        alert(`Failed to create user: ${fullError}`)
+        showAlert(`Failed to create user: ${fullError}`, 'Error', 'error')
       }
     } finally {
       setSubmitting(false)
@@ -593,7 +704,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
       
       // Trigger data reload
       retry()
-      alert(`User ${formData.name} updated successfully!`)
+      showAlert(`User ${formData.name} updated successfully!`, 'Success', 'success')
       setShowEditModal(false)
     } catch (err) {
       console.error('Error updating user:', err)
@@ -602,7 +713,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
       const fullError = validationErrors.length > 0 
         ? `${errorMsg}\n${validationErrors.map(e => `- ${e.msg || e}`).join('\n')}`
         : errorMsg
-      alert(`Failed to update user: ${fullError}`)
+      showAlert(`Failed to update user: ${fullError}`, 'Error', 'error')
     } finally {
       setSubmitting(false)
     }
@@ -610,11 +721,11 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
 
   const handleBulkAction = async (action) => {
     if (selectedUsers.length === 0) {
-      alert('Please select users first')
+      showAlert('Please select users first', 'Warning', 'warning')
       return
     }
     
-    if (window.confirm(`${action} ${selectedUsers.length} selected users?`)) {
+    showConfirm(`${action} ${selectedUsers.length} selected users?`, async () => {
       try {
         setSubmitting(true)
         
@@ -663,22 +774,10 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
             }
           }
         } else if (action === 'Reset Password') {
-          const newPassword = window.prompt(`Enter new password for ${selectedUsers.length} users (minimum 8 characters):`, 'changeme123')
-          if (!newPassword || newPassword.length < 8) {
-            alert('Password must be at least 8 characters long')
-            setSubmitting(false)
-            return
-          }
-          for (const id of userIds) {
-            try {
-              await adminAPI.resetPassword(id, newPassword)
-              successCount++
-            } catch (err) {
-              failCount++
-              errors.push(`User ID ${id}: ${err.message}`)
-              console.error(`Failed to reset password for user ${id}:`, err)
-            }
-          }
+          // Open bulk password reset modal
+          setShowBulkPasswordModal(true)
+          setSubmitting(false)
+          return
         }
         
         // Show results
@@ -693,7 +792,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
             }
           }
         }
-        alert(message)
+        showAlert(message, failedUsers.length > 0 ? 'Partial Success' : 'Success', failedUsers.length > 0 ? 'warning' : 'success')
         
         // Clear selection
         setSelectedUsers([])
@@ -704,11 +803,11 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
         
       } catch (err) {
         console.error('Bulk action error:', err)
-        alert(`Failed to ${action.toLowerCase()}: ${err.response?.data?.detail || err.message}`)
+        showAlert(`Failed to ${action.toLowerCase()}: ${err.response?.data?.detail || err.message}`, 'Error', 'error')
       } finally {
         setSubmitting(false)
       }
-    }
+    }, `Confirm ${action}`, action)
   }
 
   const toggleUserSelection = (userEmail) => {
@@ -742,9 +841,11 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
         <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-10 lg:py-12 max-w-screen-2xl">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
             <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg">
-                <span className="text-[#7a0000] font-bold text-xl">LPU</span>
-              </div>
+              <img 
+                src="/lpu-logo.png" 
+                alt="University Logo" 
+                className="w-32 h-32 object-contain"
+              />
               <div>
                 <h1 className="lpu-header-title text-3xl">User Management</h1>
                 <p className="lpu-header-subtitle text-lg">Manage all system users and permissions</p>
@@ -776,7 +877,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
               onClick={() => setActiveTab('users')}
               className={`px-6 py-4 font-semibold transition-colors ${
                 activeTab === 'users'
-                  ? 'border-b-2 border-blue-600 text-blue-600'
+                  ? 'border-b-2 border-red-600 text-red-600'
                   : 'text-gray-600 hover:text-gray-800'
               }`}
             >
@@ -786,7 +887,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
               onClick={() => setActiveTab('sections')}
               className={`px-6 py-4 font-semibold transition-colors ${
                 activeTab === 'sections'
-                  ? 'border-b-2 border-blue-600 text-blue-600'
+                  ? 'border-b-2 border-red-600 text-red-600'
                   : 'text-gray-600 hover:text-gray-800'
               }`}
             >
@@ -816,7 +917,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200 group">
+          <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200 group">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs lg:text-sm font-bold text-white/80 uppercase tracking-wide mb-3">Students</p>
@@ -830,7 +931,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200 group">
+          <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200 group">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs lg:text-sm font-bold text-white/80 uppercase tracking-wide mb-3">Dept Heads</p>
@@ -844,7 +945,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200 group">
+          <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-2xl shadow-lg p-6 transform hover:scale-105 transition-all duration-200 group">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs lg:text-sm font-bold text-white/80 uppercase tracking-wide mb-3">Staff Members</p>
@@ -957,12 +1058,12 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
         )}
 
         {/* Users Table */}
-        <div className="bg-white rounded-xl shadow-md overflow-hidden">
+        <div className="bg-white rounded-card shadow-card overflow-hidden w-fit mx-auto">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="table-auto">
               <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
                 <tr>
-                  <th className="px-6 py-4 text-left">
+                  <th className="px-6 py-4 text-center">
                     <input
                       type="checkbox"
                       checked={selectedUsers.length === paginatedUsers.length && paginatedUsers.length > 0}
@@ -987,7 +1088,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                         type="checkbox"
                         checked={selectedUsers.includes(user.email)}
                         onChange={() => toggleUserSelection(user.email)}
-                        className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                        className="w-4 h-4 text-red-600 rounded focus:ring-2 focus:ring-red-500"
                       />
                     </td>
                     <td className="px-6 py-4">
@@ -1026,7 +1127,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                       <div className="flex items-center justify-center space-x-2">
                         <button
                           onClick={() => handleEditUser(user)}
-                          className="p-2 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg transition-all"
+                          className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-all"
                           title="Edit User"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1207,7 +1308,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                       <div className="text-sm text-blue-700">
                         <p className="font-semibold mb-1">🔒 Auto-Generated Temporary Password</p>
                         <p>Password will be: <span className="font-mono font-bold bg-blue-100 px-2 py-1 rounded">lpub@{formData.school_id || 'schoolid'}</span></p>
-                        <p className="mt-2 text-xs text-blue-600">
+                        <p className="mt-2 text-xs text-red-600">
                           ✅ User will receive a welcome email<br/>
                           ✅ Required to change password on first login
                         </p>
@@ -1760,6 +1861,145 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
           </>
         )}
       </div>
+
+      {/* Modal Components */}
+      <DeleteUserModal
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ isOpen: false, user: null })}
+        onConfirm={confirmDeleteUser}
+        userName={deleteModal.user ? `${deleteModal.user.first_name || ''} ${deleteModal.user.last_name || ''}`.trim() : ''}
+      />
+
+      <DeleteResultModal
+        isOpen={resultModal.isOpen}
+        onClose={() => setResultModal({ isOpen: false, userName: '', deleteType: '', reason: '' })}
+        userName={resultModal.userName}
+        deleteType={resultModal.deleteType}
+        reason={resultModal.reason}
+      />
+
+      <AlertModal
+        isOpen={errorModal.isOpen}
+        onClose={() => setErrorModal({ isOpen: false, message: '' })}
+        title="Error"
+        message={errorModal.message}
+        variant="danger"
+      />
+
+      {/* New Modal Components */}
+      <AlertModal
+        isOpen={showAlertModal}
+        onClose={() => setShowAlertModal(false)}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+      />
+      <ConfirmModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        onConfirm={confirmConfig.onConfirm}
+        confirmText={confirmConfig.confirmText}
+        cancelText={confirmConfig.cancelText}
+      />
+
+      {/* Reset Password Modal */}
+      {showResetPasswordModal && resetPasswordUser && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full">
+            <div className="modal-header bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-t-xl">
+              <h3 className="text-xl font-bold">Reset password for {resetPasswordUser.first_name} {resetPasswordUser.last_name}</h3>
+            </div>
+            <div className="modal-body p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Enter new password (minimum 8 characters):
+                </label>
+                <input
+                  type="text"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white"
+                  placeholder="changeme123"
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="modal-footer flex gap-3 p-6 bg-gray-50 dark:bg-gray-900 rounded-b-xl">
+              <button
+                onClick={() => {
+                  setShowResetPasswordModal(false)
+                  setNewPassword('')
+                  setResetPasswordUser(null)
+                }}
+                className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg font-medium transition-all"
+                disabled={submitting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmResetPassword}
+                className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={submitting || !newPassword || newPassword.length < 8}
+              >
+                {submitting ? 'Resetting...' : 'OK'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Password Reset Modal */}
+      {showBulkPasswordModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full">
+            <div className="modal-header bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-t-xl">
+              <h3 className="text-xl font-bold">Reset Password for {selectedUsers.length} Users</h3>
+            </div>
+            <div className="modal-body p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Enter new password (minimum 8 characters):
+                </label>
+                <input
+                  type="text"
+                  value={bulkPassword}
+                  onChange={(e) => setBulkPassword(e.target.value)}
+                  className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white"
+                  placeholder="changeme123"
+                  autoFocus
+                />
+                {bulkPassword && bulkPassword.length < 8 && (
+                  <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+                    Password must be at least 8 characters long
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="modal-footer flex gap-3 p-6 bg-gray-50 dark:bg-gray-900 rounded-b-xl">
+              <button
+                onClick={() => {
+                  setShowBulkPasswordModal(false)
+                  setBulkPassword('')
+                }}
+                className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg font-medium transition-all"
+                disabled={submitting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmBulkPasswordReset}
+                className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={submitting || !bulkPassword || bulkPassword.length < 8}
+              >
+                {submitting ? 'Resetting...' : 'Reset All'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+

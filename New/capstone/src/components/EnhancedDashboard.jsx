@@ -105,9 +105,11 @@ export default function EnhancedDashboard() {
         <div className="container mx-auto px-4 py-6">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg">
-                <span className="text-[#7a0000] font-bold text-xl">LPU</span>
-              </div>
+              <img 
+                src="/lpu-logo.png" 
+                alt="University Logo" 
+                className="w-32 h-32 object-contain"
+              />
               <div>
                 <h1 className="lpu-header-title text-3xl">Course Insight Guardian</h1>
                 <p className="lpu-header-subtitle text-lg">

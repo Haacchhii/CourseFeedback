@@ -4,6 +4,7 @@ import { isSystemAdmin } from '../../utils/roleUtils'
 import { useAuth } from '../../context/AuthContext'
 import { adminAPI } from '../../services/api'
 import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
+import { AlertModal, ConfirmModal } from '../../components/Modal'
 
 export default function EmailNotifications() {
   const navigate = useNavigate()
@@ -18,6 +19,12 @@ export default function EmailNotifications() {
   const [sending, setSending] = useState(false)
   const [lastResult, setLastResult] = useState(null)
   const [emailConfig, setEmailConfig] = useState(null)
+
+  // Modal State
+  const [showAlertModal, setShowAlertModal] = useState(false)
+  const [alertConfig, setAlertConfig] = useState({ title: '', message: '', type: 'info' })
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [confirmConfig, setConfirmConfig] = useState({ title: '', message: '', onConfirm: () => {}, confirmText: 'Confirm', cancelText: 'Cancel' })
   
   // Fetch evaluation periods and email config
   const { data: apiData, loading, error, retry } = useApiWithTimeout(
@@ -45,6 +52,17 @@ export default function EmailNotifications() {
     }
   }, [apiData])
   
+  // Modal Helper Functions
+  const showAlert = (message, title = 'Notification', type = 'info') => {
+    setAlertConfig({ title, message, type })
+    setShowAlertModal(true)
+  }
+
+  const showConfirm = (message, onConfirm, title = 'Confirm Action', confirmText = 'Confirm', cancelText = 'Cancel') => {
+    setConfirmConfig({ title, message, onConfirm, confirmText, cancelText })
+    setShowConfirmModal(true)
+  }
+
   // Redirect if not admin
   useEffect(() => {
     if (currentUser && !isSystemAdmin(currentUser)) {
@@ -58,47 +76,51 @@ export default function EmailNotifications() {
     // Validation
     if (notificationType === 'test') {
       if (!testEmail) {
-        alert('Please enter a test email address')
+        showAlert('Please enter a test email address', 'Validation Error', 'warning')
         return
       }
     } else {
       if (!selectedPeriod) {
-        alert('Please select an evaluation period')
+        showAlert('Please select an evaluation period', 'Validation Error', 'warning')
         return
       }
     }
     
-    if (!window.confirm(`Send ${notificationType} notification(s)?`)) {
-      return
-    }
-    
-    try {
-      setSending(true)
-      const recipientEmails = customEmails.trim() 
-        ? customEmails.split(',').map(e => e.trim()).filter(Boolean)
-        : null
-      
-      const result = await adminAPI.sendEmailNotification({
-        notification_type: notificationType,
-        period_id: selectedPeriod ? parseInt(selectedPeriod) : null,
-        recipient_emails: recipientEmails,
-        test_email: testEmail || null
-      })
-      
-      setLastResult(result)
-      alert(result.message || 'Notification sent successfully')
-      
-      // Reset form for test emails
-      if (notificationType === 'test') {
-        setTestEmail('')
-      }
-      
-    } catch (err) {
-      alert(`Failed to send notification: ${err.message}`)
-      setLastResult({ success: false, error: err.message })
-    } finally {
-      setSending(false)
-    }
+    showConfirm(
+      `Send ${notificationType} notification(s)?`,
+      async () => {
+        try {
+          setSending(true)
+          const recipientEmails = customEmails.trim() 
+            ? customEmails.split(',').map(e => e.trim()).filter(Boolean)
+            : null
+          
+          const result = await adminAPI.sendEmailNotification({
+            notification_type: notificationType,
+            period_id: selectedPeriod ? parseInt(selectedPeriod) : null,
+            recipient_emails: recipientEmails,
+            test_email: testEmail || null
+          })
+          
+          setLastResult(result)
+          showAlert(result.message || 'Notification sent successfully', 'Success', 'success')
+          
+          // Reset form for test emails
+          if (notificationType === 'test') {
+            setTestEmail('')
+          }
+          
+        } catch (err) {
+          showAlert(err.message, 'Failed to Send Notification', 'error')
+          setLastResult({ success: false, error: err.message })
+        } finally {
+          setSending(false)
+        }
+      },
+      'Send Notification',
+      'Send',
+      'Cancel'
+    )
   }
   
   if (!currentUser || !isSystemAdmin(currentUser)) return null
@@ -115,9 +137,11 @@ export default function EmailNotifications() {
         <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-10 lg:py-12 max-w-screen-2xl">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg">
-                <span className="text-[#7a0000] font-bold text-xl">LPU</span>
-              </div>
+              <img 
+                src="/lpu-logo.png" 
+                alt="University Logo" 
+                className="w-32 h-32 object-contain"
+              />
               <div>
                 <h1 className="lpu-header-title text-3xl">📧 Email Notifications</h1>
                 <p className="lpu-header-subtitle text-lg">Send automated notifications to students</p>
@@ -357,6 +381,30 @@ SMTP_FROM_EMAIL=your-email@gmail.com`}
           </div>
         )}
       </div>
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={showAlertModal}
+        onClose={() => setShowAlertModal(false)}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        variant={alertConfig.type === 'error' ? 'danger' : alertConfig.type}
+      />
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={() => {
+          confirmConfig.onConfirm()
+          setShowConfirmModal(false)
+        }}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmText={confirmConfig.confirmText}
+        cancelText={confirmConfig.cancelText}
+        variant="info"
+      />
     </div>
   )
 }

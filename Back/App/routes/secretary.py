@@ -234,14 +234,14 @@ async def get_courses(
         
         # Get all results with aggregated data in a single query
         # Use subqueries to get counts efficiently (filtered by period)
-        # Count all evaluations (not distinct students) as each evaluation is separate feedback
+        # Count DISTINCT students who evaluated (prevents double-counting duplicate evaluations)
         eval_filters = [Evaluation.status == 'completed']
         if period_id:
             eval_filters.append(Evaluation.evaluation_period_id == period_id)
         
         eval_count_subq = db.query(
             Evaluation.class_section_id,
-            func.count(Evaluation.id).label('eval_count'),
+            func.count(func.distinct(Evaluation.student_id)).label('eval_count'),
             func.avg(Evaluation.rating_overall).label('avg_rating')
         ).filter(*eval_filters).group_by(Evaluation.class_section_id).subquery()
         
@@ -251,7 +251,7 @@ async def get_courses(
         
         enroll_count_subq = db.query(
             Enrollment.class_section_id,
-            func.count(Enrollment.id).label('enroll_count')
+            func.count(func.distinct(Enrollment.student_id)).label('enroll_count')
         ).filter(*enroll_filters).group_by(Enrollment.class_section_id).subquery()
         
         # Join with subqueries for efficient data retrieval

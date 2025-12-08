@@ -42,7 +42,8 @@ export default function Layout({ children }) {
     { path: '/dashboard', label: 'Dashboard', icon: '📊' },
     { path: '/sentiment', label: 'Sentiment & Anomalies', icon: '💭' },
     { path: '/courses', label: 'Courses', icon: '📚' },
-    { path: '/evaluations', label: 'Evaluations', icon: '📝' }
+    { path: '/evaluations', label: 'Evaluations', icon: '📝' },
+    { path: '/non-respondents', label: 'Non-Respondents', icon: '⚠️' }
   ]
 
   // Student navigation items

@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext'
 import { adminAPI } from '../../services/api'
 import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
 import Pagination from '../../components/Pagination'
+import { AlertModal, ConfirmModal } from '../../components/Modal'
 
 export default function EnhancedCourseManagement() {
   const navigate = useNavigate()
@@ -96,6 +97,12 @@ export default function EnhancedCourseManagement() {
   const [matchingCourses, setMatchingCourses] = useState([])
   const [availableProgramSectionsForBulk, setAvailableProgramSectionsForBulk] = useState([])
   const [loadingMatching, setLoadingMatching] = useState(false)
+  
+  // Modal State
+  const [showAlertModal, setShowAlertModal] = useState(false)
+  const [alertConfig, setAlertConfig] = useState({ title: '', message: '', type: 'info' })
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [confirmConfig, setConfirmConfig] = useState({ title: '', message: '', onConfirm: null, confirmText: 'Confirm', cancelText: 'Cancel' })
   
   // API State
   const [courses, setCourses] = useState([])
@@ -289,6 +296,17 @@ export default function EnhancedCourseManagement() {
     }
   }, [filteredCourses])
 
+  // Modal Helper Functions
+  const showAlert = (message, title = 'Notification', type = 'info') => {
+    setAlertConfig({ title, message, type })
+    setShowAlertModal(true)
+  }
+
+  const showConfirm = (message, onConfirm, title = 'Confirm Action', confirmText = 'Confirm', cancelText = 'Cancel') => {
+    setConfirmConfig({ title, message, onConfirm, confirmText, cancelText })
+    setShowConfirmModal(true)
+  }
+
   // Handlers
   const handleAddCourse = async (e) => {
     e.preventDefault()
@@ -297,7 +315,7 @@ export default function EnhancedCourseManagement() {
       await adminAPI.createCourse(formData)
       const updatedCourses = await adminAPI.getCourses()
       setCourses(updatedCourses?.data || [])
-      alert(`Course "${formData.name}" created successfully!`)
+      showAlert(`Course "${formData.name}" created successfully!`, 'Success', 'success')
       setShowAddModal(false)
       setFormData({
         name: '',
@@ -311,7 +329,7 @@ export default function EnhancedCourseManagement() {
         status: 'Active'
       })
     } catch (err) {
-      alert(`Failed to create course: ${err.message}`)
+      showAlert(`Failed to create course: ${err.message}`, 'Error', 'error')
     } finally {
       setSubmitting(false)
     }
@@ -363,7 +381,7 @@ export default function EnhancedCourseManagement() {
       setSubmitting(true)
       await adminAPI.createSection(sectionFormData)
       await loadSections()
-      alert('Section created successfully!')
+      showAlert('Section created successfully!', 'Success', 'success')
       setShowCreateSectionModal(false)
       setSectionFormData({
         course_id: '',
@@ -374,7 +392,7 @@ export default function EnhancedCourseManagement() {
         max_students: 40
       })
     } catch (err) {
-      alert(`Failed to create section: ${err.response?.data?.detail || err.message}`)
+      showAlert(`Failed to create section: ${err.response?.data?.detail || err.message}`, 'Error', 'error')
     } finally {
       setSubmitting(false)
     }
@@ -460,15 +478,14 @@ export default function EnhancedCourseManagement() {
     e?.preventDefault()
     
     if (importPreview.length === 0) {
-      alert('No courses to import')
+      showAlert('No courses to import', 'Warning', 'warning')
       return
     }
 
-    if (!window.confirm(`Import ${importPreview.length} courses?\n\nThis will create new courses in the system.`)) {
-      return
-    }
-
-    try {
+    showConfirm(
+      `Import ${importPreview.length} courses?\n\nThis will create new courses in the system.`,
+      async () => {
+        try {
       setSubmitting(true)
       let successCount = 0
       const errors = []
@@ -487,9 +504,9 @@ export default function EnhancedCourseManagement() {
       setCourses(updatedCourses?.data || [])
 
       if (errors.length > 0) {
-        alert(`Imported ${successCount} of ${importPreview.length} courses.\n\nErrors:\n${errors.join('\n')}`)
+        showAlert(`Imported ${successCount} of ${importPreview.length} courses.\n\nErrors:\n${errors.join('\n')}`, 'Warning', 'warning')
       } else {
-        alert(`Successfully imported ${successCount} courses!`)
+        showAlert(`Successfully imported ${successCount} courses!`, 'Success', 'success')
       }
       
       setShowBulkImportModal(false)
@@ -497,31 +514,34 @@ export default function EnhancedCourseManagement() {
       setImportPreview([])
       setImportErrors([])
       
-    } catch (err) {
-      alert(`Bulk import failed: ${err.message}`)
-    } finally {
-      setSubmitting(false)
-    }
+        } catch (err) {
+          showAlert(`Bulk import failed: ${err.message}`, 'Error', 'error')
+        } finally {
+          setSubmitting(false)
+        }
+      },
+      'Confirm Import',
+      'Import Courses'
+    )
   }
 
   const handleAssignInstructor = async (e) => {
     e?.preventDefault()
     
     if (!formData.instructor) {
-      alert('Please select an instructor')
+      showAlert('Please select an instructor', 'Warning', 'warning')
       return
     }
 
     if (selectedCourses.length === 0) {
-      alert('No courses selected')
+      showAlert('No courses selected', 'Warning', 'warning')
       return
     }
 
-    if (!window.confirm(`Assign "${formData.instructor}" to ${selectedCourses.length} course(s)?`)) {
-      return
-    }
-
-    try {
+    showConfirm(
+      `Assign "${formData.instructor}" to ${selectedCourses.length} course(s)?`,
+      async () => {
+        try {
       setSubmitting(true)
       let successCount = 0
       const errors = []
@@ -540,36 +560,130 @@ export default function EnhancedCourseManagement() {
       setCourses(updatedCourses?.data || [])
 
       if (errors.length > 0) {
-        alert(`Updated ${successCount} of ${selectedCourses.length} courses.\n\nErrors:\n${errors.join('\n')}`)
+        showAlert(`Updated ${successCount} of ${selectedCourses.length} courses.\n\nErrors:\n${errors.join('\n')}`, 'Warning', 'warning')
       } else {
-        alert(`Successfully assigned instructor to ${successCount} course(s)!`)
+        showAlert(`Successfully assigned instructor to ${successCount} course(s)!`, 'Success', 'success')
       }
       
       setShowAssignInstructorModal(false)
       setSelectedCourses([])
       setFormData({...formData, instructor: ''})
       
-    } catch (err) {
-      alert(`Instructor assignment failed: ${err.message}`)
-    } finally {
-      setSubmitting(false)
-    }
+        } catch (err) {
+          showAlert(`Instructor assignment failed: ${err.message}`, 'Error', 'error')
+        } finally {
+          setSubmitting(false)
+        }
+      },
+      'Confirm Assignment',
+      'Assign Instructor'
+    )
   }
 
   const handleArchiveCourse = async (course, e) => {
     e?.preventDefault()
-    if (window.confirm(`Archive "${course.name}"?\n\nThis will hide the course from active listings but preserve all data.`)) {
-      try {
+    showConfirm(
+      `Archive "${course.name}"?\n\nThis will hide the course from active listings but preserve all data.`,
+      async () => {
+        try {
         setSubmitting(true)
         await adminAPI.updateCourse(course.id, { status: 'Archived' })
         // Trigger data reload by calling retry
         retry()
-        alert(`Course "${course.name}" archived successfully!`)
+        showAlert(`Course "${course.name}" archived successfully!`, 'Success', 'success')
       } catch (err) {
-        alert(`Failed to archive course: ${err.message}`)
-      } finally {
-        setSubmitting(false)
+          showAlert(`Failed to archive course: ${err.message}`, 'Error', 'error')
+        } finally {
+          setSubmitting(false)
+        }
+      },
+      'Confirm Archive',
+      'Archive Course'
+    )
+  }
+
+  const handleBulkArchive = async () => {
+    if (selectedCourses.length === 0) {
+      showAlert('Please select courses to archive', 'Warning', 'warning')
+      return
+    }
+
+    showConfirm(
+      `Archive ${selectedCourses.length} course(s)?\n\nThis will hide them from active listings but preserve all data.`,
+      async () => {
+        try {
+      setSubmitting(true)
+      let successCount = 0
+      const errors = []
+      
+      for (const courseId of selectedCourses) {
+        try {
+          await adminAPI.updateCourse(courseId, { status: 'Archived' })
+          successCount++
+        } catch (err) {
+          const course = courses.find(c => c.id === courseId)
+          errors.push(`${course?.name || courseId}: ${err.message}`)
+        }
       }
+
+      // Reload courses
+      retry()
+      setSelectedCourses([])
+      
+      if (errors.length > 0) {
+        showAlert(`Archived ${successCount} of ${selectedCourses.length} courses.\n\nErrors:\n${errors.join('\n')}`, 'Warning', 'warning')
+      } else {
+        showAlert(`Successfully archived ${successCount} course(s)!`, 'Success', 'success')
+      }
+        } catch (err) {
+          showAlert(`Bulk archive failed: ${err.message}`, 'Error', 'error')
+        } finally {
+          setSubmitting(false)
+        }
+      },
+      'Confirm Bulk Archive',
+      'Archive Courses'
+    )
+  }
+
+  const handleBulkExport = async () => {
+    if (selectedCourses.length === 0) {
+      showAlert('Please select courses to export', 'Warning', 'warning')
+      return
+    }
+
+    try {
+      // Get full course details for selected courses
+      const exportData = courses
+        .filter(c => selectedCourses.includes(c.id))
+        .map(c => ({
+          Code: c.classCode || c.id,
+          Name: c.name,
+          Program: c.program,
+          'Year Level': c.yearLevel,
+          Semester: c.semester,
+          Students: c.enrolledStudents || 0,
+          'Avg Rating': c.avgRating || 'N/A',
+          Status: c.status
+        }))
+
+      // Convert to CSV
+      const headers = Object.keys(exportData[0]).join(',')
+      const rows = exportData.map(row => 
+        Object.values(row).map(val => `"${val}"`).join(',')
+      ).join('\n')
+      const csvContent = `${headers}\n${rows}`
+
+      // Download CSV file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = `courses_export_${new Date().toISOString().split('T')[0]}.csv`
+      link.click()
+
+      showAlert(`Successfully exported ${selectedCourses.length} course(s)!`, 'Success', 'success')
+    } catch (err) {
+      showAlert(`Export failed: ${err.message}`, 'Error', 'error')
     }
   }
 
@@ -599,7 +713,7 @@ export default function EnhancedCourseManagement() {
       await adminAPI.updateCourse(selectedCourse.id, formData)
       // Trigger data reload
       retry()
-      alert(`Course "${formData.name}" updated successfully!`)
+      showAlert(`Course "${formData.name}" updated successfully!`, 'Success', 'success')
       setShowEditModal(false)
       setSelectedCourse(null)
       setFormData({
@@ -614,7 +728,7 @@ export default function EnhancedCourseManagement() {
         status: 'Active'
       })
     } catch (err) {
-      alert(`Failed to update course: ${err.message}`)
+      showAlert(`Failed to update course: ${err.message}`, 'Error', 'error')
     } finally {
       setSubmitting(false)
     }
@@ -622,19 +736,24 @@ export default function EnhancedCourseManagement() {
 
   const handleDeleteCourse = async (course, e) => {
     e?.preventDefault()
-    if (window.confirm(`⚠️ DELETE "${course.name}"?\n\nThis action CANNOT be undone!\n\nAll associated evaluations and data will be permanently removed.`)) {
-      try {
+    showConfirm(
+      `⚠️ DELETE "${course.name}"?\n\nThis action CANNOT be undone!\n\nAll associated evaluations and data will be permanently removed.`,
+      async () => {
+        try {
         setSubmitting(true)
         await adminAPI.deleteCourse(course.id)
         // Trigger data reload
         retry()
-        alert(`Course "${course.name}" deleted successfully!`)
+        showAlert(`Course "${course.name}" deleted successfully!`, 'Success', 'success')
       } catch (err) {
-        alert(`Failed to delete course: ${err.message}`)
-      } finally {
-        setSubmitting(false)
-      }
-    }
+          showAlert(`Failed to delete course: ${err.message}`, 'Error', 'error')
+        } finally {
+          setSubmitting(false)
+        }
+      },
+      '⚠️ Confirm Delete',
+      'Delete Course'
+    )
   }
 
   const toggleCourseSelection = (courseId, e) => {
@@ -689,7 +808,7 @@ export default function EnhancedCourseManagement() {
       setAvailableStudents(availableResp?.data || [])
       setSelectedStudentIds([])
     } catch (err) {
-      alert(`Error loading section data: ${err.message}`)
+      showAlert(`Error loading section data: ${err.message}`, 'Error', 'error')
     } finally {
       setSubmitting(false)
     }
@@ -697,7 +816,7 @@ export default function EnhancedCourseManagement() {
 
   const handleEnrollStudents = async () => {
     if (selectedStudentIds.length === 0) {
-      alert('Please select at least one student to enroll')
+      showAlert('Please select at least one student to enroll', 'Warning', 'warning')
       return
     }
     
@@ -723,20 +842,21 @@ export default function EnhancedCourseManagement() {
       const message = skippedCount > 0 
         ? `Successfully enrolled ${enrolledCount} student(s)! (${skippedCount} already enrolled)`
         : `Successfully enrolled ${enrolledCount} student(s)!`
-      alert(message)
+      showAlert(message, 'Success', 'success')
     } catch (err) {
       console.error('Enroll students error:', err)
       const errorMsg = err.response?.data?.detail || err.message || 'Unknown error occurred'
-      alert(`Failed to enroll students: ${errorMsg}`)
+      showAlert(`Failed to enroll students: ${errorMsg}`, 'Error', 'error')
     } finally {
       setSubmitting(false)
     }
   }
 
   const handleRemoveStudent = async (studentId, studentName) => {
-    if (!window.confirm(`Remove ${studentName} from this section?`)) return
-    
-    try {
+    showConfirm(
+      `Remove ${studentName} from this section?`,
+      async () => {
+        try {
       setSubmitting(true)
       await adminAPI.removeStudentFromSection(selectedSection.id, studentId)
       
@@ -749,15 +869,19 @@ export default function EnhancedCourseManagement() {
       setEnrolledStudents(enrolledResp?.data || [])
       setAvailableStudents(availableResp?.data || [])
       
-      // Reload sections list to update enrolled count on cards
-      await loadSections()
-      
-      alert(`${studentName} removed successfully!`)
-    } catch (err) {
-      alert(`Failed to remove student: ${err.message}`)
-    } finally {
-      setSubmitting(false)
-    }
+          // Reload sections list to update enrolled count on cards
+          await loadSections()
+          
+          showAlert(`${studentName} removed successfully!`, 'Success', 'success')
+        } catch (err) {
+          showAlert(`Failed to remove student: ${err.message}`, 'Error', 'error')
+        } finally {
+          setSubmitting(false)
+        }
+      },
+      'Confirm Removal',
+      'Remove Student'
+    )
   }
 
   // Program Section Enrollment Functions
@@ -769,7 +893,7 @@ export default function EnhancedCourseManagement() {
       setProgramSections(response?.data || [])
     } catch (err) {
       console.error('Error loading program sections:', err)
-      alert(`Failed to load program sections: ${err.message}`)
+      showAlert(`Failed to load program sections: ${err.message}`, 'Error', 'error')
     } finally {
       setLoadingProgramSections(false)
     }
@@ -783,42 +907,45 @@ export default function EnhancedCourseManagement() {
 
   const handleEnrollProgramSection = async () => {
     if (!selectedProgramSectionId) {
-      alert('Please select a program section')
+      showAlert('Please select a program section', 'Warning', 'warning')
       return
     }
 
     const programSection = programSections.find(ps => ps.id === parseInt(selectedProgramSectionId))
     if (!programSection) return
 
-    if (!window.confirm(
-      `Enroll all ${programSection.studentCount} student(s) from "${programSection.sectionName}" into this class section?`
-    )) return
-
-    try {
+    showConfirm(
+      `Enroll all ${programSection.studentCount} student(s) from "${programSection.sectionName}" into this class section?`,
+      async () => {
+        try {
       setSubmitting(true)
       const response = await adminAPI.enrollProgramSectionToClass(
         selectedSection.id,
         parseInt(selectedProgramSectionId)
       )
 
-      alert(response.message || 'Students enrolled successfully!')
-      setShowProgramSectionModal(false)
+          showAlert(response.message || 'Students enrolled successfully!', 'Success', 'success')
+          setShowProgramSectionModal(false)
 
-      // Reload section data
-      const [enrolledResp, availableResp] = await Promise.all([
-        adminAPI.getSectionStudents(selectedSection.id),
-        adminAPI.getAvailableStudents(selectedSection.id)
-      ])
+          // Reload section data
+          const [enrolledResp, availableResp] = await Promise.all([
+            adminAPI.getSectionStudents(selectedSection.id),
+            adminAPI.getAvailableStudents(selectedSection.id)
+          ])
 
-      setEnrolledStudents(enrolledResp?.data || [])
-      setAvailableStudents(availableResp?.data || [])
-      
-      alert(`${studentName} removed successfully!`)
-    } catch (err) {
-      alert(`Failed to remove student: ${err.message}`)
-    } finally {
-      setSubmitting(false)
-    }
+          setEnrolledStudents(enrolledResp?.data || [])
+          setAvailableStudents(availableResp?.data || [])
+          
+          showAlert(`${studentName} removed successfully!`, 'Success', 'success')
+        } catch (err) {
+          showAlert(`Failed to remove student: ${err.message}`, 'Error', 'error')
+        } finally {
+          setSubmitting(false)
+        }
+      },
+      'Confirm Enrollment',
+      'Enroll Program Section'
+    )
   }
 
   // Bulk Enrollment Functions
@@ -921,17 +1048,12 @@ student2@example.com,IT-PROG1-2024,email,
 
   const handleBulkEnroll = async () => {
     if (!bulkEnrollFile) {
-      alert('Please select a CSV file first')
+      showAlert('Please select a CSV file first', 'Warning', 'warning')
       return
     }
 
-    if (bulkEnrollErrors.length > 0) {
-      if (!window.confirm(`There are ${bulkEnrollErrors.length} validation errors. Some enrollments may fail. Continue anyway?`)) {
-        return
-      }
-    }
-
-    const reader = new FileReader()
+    const processEnrollment = () => {
+      const reader = new FileReader()
     reader.onload = async (event) => {
       const text = event.target.result
       const lines = text.split('\n').filter(line => line.trim())
@@ -956,7 +1078,7 @@ student2@example.com,IT-PROG1-2024,email,
       })
 
       if (enrollments.length === 0) {
-        alert('No valid enrollments found in CSV file')
+        showAlert('No valid enrollments found in CSV file', 'Warning', 'warning')
         return
       }
 
@@ -1015,7 +1137,7 @@ student2@example.com,IT-PROG1-2024,email,
       if (failedEnrollments.length > 0) {
         message += `\n\nFailed enrollments (first 5):\n${failedEnrollments.slice(0, 5).join('\n')}`
       }
-      alert(message)
+      showAlert(message, failCount > 0 ? 'Partial Success' : 'Success', failCount > 0 ? 'warning' : 'success')
 
       // Reset and refresh
       setShowBulkEnrollModal(false)
@@ -1026,7 +1148,19 @@ student2@example.com,IT-PROG1-2024,email,
       loadSections()
     }
 
-    reader.readAsText(bulkEnrollFile)
+      reader.readAsText(bulkEnrollFile)
+    }
+
+    if (bulkEnrollErrors.length > 0) {
+      showConfirm(
+        `There are ${bulkEnrollErrors.length} validation errors. Some enrollments may fail. Continue anyway?`,
+        processEnrollment,
+        'Validation Errors',
+        'Continue Anyway'
+      )
+    } else {
+      processEnrollment()
+    }
   }
 
   // Quick Bulk Enrollment Functions
@@ -1079,21 +1213,20 @@ student2@example.com,IT-PROG1-2024,email,
 
   const handleQuickBulkEnroll = async () => {
     if (!quickBulkFormData.program_section_id || matchingCourses.length === 0) {
-      alert('Please select all required fields')
+      showAlert('Please select all required fields', 'Warning', 'warning')
       return
     }
 
     const selectedProgramSection = availableProgramSectionsForBulk.find(s => s.id === parseInt(quickBulkFormData.program_section_id))
     if (!selectedProgramSection) {
-      alert('Selected program section not found')
+      showAlert('Selected program section not found', 'Error', 'error')
       return
     }
 
     const confirmMsg = `Create ${matchingCourses.length} class section(s) for program section "${selectedProgramSection.sectionName}"?\n\nCourses: ${matchingCourses.map(c => c.subject_code).join(', ')}`
     
-    if (!window.confirm(confirmMsg)) return
-
-    try {
+    showConfirm(confirmMsg, async () => {
+      try {
       setSubmitting(true)
       let successCount = 0
       let failCount = 0
@@ -1126,18 +1259,19 @@ student2@example.com,IT-PROG1-2024,email,
         }
       }
 
-      alert(`✅ Quick Bulk Enrollment Complete!\n\nSuccessfully created: ${successCount} sections\nFailed: ${failCount}\n\n${errors.length > 0 ? `Errors:\n${errors.slice(0, 5).join('\n')}` : ''}`)
-      
-      setShowQuickBulkEnrollModal(false)
-      setQuickBulkFormData({ program_id: '', year_level: '', semester: '', program_section_id: '' })
-      setMatchingCourses([])
-      setAvailableProgramSectionsForBulk([])
-      loadSections()
-    } catch (err) {
-      alert(`Failed to process bulk enrollment: ${err.message}`)
-    } finally {
-      setSubmitting(false)
-    }
+        showAlert(`✅ Quick Bulk Enrollment Complete!\n\nSuccessfully created: ${successCount} sections\nFailed: ${failCount}\n\n${errors.length > 0 ? `Errors:\n${errors.slice(0, 5).join('\n')}` : ''}`, 'Success', 'success')
+        
+        setShowQuickBulkEnrollModal(false)
+        setQuickBulkFormData({ program_id: '', year_level: '', semester: '', program_section_id: '' })
+        setMatchingCourses([])
+        setAvailableProgramSectionsForBulk([])
+        loadSections()
+      } catch (err) {
+        showAlert(`Failed to process bulk enrollment: ${err.message}`, 'Error', 'error')
+      } finally {
+        setSubmitting(false)
+      }
+    }, 'Confirm Bulk Enrollment', 'Create Sections')
   }
 
   const handleEditSection = (section, e) => {
@@ -1165,9 +1299,9 @@ student2@example.com,IT-PROG1-2024,email,
       await adminAPI.updateSection(selectedSection.id, updateData)
       await loadSections()
       setShowEditSectionModal(false)
-      alert('Section updated successfully!')
+      showAlert('Section updated successfully!', 'Success', 'success')
     } catch (err) {
-      alert(`Failed to update section: ${err.response?.data?.detail || err.message}`)
+      showAlert(`Failed to update section: ${err.response?.data?.detail || err.message}`, 'Error', 'error')
     } finally {
       setSubmitting(false)
     }
@@ -1175,22 +1309,25 @@ student2@example.com,IT-PROG1-2024,email,
 
   const handleDeleteSection = async (section, e) => {
     e?.stopPropagation() // Prevent card click
-    if (!window.confirm(`⚠️ DELETE Section "${section.class_code}"?\n\nThis will remove all student enrollments in this section.\n\nThis action CANNOT be undone!`)) {
-      return
-    }
-    
-    try {
-      setSubmitting(true)
-      const response = await adminAPI.deleteSection(section.id)
-      await loadSections()
-      alert(response?.data?.message || 'Section deleted successfully!')
-    } catch (err) {
-      console.error('Delete section error:', err)
-      const errorMsg = err.response?.data?.detail || err.message || 'Unknown error occurred'
-      alert(`Failed to delete section: ${errorMsg}`)
-    } finally {
-      setSubmitting(false)
-    }
+    showConfirm(
+      `⚠️ DELETE Section "${section.class_code}"?\n\nThis will remove all student enrollments in this section.\n\nThis action CANNOT be undone!`,
+      async () => {
+        try {
+          setSubmitting(true)
+          const response = await adminAPI.deleteSection(section.id)
+          await loadSections()
+          showAlert(response?.data?.message || 'Section deleted successfully!', 'Success', 'success')
+        } catch (err) {
+          console.error('Delete section error:', err)
+          const errorMsg = err.response?.data?.detail || err.message || 'Unknown error occurred'
+          showAlert(`Failed to delete section: ${errorMsg}`, 'Error', 'error')
+        } finally {
+          setSubmitting(false)
+        }
+      },
+      '⚠️ Confirm Delete',
+      'Delete Section'
+    )
   }
 
   // Bulk Section Actions
@@ -1212,7 +1349,7 @@ student2@example.com,IT-PROG1-2024,email,
 
   const handleBulkDeleteSections = async () => {
     if (selectedSections.length === 0) {
-      alert('Please select sections to delete')
+      showAlert('Please select sections to delete', 'Warning', 'warning')
       return
     }
 
@@ -1221,11 +1358,10 @@ student2@example.com,IT-PROG1-2024,email,
       .map(s => s.class_code)
       .join(', ')
 
-    if (!window.confirm(`⚠️ DELETE ${selectedSections.length} Section(s)?\n\nSections: ${sectionNames}\n\nThis will remove all student enrollments in these sections.\n\nThis action CANNOT be undone!`)) {
-      return
-    }
-
-    try {
+    showConfirm(
+      `⚠️ DELETE ${selectedSections.length} Section(s)?\n\nSections: ${sectionNames}\n\nThis will remove all student enrollments in these sections.\n\nThis action CANNOT be undone!`,
+      async () => {
+        try {
       setSubmitting(true)
       let successCount = 0
       let failCount = 0
@@ -1240,20 +1376,24 @@ student2@example.com,IT-PROG1-2024,email,
         }
       }
 
-      await loadSections()
-      setSelectedSections([])
-      alert(`✅ Bulk Delete Complete:\n${successCount} section(s) deleted successfully${failCount > 0 ? `\n${failCount} section(s) failed to delete` : ''}`)
-    } catch (err) {
-      console.error('Bulk delete error:', err)
-      alert(`Failed to delete sections: ${err.message}`)
-    } finally {
-      setSubmitting(false)
-    }
+          await loadSections()
+          setSelectedSections([])
+          showAlert(`✅ Bulk Delete Complete:\n${successCount} section(s) deleted successfully${failCount > 0 ? `\n${failCount} section(s) failed to delete` : ''}`, 'Success', 'success')
+        } catch (err) {
+          console.error('Bulk delete error:', err)
+          showAlert(`Failed to delete sections: ${err.message}`, 'Error', 'error')
+        } finally {
+          setSubmitting(false)
+        }
+      },
+      '⚠️ Confirm Bulk Delete',
+      'Delete Sections'
+    )
   }
 
   const handleBulkActivateSections = async () => {
     if (selectedSections.length === 0) {
-      alert('Please select sections to activate')
+      showAlert('Please select sections to activate', 'Warning', 'warning')
       return
     }
 
@@ -1274,10 +1414,10 @@ student2@example.com,IT-PROG1-2024,email,
 
       await loadSections()
       setSelectedSections([])
-      alert(`✅ Bulk Activate Complete:\n${successCount} section(s) activated successfully${failCount > 0 ? `\n${failCount} section(s) failed to activate` : ''}`)
+      showAlert(`✅ Bulk Activate Complete:\n${successCount} section(s) activated successfully${failCount > 0 ? `\n${failCount} section(s) failed to activate` : ''}`, 'Success', 'success')
     } catch (err) {
       console.error('Bulk activate error:', err)
-      alert(`Failed to activate sections: ${err.message}`)
+      showAlert(`Failed to activate sections: ${err.message}`, 'Error', 'error')
     } finally {
       setSubmitting(false)
     }
@@ -1285,7 +1425,7 @@ student2@example.com,IT-PROG1-2024,email,
 
   const handleBulkDeactivateSections = async () => {
     if (selectedSections.length === 0) {
-      alert('Please select sections to deactivate')
+      showAlert('Please select sections to deactivate', 'Warning', 'warning')
       return
     }
 
@@ -1306,10 +1446,10 @@ student2@example.com,IT-PROG1-2024,email,
 
       await loadSections()
       setSelectedSections([])
-      alert(`✅ Bulk Deactivate Complete:\n${successCount} section(s) deactivated successfully${failCount > 0 ? `\n${failCount} section(s) failed to deactivate` : ''}`)
+      showAlert(`✅ Bulk Deactivate Complete:\n${successCount} section(s) deactivated successfully${failCount > 0 ? `\n${failCount} section(s) failed to deactivate` : ''}`, 'Success', 'success')
     } catch (err) {
       console.error('Bulk deactivate error:', err)
-      alert(`Failed to deactivate sections: ${err.message}`)
+      showAlert(`Failed to deactivate sections: ${err.message}`, 'Error', 'error')
     } finally {
       setSubmitting(false)
     }
@@ -1335,9 +1475,11 @@ student2@example.com,IT-PROG1-2024,email,
         <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-8 lg:py-10 max-w-screen-2xl">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg">
-                <span className="text-[#7a0000] font-bold text-xl">LPU</span>
-              </div>
+              <img 
+                src="/lpu-logo.png" 
+                alt="University Logo" 
+                className="w-32 h-32 object-contain"
+              />
               <div>
                 <h1 className="lpu-header-title text-3xl">Enhanced Course Management</h1>
                 <p className="lpu-header-subtitle text-lg">Comprehensive course administration and analytics</p>
@@ -1490,10 +1632,10 @@ student2@example.com,IT-PROG1-2024,email,
                   <button onClick={() => setShowAssignInstructorModal(true)} className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all">
                     Assign Instructor
                   </button>
-                  <button onClick={() => alert('Archiving selected courses...')} className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg transition-all">
+                  <button onClick={handleBulkArchive} className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg transition-all">
                     Archive
                   </button>
-                  <button onClick={() => alert('Exporting selected courses...')} className="px-4 py-2 bg-yellow-500 hover:bg-amber-600 text-white rounded-lg transition-all">
+                  <button onClick={handleBulkExport} className="px-4 py-2 bg-yellow-500 hover:bg-amber-600 text-white rounded-lg transition-all">
                     Export
                   </button>
                 </div>
@@ -1503,10 +1645,10 @@ student2@example.com,IT-PROG1-2024,email,
             {/* Courses Table */}
             <div className="bg-white rounded-card shadow-card overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-fit mx-auto table-auto">
                   <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
                     <tr>
-                      <th className="px-6 py-4 text-left">
+                      <th className="px-4 py-3 text-center">
                         <input
                           type="checkbox"
                           checked={selectedCourses.length === filteredCourses.length && filteredCourses.length > 0}
@@ -1520,19 +1662,19 @@ student2@example.com,IT-PROG1-2024,email,
                           className="w-4 h-4 text-red-600 rounded focus:ring-2 focus:ring-indigo-500"
                         />
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Code</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Course Name</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Program</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Students</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Rating</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Status</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700">Actions</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Code</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Course Name</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Program</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Students</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Rating</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Status</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {filteredCourses.map((course) => (
                       <tr key={course.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-center">
                           <input
                             type="checkbox"
                             checked={selectedCourses.includes(course.id)}
@@ -1540,32 +1682,32 @@ student2@example.com,IT-PROG1-2024,email,
                             className="w-4 h-4 text-red-600 rounded focus:ring-2 focus:ring-indigo-500"
                           />
                         </td>
-                        <td className="px-4 py-3 text-xs font-medium text-gray-900">{course.classCode || course.id}</td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-center text-sm font-medium text-gray-900">{course.classCode || course.id}</td>
+                        <td className="px-4 py-3 text-center">
                           <div className="text-sm font-medium text-gray-900">{course.name}</div>
                           <div className="text-xs text-gray-500">Year {course.yearLevel} • {course.semester}</div>
                         </td>
-                        <td className="px-4 py-3 text-xs text-gray-600">{course.program}</td>
-                        <td className="px-4 py-3">
-                          <div className="text-xs font-semibold text-gray-900">{course.enrolledStudents || 0}</div>
+                        <td className="px-4 py-3 text-center text-sm text-gray-600">{course.program}</td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="text-sm font-semibold text-gray-900">{course.enrolledStudents || 0}</div>
                           <div className="text-xs text-gray-500">{course.evaluationCount || 0} evals</div>
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center">
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex items-center justify-center">
                             <svg className="w-4 h-4 text-yellow-400 mr-1" fill="currentColor" viewBox="0 0 20 20">
                               <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
                             </svg>
-                            <span className="text-xs font-semibold text-gray-900">{course.avgRating || 0}</span>
+                            <span className="text-sm font-semibold text-gray-900">{course.avgRating || 0}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-center">
                           <span className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${
                             course.status === 'Active' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
                           }`}>
                             {course.status}
                           </span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-center">
                           <div className="flex items-center justify-center space-x-2">
                             <button
                               onClick={() => navigate(`/courses`)}
@@ -3379,9 +3521,29 @@ student2@example.com,IT-PROG1-2024,email,
           </div>
         </div>
       )}
+
+      {/* Modal Components */}
+      <AlertModal
+        isOpen={showAlertModal}
+        onClose={() => setShowAlertModal(false)}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+      />
+      <ConfirmModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        onConfirm={confirmConfig.onConfirm}
+        confirmText={confirmConfig.confirmText}
+        cancelText={confirmConfig.cancelText}
+      />
     </div>
   )
 }
+
+
 
 
 

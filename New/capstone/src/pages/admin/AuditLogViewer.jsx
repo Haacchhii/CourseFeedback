@@ -4,6 +4,8 @@ import { isSystemAdmin } from '../../utils/roleUtils'
 import { useAuth } from '../../context/AuthContext'
 import { adminAPI } from '../../services/api'
 import Pagination from '../../components/Pagination'
+import { useDebounce } from '../../hooks/useDebounce'
+import { AlertModal } from '../../components/Modal'
 
 export default function AuditLogViewer() {
   const navigate = useNavigate()
@@ -11,6 +13,7 @@ export default function AuditLogViewer() {
   
   // State
   const [searchTerm, setSearchTerm] = useState('')
+  const debouncedSearchTerm = useDebounce(searchTerm, 500) // Debounce search
   const [actionFilter, setActionFilter] = useState('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -29,6 +32,16 @@ export default function AuditLogViewer() {
   const [stats, setStats] = useState({ totalLogs: 0, last24h: 0, criticalEvents: 0, failedAttempts: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+
+  // Modal State
+  const [showAlertModal, setShowAlertModal] = useState(false)
+  const [alertConfig, setAlertConfig] = useState({ title: '', message: '', type: 'info' })
+
+  // Modal Helper Function
+  const showAlert = (message, title = 'Notification', type = 'info') => {
+    setAlertConfig({ title, message, type })
+    setShowAlertModal(true)
+  }
 
   // Redirect if not system admin
   useEffect(() => {
@@ -255,7 +268,7 @@ export default function AuditLogViewer() {
       window.URL.revokeObjectURL(url)
     } catch (error) {
       console.error('Export error:', error)
-      alert('Failed to export logs. Please try again.')
+      showAlert('Failed to export logs. Please try again.', 'Export Failed', 'error')
     }
   }
 
@@ -303,9 +316,11 @@ export default function AuditLogViewer() {
         <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-8 lg:py-10 max-w-screen-2xl">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg">
-                <span className="text-[#7a0000] font-bold text-xl">LPU</span>
-              </div>
+              <img 
+                src="/lpu-logo.png" 
+                alt="University Logo" 
+                className="w-32 h-32 object-contain"
+              />
               <div>
                 <h1 className="lpu-header-title text-3xl">Audit Log Viewer</h1>
                 <p className="lpu-header-subtitle text-lg">Monitor system activity and security events</p>
@@ -614,36 +629,36 @@ export default function AuditLogViewer() {
         </div>
 
         {/* Logs Table */}
-        <div className="bg-white rounded-card shadow-card overflow-hidden">
+        <div className="bg-white rounded-card shadow-card overflow-hidden w-fit mx-auto">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="table-auto">
               <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
                 <tr>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Timestamp</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">User</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Action</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Category</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">IP Address</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
+                  <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">Timestamp</th>
+                  <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">User</th>
+                  <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">Action</th>
+                  <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">Category</th>
+                  <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">IP Address</th>
+                  <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">Status</th>
                   <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {paginatedLogs.map((log) => (
                   <tr key={log.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 text-sm text-gray-900 font-medium">
+                    <td className="px-6 py-4 text-sm text-gray-900 font-medium text-center">
                       {new Date(log.timestamp).toLocaleString()}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{log.user}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4 text-sm text-gray-600 text-center">{log.user}</td>
+                    <td className="px-6 py-4 text-center">
                       <span className="inline-flex px-2 py-1 text-xs font-semibold bg-red-100 text-red-800 rounded">
                         {log.action}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{log.category}</td>
-                    <td className="px-6 py-4 text-sm font-mono text-gray-600">{log.ipAddress}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center space-x-2">
+                    <td className="px-6 py-4 text-sm text-gray-600 text-center">{log.category}</td>
+                    <td className="px-6 py-4 text-sm font-mono text-gray-600 text-center">{log.ipAddress}</td>
+                    <td className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center space-x-2">
                         <span className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
                           log.status === 'Success' ? 'bg-yellow-100 text-yellow-800' :
                           log.status === 'Failed' ? 'bg-red-100 text-red-800' :
@@ -658,18 +673,16 @@ export default function AuditLogViewer() {
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-center">
-                        <button
-                          onClick={() => handleViewDetails(log)}
-                          className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-all"
-                          title="View Details"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                          </svg>
-                        </button>
-                      </div>
+                    <td className="px-6 py-4 text-center">
+                      <button
+                        onClick={() => handleViewDetails(log)}
+                        className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-all inline-flex items-center justify-center"
+                        title="View Details"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -786,6 +799,15 @@ export default function AuditLogViewer() {
           </div>
         </div>
       )}
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={showAlertModal}
+        onClose={() => setShowAlertModal(false)}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        variant={alertConfig.type === 'error' ? 'danger' : alertConfig.type}
+      />
     </div>
   )
 }

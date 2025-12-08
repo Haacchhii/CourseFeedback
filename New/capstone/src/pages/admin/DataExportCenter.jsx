@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { adminAPI } from '../../services/api'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { AlertModal } from '../../components/Modal'
 
 export default function DataExportCenter() {
   const navigate = useNavigate()
@@ -48,6 +49,16 @@ export default function DataExportCenter() {
     auditUser: 'all',
     auditCategory: 'all',
     auditSeverity: 'all'
+  })
+
+  // Modal State
+  const [showAlertModal, setShowAlertModal] = useState(false)
+  const [alertConfig, setAlertConfig] = useState({ title: '', message: '', type: 'info' })
+
+  // Modal Helper Function
+  const showAlert = (message, title = 'Notification', type = 'info') => {
+    setAlertConfig({ title, message, type })
+    setShowAlertModal(true)
   })
   
   // API State
@@ -206,7 +217,7 @@ export default function DataExportCenter() {
       setShowExportModal(false)
       
       // Show success message
-      alert(`${selectedExportType} exported successfully!`)
+      showAlert(`${selectedExportType} exported successfully!`, 'Export Complete', 'success')
       
       // Force refresh history after a short delay to allow backend to save export record
       setTimeout(async () => {
@@ -230,7 +241,7 @@ export default function DataExportCenter() {
       } else if (err?.detail) {
         errorMessage = err.detail
       }
-      alert(`Export failed: ${errorMessage}`)
+      showAlert(errorMessage, 'Export Failed', 'error')
     } finally {
       setExporting(false)
     }
@@ -247,13 +258,13 @@ export default function DataExportCenter() {
     
     // Check if data is empty
     if (Array.isArray(data) && data.length === 0) {
-      alert('No data found matching the selected filters. Please adjust your filters and try again.')
+      showAlert('No data found matching the selected filters. Please adjust your filters and try again.', 'No Data Found', 'warning')
       return
     }
     
     // Check for null/undefined data
     if (!data) {
-      alert('Export failed: No data received from server.')
+      showAlert('No data received from server.', 'Export Failed', 'error')
       return
     }
     
@@ -498,7 +509,7 @@ export default function DataExportCenter() {
       a.click()
       document.body.removeChild(a)
       window.URL.revokeObjectURL(url)
-      alert('PDF generation failed. Downloaded as JSON instead.')
+      showAlert('PDF generation failed. Downloaded as JSON instead.', 'PDF Generation Failed', 'warning')
     }
   }
 
@@ -530,7 +541,7 @@ export default function DataExportCenter() {
         console.log('Could not refresh export history:', historyErr)
       }
       
-      alert(`Custom data exported successfully!`)
+      showAlert('Custom data exported successfully!', 'Export Complete', 'success')
     } catch (err) {
       console.error('Export error:', err)
       // Extract meaningful error message
@@ -544,7 +555,7 @@ export default function DataExportCenter() {
       } else if (err?.detail) {
         errorMessage = err.detail
       }
-      alert(`Export failed: ${errorMessage}`)
+      showAlert(errorMessage, 'Export Failed', 'error')
     } finally {
       setExporting(false)
     }
@@ -553,7 +564,7 @@ export default function DataExportCenter() {
 
 
   const handleDownload = (file) => {
-    alert(`Downloading ${file.filename}...`)
+    showAlert(`Downloading ${file.filename}...`, 'Download Started', 'info')
   }
 
   if (!currentUser || !isSystemAdmin(currentUser)) return null
@@ -600,9 +611,11 @@ export default function DataExportCenter() {
         <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-8 lg:py-10 max-w-screen-2xl">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg">
-                <span className="text-[#7a0000] font-bold text-xl">LPU</span>
-              </div>
+              <img 
+                src="/lpu-logo.png" 
+                alt="University Logo" 
+                className="w-32 h-32 object-contain"
+              />
               <div>
                 <h1 className="lpu-header-title text-3xl">Data Export Center</h1>
                 <p className="lpu-header-subtitle text-lg">Export system data in multiple formats</p>
@@ -1285,7 +1298,14 @@ export default function DataExportCenter() {
         </div>
       )}
 
-
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={showAlertModal}
+        onClose={() => setShowAlertModal(false)}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        variant={alertConfig.type === 'error' ? 'danger' : alertConfig.type}
+      />
     </div>
   )
 }

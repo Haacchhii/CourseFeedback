@@ -120,7 +120,7 @@ export default function StudentCourses(){
           <div>
             <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">My Courses</h1>
             <p className="text-sm md:text-base text-gray-600">
-              {currentStudent.name} • {currentStudent.program} • Year {currentStudent.year_level || currentStudent.yearLevel}
+              {currentStudent.name} • {toDisplayCode(currentStudent.program)} • Year {currentStudent.year_level || currentStudent.yearLevel}
             </p>
           </div>
         </div>

@@ -643,6 +643,20 @@ export const adminAPI = {
     return apiClient.get('/admin/programs')
   },
 
+  /**
+   * Upload enrollment list CSV
+   * @param {File} file - CSV file containing student enrollment data
+   * @returns {Promise} Upload result with success/error counts
+   */
+  uploadEnrollmentList: async (file) => {
+    const currentUser = authAPI.getCurrentUser()
+    const formData = new FormData()
+    formData.append('file', file)
+    return apiClient.post(`/admin/enrollment-list/upload?current_user_id=${currentUser?.id}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  },
+
   // ============================================
   // SECTION MANAGEMENT
   // ============================================
@@ -1537,6 +1551,14 @@ export const deptHeadAPI = {
       : `/dept-head/ml-insights-summary?user_id=${currentUser?.id}`
     return apiClient.get(url)
   },
+
+  /**
+   * Get all evaluation periods
+   * @returns {Promise} List of evaluation periods
+   */
+  getEvaluationPeriods: async () => {
+    return apiClient.get('/admin/evaluation-periods')
+  },
 }
 
 // ============================================
@@ -1644,6 +1666,14 @@ export const secretaryAPI = {
   getYearLevels: async () => {
     const currentUser = authAPI.getCurrentUser()
     return apiClient.get(`/secretary/year-levels?user_id=${currentUser?.id}`)
+  },
+
+  /**
+   * Get all evaluation periods
+   * @returns {Promise} List of evaluation periods
+   */
+  getEvaluationPeriods: async () => {
+    return apiClient.get('/admin/evaluation-periods')
   },
 
   /**

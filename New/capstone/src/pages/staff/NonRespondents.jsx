@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 import ActiveFilters from '../../components/ActiveFilters'
 import Pagination from '../../components/Pagination'
 import { Download, Search, Users, AlertCircle } from 'lucide-react'
+import { useDebounce } from '../../hooks/useDebounce'
 
 export default function NonRespondents() {
   const { user } = useAuth()
@@ -11,6 +12,7 @@ export default function NonRespondents() {
   const [error, setError] = useState(null)
   const [data, setData] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const debouncedSearchQuery = useDebounce(searchQuery, 500) // Debounce search
   const [selectedYearLevel, setSelectedYearLevel] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 15
@@ -77,10 +79,10 @@ export default function NonRespondents() {
 
   // Filtered and paginated data
   const filteredData = data?.non_respondents?.filter(student =>
-    searchQuery === '' ||
-    student.student_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    student.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    student.program.toLowerCase().includes(searchQuery.toLowerCase())
+    debouncedSearchQuery === '' ||
+    student.student_number.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+    student.full_name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+    student.program.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
   ) || []
 
   const totalPages = Math.ceil(filteredData.length / itemsPerPage)
@@ -151,9 +153,11 @@ export default function NonRespondents() {
       <header className="lpu-header">
         <div className="container mx-auto px-6 sm:px-8 lg:px-10 py-8 lg:py-10 max-w-screen-2xl">
           <div className="flex items-center space-x-5">
-            <div className="w-14 h-14 lg:w-16 lg:h-16 bg-white rounded-full flex items-center justify-center shadow-lg flex-shrink-0">
-              <Users className="w-8 h-8 text-[#7a0000]" />
-            </div>
+            <img 
+              src="/lpu-logo.png" 
+              alt="University Logo" 
+              className="w-32 h-32 object-contain"
+            />
             <div>
               <h1 className="lpu-header-title text-3xl lg:text-4xl">Non-Respondent Tracking</h1>
               <p className="lpu-header-subtitle text-base lg:text-lg mt-1">
@@ -172,7 +176,11 @@ export default function NonRespondents() {
             <AlertCircle className="w-20 h-20 mx-auto text-gray-300 mb-4" />
             <h3 className="text-xl font-semibold text-gray-700 mb-2">No Active Evaluation Period</h3>
             <p className="text-gray-500 mb-4">There is currently no active evaluation period.</p>
-            <p className="text-gray-500">Please contact the administrator to activate an evaluation period, or select a specific period from the filter below.</p>
+            {evaluationPeriods.length > 0 ? (
+              <p className="text-gray-500">Select a past evaluation period from the filters below to view historical data.</p>
+            ) : (
+              <p className="text-gray-500">Please contact the administrator to create and activate an evaluation period.</p>
+            )}
           </div>
         ) : (
           <>
@@ -183,12 +191,12 @@ export default function NonRespondents() {
             <p className="text-4xl font-bold text-white">{data?.total_students || 0}</p>
           </div>
           
-          <div className="bg-gradient-to-br from-[#10b981] to-[#059669] rounded-card shadow-card p-6">
+          <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-card shadow-card p-6">
             <h3 className="text-sm font-semibold text-white/80 mb-2">Responded</h3>
             <p className="text-4xl font-bold text-white">{data?.responded || 0}</p>
           </div>
           
-          <div className="bg-gradient-to-br from-[#ef4444] to-[#dc2626] rounded-card shadow-card p-6">
+          <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-card shadow-card p-6">
             <h3 className="text-sm font-semibold text-white/80 mb-2">Non-Responded</h3>
             <p className="text-4xl font-bold text-white">{data?.non_responded || 0}</p>
           </div>
@@ -296,31 +304,31 @@ export default function NonRespondents() {
           ) : (
             <>
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                <table className="table-auto">
+                  <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
                         Student Number
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
                         Name
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
                         Program
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
                         Section
                       </th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
                         Year
                       </th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
                         Pending
                       </th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
                         Progress
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
                         Pending Courses
                       </th>
                     </tr>

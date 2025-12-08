@@ -4,6 +4,8 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieC
 import { isAdmin, isStaffMember } from '../../utils/roleUtils'
 import { useAuth } from '../../context/AuthContext'
 import { adminAPI, deptHeadAPI, secretaryAPI } from '../../services/api'
+import { useDebounce } from '../../hooks/useDebounce'
+import { transformPrograms, toDisplayCode } from '../../utils/programMapping'
 
 const SENTIMENT_COLORS = ['#10b981', '#f59e0b', '#ef4444'] // Green, Yellow, Red
 
@@ -22,6 +24,7 @@ export default function SentimentAnalysis() {
   const [anomalies, setAnomalies] = useState([])
   const [anomaliesLoading, setAnomaliesLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const debouncedSearchTerm = useDebounce(searchTerm, 500) // Debounce search
 
   // Filter options states
   const [programOptions, setProgramOptions] = useState([])
@@ -78,7 +81,7 @@ export default function SentimentAnalysis() {
         }
         
         if (programsResponse?.data) {
-          setProgramOptions(programsResponse.data)
+          setProgramOptions(transformPrograms(programsResponse.data))
         }
         if (yearLevelsResponse?.data) {
           setYearLevelOptions(yearLevelsResponse.data)
@@ -106,10 +109,16 @@ export default function SentimentAnalysis() {
   useEffect(() => {
     const fetchSentiment = async () => {
       if (!currentUser) return
-      if (!selectedPeriod && !activePeriod) return
       
       try {
         setLoading(true)
+        
+        if (!selectedPeriod && !activePeriod) {
+          setSentimentData(null)
+          setEvaluations([])
+          setLoading(false)
+          return
+        }
         const filters = {}
         if (selectedSemester !== 'all') filters.semester = selectedSemester
         if (selectedYearLevel !== 'all') filters.yearLevel = selectedYearLevel
@@ -159,10 +168,15 @@ export default function SentimentAnalysis() {
   useEffect(() => {
     const fetchAnomalies = async () => {
       if (!currentUser) return
-      if (!selectedPeriod && !activePeriod) return
       
       try {
         setAnomaliesLoading(true)
+        
+        if (!selectedPeriod && !activePeriod) {
+          setAnomalies([])
+          setAnomaliesLoading(false)
+          return
+        }
         const params = {}
         if (selectedPeriod) params.period_id = selectedPeriod
         
@@ -194,8 +208,8 @@ export default function SentimentAnalysis() {
   const filteredAnomalies = useMemo(() => {
     return anomalies.filter(anomaly => {
       if (searchTerm === '') return true
-      return anomaly.courseName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-             anomaly.comment?.toLowerCase().includes(searchTerm.toLowerCase())
+      return anomaly.courseName?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+             anomaly.comment?.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
     })
   }, [anomalies, searchTerm])
 
@@ -388,7 +402,11 @@ export default function SentimentAnalysis() {
             </svg>
             <h3 className="text-xl font-semibold text-gray-700 mb-2">No Active Evaluation Period</h3>
             <p className="text-gray-500 mb-4">There is currently no active evaluation period.</p>
-            <p className="text-gray-500">Please contact the administrator to activate an evaluation period, or select a specific period from the filter below.</p>
+            {evaluationPeriods.length > 0 ? (
+              <p className="text-gray-500">Click "Show Filters" below and select a past evaluation period to view historical data.</p>
+            ) : (
+              <p className="text-gray-500">Please contact the administrator to create and activate an evaluation period.</p>
+            )}
           </div>
         ) : (
           <>
@@ -743,7 +761,7 @@ export default function SentimentAnalysis() {
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-card shadow-card p-7 lg:p-8">
+            <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-card shadow-card p-7 lg:p-8">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-white/90 mb-2">Filtered Results</h3>
@@ -758,7 +776,7 @@ export default function SentimentAnalysis() {
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-card shadow-card p-7 lg:p-8">
+            <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-card shadow-card p-7 lg:p-8">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-white/90 mb-2">Flagged Rate</h3>

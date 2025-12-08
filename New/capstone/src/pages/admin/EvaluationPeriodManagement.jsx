@@ -4,6 +4,7 @@ import { isSystemAdmin } from '../../utils/roleUtils'
 import { useAuth } from '../../context/AuthContext'
 import { adminAPI } from '../../services/api'
 import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
+import { AlertModal, ConfirmModal } from '../../components/Modal'
 
 export default function EvaluationPeriodManagement() {
   const navigate = useNavigate()
@@ -15,6 +16,12 @@ export default function EvaluationPeriodManagement() {
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [showErrorModal, setShowErrorModal] = useState(false)
+
+  // Modal State
+  const [showAlertModal, setShowAlertModal] = useState(false)
+  const [alertConfig, setAlertConfig] = useState({ title: '', message: '', type: 'info' })
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [confirmConfig, setConfirmConfig] = useState({ title: '', message: '', onConfirm: () => {}, confirmText: 'Confirm', cancelText: 'Cancel' })
 
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showExtendModal, setShowExtendModal] = useState(false)
@@ -93,6 +100,17 @@ export default function EvaluationPeriodManagement() {
     }
   }
 
+  // Modal Helper Functions
+  const showAlert = (message, title = 'Notification', type = 'info') => {
+    setAlertConfig({ title, message, type })
+    setShowAlertModal(true)
+  }
+
+  const showConfirm = (message, onConfirm, title = 'Confirm Action', confirmText = 'Confirm', cancelText = 'Cancel') => {
+    setConfirmConfig({ title, message, onConfirm, confirmText, cancelText })
+    setShowConfirmModal(true)
+  }
+
   // Redirect if not system admin
   useEffect(() => {
     if (currentUser && !isSystemAdmin(currentUser)) {
@@ -103,51 +121,63 @@ export default function EvaluationPeriodManagement() {
   const handleClosePeriod = async () => {
     if (!currentPeriod) return
     
-    if (window.confirm(`Close "${currentPeriod.name}"?\n\nThis will prevent any further evaluations from being submitted. This action cannot be undone.`)) {
-      try {
-        setSubmitting(true)
-        await adminAPI.updatePeriodStatus(currentPeriod.id, 'closed')
+    showConfirm(
+      `Close "${currentPeriod.name}"?\n\nThis will prevent any further evaluations from being submitted. This action cannot be undone.`,
+      async () => {
+        try {
+          setSubmitting(true)
+          await adminAPI.updatePeriodStatus(currentPeriod.id, 'closed')
 
-        // Refresh periods
-        const response = await adminAPI.getPeriods()
-        const periods = response?.data || []
-        const current = periods.find(p => p.status === 'active') || null
-        const past = periods.filter(p => p.status === 'closed')
-        setCurrentPeriod(current)
-        setPastPeriods(past)
-        
-        alert('Evaluation period closed successfully!')
-      } catch (err) {
-        alert(`Failed to close period: ${err.message}`)
-      } finally {
-        setSubmitting(false)
-      }
-    }
+          // Refresh periods
+          const response = await adminAPI.getPeriods()
+          const periods = response?.data || []
+          const current = periods.find(p => p.status === 'active') || null
+          const past = periods.filter(p => p.status === 'closed')
+          setCurrentPeriod(current)
+          setPastPeriods(past)
+          
+          showAlert('Evaluation period closed successfully!', 'Success', 'success')
+        } catch (err) {
+          showAlert(`Failed to close period: ${err.message}`, 'Error', 'error')
+        } finally {
+          setSubmitting(false)
+        }
+      },
+      'Close Period',
+      'Close Period',
+      'Cancel'
+    )
   }
 
   const handleOpenPeriod = async () => {
     if (!currentPeriod) return
     
-    if (window.confirm(`Reopen "${currentPeriod.name}"?\n\nStudents will be able to submit evaluations again.`)) {
-      try {
-        setSubmitting(true)
-        await adminAPI.updatePeriodStatus(currentPeriod.id, 'active')
+    showConfirm(
+      `Reopen "${currentPeriod.name}"?\n\nStudents will be able to submit evaluations again.`,
+      async () => {
+        try {
+          setSubmitting(true)
+          await adminAPI.updatePeriodStatus(currentPeriod.id, 'active')
 
-        // Refresh periods
-        const response = await adminAPI.getPeriods()
-        const periods = response?.data || []
-        const current = periods.find(p => p.status === 'active') || null
-        const past = periods.filter(p => p.status === 'closed')
-        setCurrentPeriod(current)
-        setPastPeriods(past)
-        
-        alert('Evaluation period reopened successfully!')
-      } catch (err) {
-        alert(`Failed to reopen period: ${err.message}`)
-      } finally {
-        setSubmitting(false)
-      }
-    }
+          // Refresh periods
+          const response = await adminAPI.getPeriods()
+          const periods = response?.data || []
+          const current = periods.find(p => p.status === 'active') || null
+          const past = periods.filter(p => p.status === 'closed')
+          setCurrentPeriod(current)
+          setPastPeriods(past)
+          
+          showAlert('Evaluation period reopened successfully!', 'Success', 'success')
+        } catch (err) {
+          showAlert(`Failed to reopen period: ${err.message}`, 'Error', 'error')
+        } finally {
+          setSubmitting(false)
+        }
+      },
+      'Reopen Period',
+      'Reopen Period',
+      'Cancel'
+    )
   }
 
   const handleExtendPeriod = async (e) => {
@@ -159,7 +189,7 @@ export default function EvaluationPeriodManagement() {
     const currentEndDate = new Date(targetPeriod.endDate)
     
     if (newEndDate <= currentEndDate) {
-      alert('New end date must be after the current end date.')
+      showAlert('New end date must be after the current end date.', 'Invalid Date', 'warning')
       return
     }
 
@@ -167,7 +197,18 @@ export default function EvaluationPeriodManagement() {
       ? `Extend and Reopen "${targetPeriod.name}"?\n\nThis will:\n• Extend the period to ${formData.endDate}\n• Reopen the period for new submissions\n• Send notifications to all enrolled students`
       : `Extend "${targetPeriod.name}" to ${formData.endDate}?\n\nThis will send notifications to all enrolled students.`
 
-    if (!window.confirm(confirmMsg)) return
+    showConfirm(
+      confirmMsg,
+      async () => {
+        await processExtendPeriod(targetPeriod)
+      },
+      'Extend Period',
+      'Extend Period',
+      'Cancel'
+    )
+  }
+
+  const processExtendPeriod = async (targetPeriod) => {
 
     try {
       setSubmitting(true)
@@ -188,12 +229,11 @@ export default function EvaluationPeriodManagement() {
       setCurrentPeriod(current)
       setPastPeriods(past)
       
-      alert(`Period extended successfully to ${formData.endDate}${targetPeriod.status === 'closed' ? ' and reopened' : ''}.`)
+      showAlert(`Period extended successfully to ${formData.endDate}${targetPeriod.status === 'closed' ? ' and reopened' : ''}.`, 'Success', 'success')
       setShowExtendModal(false)
       setPeriodToExtend(null)
     } catch (err) {
-      setErrorMessage(err.message || 'Failed to extend period')
-      setShowErrorModal(true)
+      showAlert(err.message || 'Failed to extend period', 'Error', 'error')
     } finally {
       setSubmitting(false)
     }
@@ -214,7 +254,7 @@ export default function EvaluationPeriodManagement() {
   const handleCreatePeriod = async (e) => {
     e.preventDefault()
     if (currentPeriod && currentPeriod.status === 'active') {
-      alert('Please close the current period before creating a new one.')
+      showAlert('Please close the current period before creating a new one.', 'Cannot Create Period', 'warning')
       return
     }
     
@@ -237,7 +277,7 @@ export default function EvaluationPeriodManagement() {
     })
     
     if (hasOverlap) {
-      alert('⚠️ Date Overlap Detected\n\nThe selected dates overlap with an existing evaluation period. Please choose different dates that do not conflict with any active or past periods.')
+      showAlert('The selected dates overlap with an existing evaluation period. Please choose different dates that do not conflict with any active or past periods.', 'Date Overlap Detected', 'warning')
       return
     }
     
@@ -256,10 +296,10 @@ export default function EvaluationPeriodManagement() {
       setCurrentPeriod(current)
       setPastPeriods(past)
 
-      alert(`New evaluation period "${periodName}" created successfully!`)
+      showAlert(`New evaluation period "${periodName}" created successfully!`, 'Success', 'success')
       setShowCreateModal(false)
     } catch (err) {
-      alert(`Failed to create period: ${err.message}`)
+      showAlert(`Failed to create period: ${err.message}`, 'Error', 'error')
     } finally {
       setSubmitting(false)
     }
@@ -276,39 +316,41 @@ export default function EvaluationPeriodManagement() {
 
     const confirmMsg = `Enable program section "${section.sectionName}" (${section.programCode}) for evaluation?\n\nAll students in this program section will be able to evaluate ALL their enrolled courses during this period.`
     
-    if (window.confirm(confirmMsg)) {
-      try {
-        setSubmitting(true)
-        const response = await adminAPI.enrollProgramSectionInPeriod(currentPeriod.id, parseInt(enrollFormData.programSectionId))
-        
-        // Handle response structure properly
-        const data = response.data || response
-        
-        // Check for different error scenarios
-        if (data.success === false) {
-          // Display detailed error messages from backend
-          const errorMsg = data.message || 'Enrollment failed'
+    showConfirm(
+      confirmMsg,
+      async () => {
+        try {
+          setSubmitting(true)
+          const response = await adminAPI.enrollProgramSectionInPeriod(currentPeriod.id, parseInt(enrollFormData.programSectionId))
           
-          // Check for specific error scenarios
-          if (errorMsg.includes('No students are assigned')) {
-            alert(`❌ No Students in Section\n\n${errorMsg}\n\nPlease add students to this program section before enrolling it in an evaluation period.`)
-          } else if (errorMsg.includes('No active students found')) {
-            alert(`❌ No Active Students\n\n${errorMsg}\n\nPlease ensure students are set to 'active' status in the system.`)
-          } else if (errorMsg.includes('No course enrollments found')) {
-            alert(`❌ No Course Enrollments\n\n${errorMsg}\n\nStudents must be enrolled in courses (class sections) before they can be enabled for evaluation.`)
-          } else if (errorMsg.includes('already enrolled')) {
-            alert(`⚠️ Already Enrolled\n\n${errorMsg}`)
-          } else if (errorMsg.includes('none are \'active\' status')) {
-            alert(`❌ Enrollment Status Issue\n\n${errorMsg}\n\nPlease check that student enrollments are marked as 'active' in the database.`)
+          // Handle response structure properly
+          const data = response.data || response
+          
+          // Check for different error scenarios
+          if (data.success === false) {
+            // Display detailed error messages from backend
+            const errorMsg = data.message || 'Enrollment failed'
+            
+            // Check for specific error scenarios
+            if (errorMsg.includes('No students are assigned')) {
+              showAlert(`${errorMsg}\n\nPlease add students to this program section before enrolling it in an evaluation period.`, 'No Students in Section', 'error')
+            } else if (errorMsg.includes('No active students found')) {
+              showAlert(`${errorMsg}\n\nPlease ensure students are set to 'active' status in the system.`, 'No Active Students', 'error')
+            } else if (errorMsg.includes('No course enrollments found')) {
+              showAlert(`${errorMsg}\n\nStudents must be enrolled in courses (class sections) before they can be enabled for evaluation.`, 'No Course Enrollments', 'error')
+            } else if (errorMsg.includes('already enrolled')) {
+              showAlert(errorMsg, 'Already Enrolled', 'warning')
+            } else if (errorMsg.includes('none are \'active\' status')) {
+              showAlert(`${errorMsg}\n\nPlease check that student enrollments are marked as 'active' in the database.`, 'Enrollment Status Issue', 'error')
+            } else {
+              // Generic error message
+              showAlert(errorMsg, 'Enrollment Failed', 'warning')
+            }
           } else {
-            // Generic error message
-            alert(`⚠️ Enrollment Failed\n\n${errorMsg}`)
+            // Success case
+            const enrollData = data.data || data
+            showAlert(`${data.message}\n\n📊 Summary:\n• ${enrollData.students_enrolled} students enrolled\n• ${enrollData.evaluations_created} evaluation records created\n• ${enrollData.class_sections_affected} course section(s) affected`, 'Enrollment Successful', 'success')
           }
-        } else {
-          // Success case
-          const enrollData = data.data || data
-          alert(`✅ Enrollment Successful!\n\n${data.message}\n\n📊 Summary:\n• ${enrollData.students_enrolled} students enrolled\n• ${enrollData.evaluations_created} evaluation records created\n• ${enrollData.class_sections_affected} course section(s) affected`)
-        }
         
         setShowEnrollModal(false)
         setEnrollFormData({ programSectionId: '' })
@@ -322,79 +364,97 @@ export default function EvaluationPeriodManagement() {
         setPastPeriods(past)
         
         await loadEnrolledSections()
-      } catch (err) {
-        console.error('Enrollment error:', err)
-        
-        // Handle different error response formats
-        const errorDetail = err.response?.data?.detail || err.response?.data?.message || err.message || 'Unknown error occurred'
-        
-        // Check if it's a specific error scenario
-        if (typeof errorDetail === 'string') {
-          if (errorDetail.includes('not found')) {
-            alert(`❌ Not Found\n\n${errorDetail}\n\nThe selected program section or evaluation period may have been deleted.`)
-          } else if (errorDetail.includes('No students') || errorDetail.includes('No course enrollments')) {
-            alert(`❌ Enrollment Error\n\n${errorDetail}`)
+        } catch (err) {
+          console.error('Enrollment error:', err)
+          
+          // Handle different error response formats
+          const errorDetail = err.response?.data?.detail || err.response?.data?.message || err.message || 'Unknown error occurred'
+          
+          // Check if it's a specific error scenario
+          if (typeof errorDetail === 'string') {
+            if (errorDetail.includes('not found')) {
+              showAlert(`${errorDetail}\n\nThe selected program section or evaluation period may have been deleted.`, 'Not Found', 'error')
+            } else if (errorDetail.includes('No students') || errorDetail.includes('No course enrollments')) {
+              showAlert(errorDetail, 'Enrollment Error', 'error')
+            } else {
+              showAlert(errorDetail, 'Failed to Enroll Program Section', 'error')
+            }
           } else {
-            alert(`❌ Failed to Enroll Program Section\n\n${errorDetail}`)
+            showAlert('An unexpected error occurred. Please try again or contact support.', 'Failed to Enroll Program Section', 'error')
           }
-        } else {
-          alert(`❌ Failed to Enroll Program Section\n\nAn unexpected error occurred. Please try again or contact support.`)
+        } finally {
+          setSubmitting(false)
         }
-      } finally {
-        setSubmitting(false)
-      }
-    }
+        
+        setShowEnrollModal(false)
+        setEnrollFormData({ programSectionId: '' })
+      },
+      'Enable Program Section',
+      'Enable',
+      'Cancel'
+    )
   }
 
   const handleRemoveEnrollment = async (enrollmentId, classCode, subject) => {
-    if (window.confirm(`Remove "${classCode}" from this evaluation period?\n\nThis will delete all evaluation records for students in this program section.`)) {
-      try {
-        setSubmitting(true)
-        const response = await adminAPI.removePeriodEnrollment(currentPeriod.id, enrollmentId)
-        const data = response?.data || response
-        const evalsDeleted = data?.evaluations_deleted || 0
-        
-        alert(`✅ Section removed successfully!\n\n${evalsDeleted} evaluation record(s) deleted.`)
-        
-        // Reload period statistics and enrolled sections
-        const periodsResponse = await adminAPI.getPeriods()
-        const periods = periodsResponse?.data || []
-        const current = periods.find(p => p.status === 'active') || null
-        const past = periods.filter(p => p.status === 'closed')
-        setCurrentPeriod(current)
-        setPastPeriods(past)
-        
-        await loadEnrolledSections()
-      } catch (err) {
-        alert(`Failed to remove enrollment: ${err.response?.data?.detail || err.message}`)
-      } finally {
-        setSubmitting(false)
-      }
-    }
+    showConfirm(
+      `Remove "${classCode}" from this evaluation period?\n\nThis will delete all evaluation records for students in this program section.`,
+      async () => {
+        try {
+          setSubmitting(true)
+          const response = await adminAPI.removePeriodEnrollment(currentPeriod.id, enrollmentId)
+          const data = response?.data || response
+          const evalsDeleted = data?.evaluations_deleted || 0
+          
+          showAlert(`Section removed successfully!\n\n${evalsDeleted} evaluation record(s) deleted.`, 'Success', 'success')
+          
+          // Reload period statistics and enrolled sections
+          const periodsResponse = await adminAPI.getPeriods()
+          const periods = periodsResponse?.data || []
+          const current = periods.find(p => p.status === 'active') || null
+          const past = periods.filter(p => p.status === 'closed')
+          setCurrentPeriod(current)
+          setPastPeriods(past)
+          
+          await loadEnrolledSections()
+        } catch (err) {
+          showAlert(err.response?.data?.detail || err.message, 'Failed to Remove Enrollment', 'error')
+        } finally {
+          setSubmitting(false)
+        }
+      },
+      'Remove Enrollment',
+      'Remove',
+      'Cancel'
+    )
   }
 
   const handleDeletePastPeriod = async (periodId, periodName) => {
-    if (window.confirm(`⚠️ Delete "${periodName}"?\n\nThis will permanently delete this evaluation period and all associated data. This action cannot be undone!`)) {
-      try {
-        setSubmitting(true)
-        await adminAPI.deletePeriod(periodId)
-        
-        // Refresh periods
-        const response = await adminAPI.getPeriods()
-        const periods = response?.data || []
-        const current = periods.find(p => p.status === 'active') || null
-        const past = periods.filter(p => p.status === 'closed')
-        setCurrentPeriod(current)
-        setPastPeriods(past)
-        
-        alert(`Period "${periodName}" deleted successfully!`)
-      } catch (err) {
-        setErrorMessage(err.message || 'Failed to delete period')
-        setShowErrorModal(true)
-      } finally {
-        setSubmitting(false)
-      }
-    }
+    showConfirm(
+      `Delete "${periodName}"?\n\nThis will permanently delete this evaluation period and all associated data. This action cannot be undone!`,
+      async () => {
+        try {
+          setSubmitting(true)
+          await adminAPI.deletePeriod(periodId)
+          
+          // Refresh periods
+          const response = await adminAPI.getPeriods()
+          const periods = response?.data || []
+          const current = periods.find(p => p.status === 'active') || null
+          const past = periods.filter(p => p.status === 'closed')
+          setCurrentPeriod(current)
+          setPastPeriods(past)
+          
+          showAlert(`Period "${periodName}" deleted successfully!`, 'Success', 'success')
+        } catch (err) {
+          showAlert(err.message || 'Failed to delete period', 'Error', 'error')
+        } finally {
+          setSubmitting(false)
+        }
+      },
+      'Delete Period',
+      'Delete Period',
+      'Cancel'
+    )
   }
 
   if (!currentUser || !isSystemAdmin(currentUser)) return null
@@ -410,20 +470,16 @@ export default function EvaluationPeriodManagement() {
         <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-8 lg:py-10 max-w-screen-2xl">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg">
-                <span className="text-[#7a0000] font-bold text-xl">LPU</span>
-              </div>
+              <img 
+                src="/lpu-logo.png" 
+                alt="University Logo" 
+                className="w-32 h-32 object-contain"
+              />
               <div>
                 <h1 className="lpu-header-title text-3xl">Evaluation Period Management</h1>
                 <p className="lpu-header-subtitle text-lg">Control evaluation schedules and monitor participation</p>
               </div>
             </div>
-            <button onClick={() => setShowCreateModal(true)} className="bg-white hover:bg-[#ffd700] text-[#7a0000] font-semibold px-6 py-3 rounded-button shadow-card transition-all duration-250 flex items-center space-x-2">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
-              </svg>
-              <span>New Period</span>
-            </button>
           </div>
         </div>
       </header>
@@ -1039,6 +1095,30 @@ export default function EvaluationPeriodManagement() {
           </div>
         </div>
       )}
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={showAlertModal}
+        onClose={() => setShowAlertModal(false)}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        variant={alertConfig.type === 'error' ? 'danger' : alertConfig.type}
+      />
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={() => {
+          confirmConfig.onConfirm()
+          setShowConfirmModal(false)
+        }}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmText={confirmConfig.confirmText}
+        cancelText={confirmConfig.cancelText}
+        variant="warning"
+      />
     </div>
   )
 }

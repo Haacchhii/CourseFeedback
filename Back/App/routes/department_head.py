@@ -475,16 +475,16 @@ async def get_department_courses(
         
         # Build query for class sections with course info
         # Use subqueries to get counts efficiently
-        # Count all evaluations (not distinct students) as each evaluation is separate feedback
+        # Count DISTINCT students who evaluated (prevents double-counting duplicate evaluations)
         eval_count_subq = db.query(
             Evaluation.class_section_id,
-            func.count(Evaluation.id).label('eval_count'),
+            func.count(func.distinct(Evaluation.student_id)).label('eval_count'),
             func.avg(Evaluation.rating_overall).label('avg_rating')
         ).filter(Evaluation.status == 'completed').group_by(Evaluation.class_section_id).subquery()
         
         enroll_count_subq = db.query(
             Enrollment.class_section_id,
-            func.count(Enrollment.id).label('enroll_count')
+            func.count(func.distinct(Enrollment.student_id)).label('enroll_count')
         ).filter(Enrollment.status == 'active').group_by(Enrollment.class_section_id).subquery()
         
         # Build efficient query with joins

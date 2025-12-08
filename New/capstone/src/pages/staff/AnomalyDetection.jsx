@@ -4,6 +4,8 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recha
 import { isAdmin, isStaffMember } from '../../utils/roleUtils'
 import { useAuth } from '../../context/AuthContext'
 import { adminAPI, deptHeadAPI, secretaryAPI } from '../../services/api'
+import { useDebounce } from '../../hooks/useDebounce'
+import { transformPrograms, toDisplayCode } from '../../utils/programMapping'
 
 export default function AnomalyDetection() {
   const navigate = useNavigate()
@@ -14,6 +16,7 @@ export default function AnomalyDetection() {
   
   // Enhanced filter states
   const [searchTerm, setSearchTerm] = useState('')
+  const debouncedSearchTerm = useDebounce(searchTerm, 500) // Debounce search
   const [severityFilter, setSeverityFilter] = useState('all')
   const [programFilter, setProgramFilter] = useState('all')
   const [yearLevelFilter, setYearLevelFilter] = useState('all')
@@ -80,7 +83,7 @@ export default function AnomalyDetection() {
           ])
         }
         
-        if (programsRes?.data) setPrograms(programsRes.data)
+        if (programsRes?.data) setPrograms(transformPrograms(programsRes.data))
         if (yearLevelsRes?.data) setYearLevels(yearLevelsRes.data)
         if (coursesRes?.data) setCourses(coursesRes.data)
         if (periodsRes?.data) {
@@ -103,10 +106,15 @@ export default function AnomalyDetection() {
   useEffect(() => {
     const fetchAnomalies = async () => {
       if (!currentUser) return
-      if (!selectedPeriod && !activePeriod) return
       
       try {
         setLoading(true)
+        
+        if (!selectedPeriod && !activePeriod) {
+          setAnomalies([])
+          setLoading(false)
+          return
+        }
         const params = {}
         if (selectedPeriod) params.period_id = selectedPeriod
         
@@ -142,9 +150,9 @@ export default function AnomalyDetection() {
     return anomalies.filter(anomaly => {
       // Search filter
       const matchesSearch = searchTerm === '' || 
-        anomaly.courseName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        anomaly.comment?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        anomaly.instructorName?.toLowerCase().includes(searchTerm.toLowerCase())
+        anomaly.courseName?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        anomaly.comment?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        anomaly.instructorName?.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
       
       // Severity filter
       const matchesSeverity = severityFilter === 'all' || anomaly.severity === severityFilter
@@ -257,11 +265,11 @@ export default function AnomalyDetection() {
         <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-8 lg:py-10 max-w-screen-2xl">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center shadow-md">
-                <svg className="w-7 h-7 text-[#7a0000]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                </svg>
-              </div>
+              <img 
+                src="/lpu-logo.png" 
+                alt="University Logo" 
+                className="w-32 h-32 object-contain"
+              />
               <div>
                 <h1 className="text-2xl font-bold text-white">Anomaly Detection System</h1>
                 <p className="text-[#ffd700] text-sm">
@@ -308,7 +316,11 @@ export default function AnomalyDetection() {
             </svg>
             <h3 className="text-xl font-semibold text-gray-700 mb-2">No Active Evaluation Period</h3>
             <p className="text-gray-500 mb-4">There is currently no active evaluation period.</p>
-            <p className="text-gray-500">Please contact the administrator to activate an evaluation period, or select a specific period from the filter below.</p>
+            {evaluationPeriods.length > 0 ? (
+              <p className="text-gray-500">Select a past evaluation period from the filters below to view historical anomaly data.</p>
+            ) : (
+              <p className="text-gray-500">Please contact the administrator to create and activate an evaluation period.</p>
+            )}
           </div>
         ) : (
           <>
@@ -342,7 +354,7 @@ export default function AnomalyDetection() {
             </div>
           </div>
           
-          <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
+          <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-white/90 mb-2">Medium Severity</h3>
@@ -356,7 +368,7 @@ export default function AnomalyDetection() {
             </div>
           </div>
           
-          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
+          <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-white/90 mb-2">Low Severity</h3>

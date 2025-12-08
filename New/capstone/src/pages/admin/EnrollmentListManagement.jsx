@@ -24,6 +24,11 @@ const EnrollmentListManagement = () => {
     fetchStats();
   }, []);
 
+  // Refresh when filters change
+  useEffect(() => {
+    fetchEnrollmentList();
+  }, [filters]);
+
   const fetchPrograms = async () => {
     try {
       const response = await adminAPI.getPrograms();
@@ -43,13 +48,19 @@ const EnrollmentListManagement = () => {
       if (filters.year_level) params.append('year_level', filters.year_level);
       if (filters.status) params.append('status', filters.status);
 
+      // Add cache buster to force fresh data
+      params.append('_t', Date.now());
+
       const response = await apiClient.get(`/admin/enrollment-list/search?${params.toString()}`);
       // Handle different response formats
       const data = response?.data || response;
-      setEnrollmentList(Array.isArray(data) ? data : []);
+      const enrollments = Array.isArray(data) ? data : [];
+      console.log('[EnrollmentList] Fetched enrollments:', enrollments.length);
+      setEnrollmentList(enrollments);
     } catch (err) {
       setError('Failed to fetch enrollment list. Please try again.');
       console.error('Error fetching enrollment list:', err);
+      setEnrollmentList([]); // Clear list on error
     } finally {
       setLoading(false);
     }
@@ -57,7 +68,9 @@ const EnrollmentListManagement = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await apiClient.get('/admin/enrollment-list/stats');
+      // Add cache buster to force fresh data
+      const response = await apiClient.get(`/admin/enrollment-list/stats?_t=${Date.now()}`);
+      console.log('[EnrollmentList] Fetched stats:', response);
       setStats(response);
       
       // Extract unique colleges from stats for dynamic filtering
@@ -70,6 +83,8 @@ const EnrollmentListManagement = () => {
       }
     } catch (err) {
       console.error('Error fetching stats:', err);
+      // Reset stats on error
+      setStats({ total_students: 0, by_status: {}, by_program: {}, by_year: {} });
     }
   };
 
@@ -103,20 +118,13 @@ const EnrollmentListManagement = () => {
     setUploadResult(null);
     setError(null);
 
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
-      const response = await apiClient.post('/admin/enrollment-list/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      const response = await adminAPI.uploadEnrollmentList(file);
       setUploadResult(response);
       fetchEnrollmentList();
       fetchStats();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to upload file. Please check the format and try again.');
+      setError(err.response?.data?.detail || err.message || 'Failed to upload file. Please check the format and try again.');
     } finally {
       setUploading(false);
       event.target.value = ''; // Reset file input
@@ -147,14 +155,28 @@ const EnrollmentListManagement = () => {
         <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-10 lg:py-12 max-w-screen-2xl">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-lg">
-                <span className="text-[#7a0000] font-bold text-xl">LPU</span>
-              </div>
+              <img 
+                src="/lpu-logo.png" 
+                alt="University Logo" 
+                className="w-32 h-32 object-contain"
+              />
               <div>
                 <h1 className="lpu-header-title text-3xl">📋 Enrollment List Management</h1>
                 <p className="lpu-header-subtitle text-lg">Manage official enrollment records and student assignments</p>
               </div>
             </div>
+            <button
+              onClick={() => {
+                fetchEnrollmentList();
+                fetchStats();
+              }}
+              className="px-6 py-3 bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white rounded-card hover:from-[#9a1000] hover:to-[#7a0000] shadow-md hover:shadow-lg transition-all font-medium flex items-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+              </svg>
+              Refresh
+            </button>
           </div>
         </div>
       </header>
@@ -208,36 +230,36 @@ const EnrollmentListManagement = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Total Students</p>
-                  <p className="text-2xl lg:text-3xl font-bold text-gray-900 mt-2">{stats.total_students || 0}</p>
+                  <p className="text-2xl lg:text-3xl font-bold text-[#7a0000] mt-2">{stats.total_students || 0}</p>
                 </div>
-                <Users className="w-10 h-10 text-blue-500" />
+                <Users className="w-10 h-10 text-[#7a0000]" />
               </div>
             </div>
             <div className="bg-white rounded-card shadow-card p-6 lg:p-8 hover:shadow-lg transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Active Students</p>
-                  <p className="text-2xl lg:text-3xl font-bold text-green-600 mt-2">{stats.by_status?.active || 0}</p>
+                  <p className="text-2xl lg:text-3xl font-bold text-[#7a0000] mt-2">{stats.by_status?.active || 0}</p>
                 </div>
-                <CheckCircle className="w-10 h-10 text-green-500" />
+                <CheckCircle className="w-10 h-10 text-[#7a0000]" />
               </div>
             </div>
             <div className="bg-white rounded-card shadow-card p-6 lg:p-8 hover:shadow-lg transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Programs</p>
-                  <p className="text-2xl lg:text-3xl font-bold text-purple-600 mt-2">{Object.keys(stats.by_program || {}).length}</p>
+                  <p className="text-2xl lg:text-3xl font-bold text-[#7a0000] mt-2">{Object.keys(stats.by_program || {}).length}</p>
                 </div>
-                <TrendingUp className="w-10 h-10 text-purple-500" />
+                <TrendingUp className="w-10 h-10 text-[#7a0000]" />
               </div>
             </div>
             <div className="bg-white rounded-card shadow-card p-6 lg:p-8 hover:shadow-lg transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Year Levels</p>
-                  <p className="text-2xl lg:text-3xl font-bold text-indigo-600 mt-2">{Object.keys(stats.by_year || {}).length}</p>
+                  <p className="text-2xl lg:text-3xl font-bold text-[#7a0000] mt-2">{Object.keys(stats.by_year || {}).length}</p>
                 </div>
-                <Filter className="w-10 h-10 text-indigo-500" />
+                <Filter className="w-10 h-10 text-[#7a0000]" />
               </div>
             </div>
           </div>
@@ -266,7 +288,7 @@ const EnrollmentListManagement = () => {
                   <button
                     onClick={() => document.getElementById('csv-upload').click()}
                     disabled={uploading}
-                    className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-card hover:from-blue-700 hover:to-blue-800 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed flex items-center gap-2 shadow-md hover:shadow-lg transition-all font-medium"
+                    className="px-6 py-3 bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white rounded-card hover:from-[#9a1000] hover:to-[#7a0000] disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed flex items-center gap-2 shadow-md hover:shadow-lg transition-all font-medium"
                   >
                     {uploading ? (
                       <>
@@ -293,12 +315,12 @@ const EnrollmentListManagement = () => {
                 Download Sample
               </button>
             </div>
-            <div className="mt-6 p-4 lg:p-6 bg-blue-50 rounded-card border-2 border-blue-200">
-              <p className="font-bold text-base text-blue-900 mb-3 flex items-center gap-2">
+            <div className="mt-6 p-4 lg:p-6 bg-red-50 rounded-card border-2 border-red-200">
+              <p className="font-bold text-base text-[#7a0000] mb-3 flex items-center gap-2">
                 <FileText className="w-5 h-5" />
                 CSV Format Requirements:
               </p>
-              <ul className="list-disc list-inside space-y-2 text-sm text-blue-800">
+              <ul className="list-disc list-inside space-y-2 text-sm text-[#9a1000]">
                 <li><strong>Required columns:</strong> student_number, first_name, last_name, middle_name, email, program_code, year_level, college_code, college_name</li>
                 <li><strong>Program codes:</strong> Must exist in the system {programs.length > 0 && `(${programs.slice(0, 5).map(p => p.code || p.program_code).join(', ')}${programs.length > 5 ? ', etc.' : ''})`}</li>
                 <li><strong>Year level:</strong> Must be between 1 and 4</li>
@@ -327,11 +349,11 @@ const EnrollmentListManagement = () => {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                   placeholder="Search by student number, name, or email..."
-                  className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                  className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-[#7a0000] focus:border-[#7a0000] text-base"
                 />
                 <button
                   onClick={handleSearch}
-                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-card hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg transition-all font-medium flex items-center gap-2"
+                  className="px-6 py-3 bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white rounded-card hover:from-[#9a1000] hover:to-[#7a0000] shadow-md hover:shadow-lg transition-all font-medium flex items-center gap-2"
                 >
                   <Search className="w-5 h-5" />
                   Search
@@ -346,7 +368,7 @@ const EnrollmentListManagement = () => {
                 <select
                   value={filters.program_id}
                   onChange={(e) => handleFilterChange('program_id', e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-[#7a0000] focus:border-[#7a0000] text-base"
                 >
                   <option value="">All Programs</option>
                   {programs.length > 0 ? (
@@ -366,7 +388,7 @@ const EnrollmentListManagement = () => {
                 <select
                   value={filters.year_level}
                   onChange={(e) => handleFilterChange('year_level', e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-[#7a0000] focus:border-[#7a0000] text-base"
                 >
                   <option value="">All Years</option>
                   <option value="1">Year 1</option>
@@ -381,7 +403,7 @@ const EnrollmentListManagement = () => {
                 <select
                   value={filters.status}
                   onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-[#7a0000] focus:border-[#7a0000] text-base"
                 >
                   <option value="">All Statuses</option>
                   <option value="active">Active</option>
@@ -431,28 +453,28 @@ const EnrollmentListManagement = () => {
                 <p className="text-sm mt-1">Try adjusting your search or filters</p>
               </div>
             ) : (
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="table-auto">
+                <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
                       Student Number
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
                       Name
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
                       Email
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
                       Program
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
                       Year Level
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
                       College
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
                       Status
                     </th>
                   </tr>

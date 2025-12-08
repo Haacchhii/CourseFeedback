@@ -87,9 +87,11 @@ export default function AdminDashboard() {
         <div className="container mx-auto px-6 sm:px-8 lg:px-10 py-8 lg:py-10 max-w-screen-2xl">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
             <div className="flex items-center space-x-5">
-              <div className="w-14 h-14 lg:w-16 lg:h-16 bg-white rounded-full flex items-center justify-center shadow-lg flex-shrink-0">
-                <span className="text-[#7a0000] font-bold text-xl lg:text-2xl">LPU</span>
-              </div>
+              <img 
+                src="/lpu-logo.png" 
+                alt="University Logo" 
+                className="w-32 h-32 object-contain"
+              />
               <div>
                 <h1 className="lpu-header-title text-3xl lg:text-4xl">Course Insight Guardian</h1>
                 <p className="lpu-header-subtitle text-base lg:text-lg mt-1">System Administration Panel</p>
@@ -98,10 +100,6 @@ export default function AdminDashboard() {
             <div className="bg-white/20 backdrop-blur-sm rounded-xl px-6 lg:px-8 py-4 lg:py-5 text-left lg:text-right w-full lg:w-auto">
               <p className="text-[#ffd700] text-sm font-medium">Welcome back,</p>
               <p className="text-white font-bold text-lg lg:text-xl mt-1">{currentUser.name}</p>
-              <div className="flex items-center justify-start lg:justify-end space-x-2 mt-2">
-                <div className="w-2 h-2 bg-[#ffd700] rounded-full animate-pulse"></div>
-                <span className="text-white text-xs font-medium">Online</span>
-              </div>
             </div>
           </div>
         </div>

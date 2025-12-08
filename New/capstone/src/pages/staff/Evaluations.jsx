@@ -6,6 +6,8 @@ import { useAuth } from '../../context/AuthContext'
 import { adminAPI, deptHeadAPI, secretaryAPI } from '../../services/api'
 import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
 import Pagination from '../../components/Pagination'
+import { useDebounce } from '../../hooks/useDebounce'
+import { transformPrograms, toDisplayCode } from '../../utils/programMapping'
 
 export default function Evaluations() {
   const navigate = useNavigate()
@@ -14,6 +16,7 @@ export default function Evaluations() {
   const [allEvaluations, setAllEvaluations] = useState([]) // All evaluations for chart
   const [courses, setCourses] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
+  const debouncedSearchTerm = useDebounce(searchTerm, 500) // Debounce search
   const [programFilter, setProgramFilter] = useState('all')
   const [sentimentFilter, setSentimentFilter] = useState('all')
   const [semesterFilter, setSemesterFilter] = useState('all')
@@ -60,7 +63,7 @@ export default function Evaluations() {
         }
         
         if (programsResponse?.data) {
-          setProgramOptions(programsResponse.data)
+          setProgramOptions(transformPrograms(programsResponse.data))
         }
         if (yearLevelsResponse?.data) {
           setYearLevelOptions(yearLevelsResponse.data)
@@ -220,7 +223,7 @@ export default function Evaluations() {
       return {
         ...evaluation,
         courseName: course?.name || 'Unknown Course',
-        courseProgram: course?.program || 'Unknown',
+        courseProgram: toDisplayCode(course?.program) || 'Unknown',
         avgRating,
         submittedDate: evaluation.submission_date 
           ? new Date(evaluation.submission_date).toLocaleDateString('en-US', { 
@@ -237,9 +240,9 @@ export default function Evaluations() {
   const filteredEvaluations = useMemo(() => {
     return enhancedEvaluations.filter(evaluation => {
       const matchesSearch = searchTerm === '' || 
-        evaluation.courseName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        evaluation.student.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        evaluation.comment.toLowerCase().includes(searchTerm.toLowerCase())
+        evaluation.courseName.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        evaluation.student.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        evaluation.comment.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
       
       const matchesProgram = programFilter === 'all' || evaluation.courseProgram === programFilter
       const matchesSentiment = sentimentFilter === 'all' || evaluation.sentiment === sentimentFilter
@@ -406,11 +409,11 @@ export default function Evaluations() {
         <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-8 lg:py-10 max-w-screen-2xl">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center shadow-md">
-                <svg className="w-7 h-7 text-[#7a0000]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
-                </svg>
-              </div>
+              <img 
+                src="/lpu-logo.png" 
+                alt="University Logo" 
+                className="w-32 h-32 object-contain"
+              />
               <div>
                 <h1 className="text-2xl font-bold text-white">Student Evaluations Management</h1>
                 <p className="text-[#ffd700] text-sm">
@@ -464,7 +467,7 @@ export default function Evaluations() {
             </div>
           </div>
           
-          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
+          <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-white/90 mb-2">Positive Feedback</h3>
@@ -478,7 +481,7 @@ export default function Evaluations() {
             </div>
           </div>
           
-          <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
+          <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-white/90 mb-2">Neutral Feedback</h3>
@@ -760,7 +763,7 @@ export default function Evaluations() {
                       <span className={`inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full ${
                         evaluation.courseProgram === 'BSIT' ? 'bg-blue-100 text-blue-800' :
                         evaluation.courseProgram === 'BSCS-DS' ? 'bg-green-100 text-green-800' :
-                        evaluation.courseProgram === 'BS-CY' ? 'bg-red-100 text-red-800' :
+                        evaluation.courseProgram === 'BSCYSEC' ? 'bg-red-100 text-red-800' :
                         'bg-purple-100 text-purple-800'
                       }`}>
                         {evaluation.courseProgram}

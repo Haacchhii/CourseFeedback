@@ -4,6 +4,8 @@ import { isAdmin, isStaffMember } from '../../utils/roleUtils'
 import { useAuth } from '../../context/AuthContext'
 import { adminAPI, deptHeadAPI, secretaryAPI } from '../../services/api'
 import Pagination from '../../components/Pagination'
+import { useDebounce } from '../../hooks/useDebounce'
+import { transformPrograms, toDisplayCode } from '../../utils/programMapping'
 
 export default function Courses() {
   const { user: currentUser } = useAuth()
@@ -16,6 +18,7 @@ export default function Courses() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const debouncedSearchTerm = useDebounce(searchTerm, 500) // Debounce search by 500ms
   const [selectedProgram, setSelectedProgram] = useState('all')
   const [selectedProgramSection, setSelectedProgramSection] = useState('all')
   const [programSections, setProgramSections] = useState([])
@@ -70,7 +73,7 @@ export default function Courses() {
         if (!isMounted) return // Don't update state if unmounted
         
         if (programsData?.data && Array.isArray(programsData.data) && programsData.data.length > 0) {
-          setPrograms(programsData.data)
+          setPrograms(transformPrograms(programsData.data))
         } else {
           setPrograms([])
         }
@@ -357,9 +360,9 @@ export default function Courses() {
   }
 
   const filteredCourses = enhancedCourses.filter(course => {
-    const matchesSearch = (course.name || course.course_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (course.code || course.course_code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (course.classCode || '').toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesSearch = (course.name || course.course_name || '').toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+                         (course.code || course.course_code || '').toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+                         (course.classCode || '').toLowerCase().includes(debouncedSearchTerm.toLowerCase())
     
     // Enhanced program matching - handle different field variations
     const courseProgram = course.program || course.program_code || course.program_name || ''
@@ -395,7 +398,7 @@ export default function Courses() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, selectedProgram, selectedProgramSection])
+  }, [debouncedSearchTerm, selectedProgram, selectedProgramSection])
 
   // Calculate active courses (courses with status 'active' or ongoing evaluations)
   const activeCourses = enhancedCourses.filter(course => {
@@ -792,11 +795,11 @@ export default function Courses() {
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
             <div className="mb-6 lg:mb-0">
               <div className="flex items-center space-x-3 mb-4">
-                <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
-                  <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2-2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                  </svg>
-                </div>
+                <img 
+                  src="/lpu-logo.png" 
+                  alt="University Logo" 
+                  className="w-32 h-32 object-contain"
+                />
                 <div>
                   <h1 className="text-3xl font-bold text-white">Course Management</h1>
                   <p className="text-[#ffd700] text-lg font-medium">
@@ -867,7 +870,7 @@ export default function Courses() {
             </div>
           </div>
           
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
+          <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-white/90 mb-2">Total Students</h3>
@@ -886,7 +889,7 @@ export default function Courses() {
             </div>
           </div>
           
-          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
+          <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-white/90 mb-2">Avg Rating</h3>
@@ -907,7 +910,7 @@ export default function Courses() {
             </div>
           </div>
           
-          <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
+          <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-white/90 mb-2">Response Rate</h3>
@@ -1173,7 +1176,7 @@ export default function Courses() {
                           <div className="font-bold text-gray-900 group-hover:text-[#7a0000] transition-colors duration-200">
                             {course.name}
                           </div>
-                          <div className="text-sm text-gray-500">{course.code} • {course.program}</div>
+                          <div className="text-sm text-gray-500">{course.code} • {toDisplayCode(course.program)}</div>
                         </div>
                       </div>
                     </td>
