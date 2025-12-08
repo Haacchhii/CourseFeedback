@@ -503,7 +503,11 @@ async def delete_user(
     current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """Delete a user (soft delete by setting is_active=False)"""
+    """
+    Delete a user - performs hard delete if no data exists, soft delete otherwise.
+    - Hard delete: User has no evaluations, enrollments, or audit logs (newly created)
+    - Soft delete: User has related data (preserves data integrity)
+    """
     try:
         current_user_id = current_user['id']
         
@@ -511,21 +515,81 @@ async def delete_user(
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         
-        # Soft delete
-        user.is_active = False
-        user.updated_at = now_local()
-        db.commit()
+        # Check if user has any related data
+        has_evaluations = db.query(Evaluation).filter(Evaluation.student_id == user_id).first() is not None
+        has_enrollments = db.query(Enrollment).filter(Enrollment.student_id == user_id).first() is not None
+        has_audit_logs = db.query(AuditLog).filter(AuditLog.user_id == user_id).first() is not None
         
-        # Log audit event
-        await create_audit_log(
-            db, current_user_id, "USER_DELETED", "User Management",
-            details={"user_id": user_id, "email": user.email}
-        )
+        # Check if user is a student with a student record
+        student_record = None
+        if user.role == 'student':
+            student_record = db.query(Student).filter(Student.user_id == user_id).first()
         
-        return {
-            "success": True,
-            "message": "User deleted successfully"
-        }
+        # Check if user is department head with a record
+        dept_head_record = None
+        if user.role == 'department_head':
+            dept_head_record = db.query(DepartmentHead).filter(DepartmentHead.user_id == user_id).first()
+        
+        # Check if user is secretary with a record
+        secretary_record = None
+        if user.role == 'secretary':
+            secretary_record = db.query(Secretary).filter(Secretary.user_id == user_id).first()
+        
+        # Determine delete type
+        has_data = has_evaluations or has_enrollments or has_audit_logs
+        delete_type = "soft" if has_data else "hard"
+        
+        if delete_type == "hard":
+            # Hard delete - completely remove user and role records
+            if student_record:
+                db.delete(student_record)
+            if dept_head_record:
+                db.delete(dept_head_record)
+            if secretary_record:
+                db.delete(secretary_record)
+            
+            # Delete the user
+            db.delete(user)
+            db.commit()
+            
+            # Log audit event
+            await create_audit_log(
+                db, current_user_id, "USER_DELETED", "User Management",
+                details={
+                    "user_id": user_id, 
+                    "email": user.email,
+                    "delete_type": "hard",
+                    "reason": "No related data found"
+                }
+            )
+            
+            return {
+                "success": True,
+                "message": "User permanently deleted (no related data found)",
+                "delete_type": "hard"
+            }
+        else:
+            # Soft delete - preserve data integrity
+            user.is_active = False
+            user.updated_at = now_local()
+            db.commit()
+            
+            # Log audit event
+            await create_audit_log(
+                db, current_user_id, "USER_DELETED", "User Management",
+                details={
+                    "user_id": user_id, 
+                    "email": user.email,
+                    "delete_type": "soft",
+                    "reason": "Has related data (evaluations/enrollments/logs)"
+                }
+            )
+            
+            return {
+                "success": True,
+                "message": "User deactivated (has related data - preserving for integrity)",
+                "delete_type": "soft"
+            }
         
     except HTTPException:
         raise
@@ -686,6 +750,8 @@ async def create_evaluation_period(
 ):
     """Create a new evaluation period"""
     try:
+        current_user_id = current_user['id']
+        
         # Get total students for this period
         total_students = db.query(func.count(Student.id)).scalar() or 0
         
@@ -737,6 +803,8 @@ async def update_evaluation_period(
 ):
     """Update evaluation period details (extend dates, rename, etc.)"""
     try:
+        current_user_id = current_user['id']
+        
         period = db.query(EvaluationPeriod).filter(EvaluationPeriod.id == period_id).first()
         if not period:
             raise HTTPException(status_code=404, detail="Evaluation period not found")
@@ -801,6 +869,8 @@ async def update_period_status(
 ):
     """Update evaluation period status (draft -> active -> closed)"""
     try:
+        current_user_id = current_user['id']
+        
         period = db.query(EvaluationPeriod).filter(EvaluationPeriod.id == period_id).first()
         if not period:
             raise HTTPException(status_code=404, detail="Evaluation period not found")
@@ -893,6 +963,8 @@ async def delete_evaluation_period(
     Delete an evaluation period (only if no evaluations exist)
     """
     try:
+        current_user_id = current_user['id']
+        
         # Get the period
         period = db.query(EvaluationPeriod).filter(EvaluationPeriod.id == period_id).first()
         
@@ -1024,6 +1096,8 @@ async def enroll_section_in_period(
     All students enrolled in this section will be able to evaluate during this period
     """
     try:
+        current_user_id = current_user['id']
+        
         # Verify period exists
         period = db.query(EvaluationPeriod).filter(EvaluationPeriod.id == period_id).first()
         if not period:
@@ -1211,6 +1285,8 @@ async def remove_period_enrollment(
 ):
     """Remove a class section enrollment from an evaluation period"""
     try:
+        current_user_id = current_user['id']
+        
         # Get enrollment details before deletion
         enrollment = db.execute(text("""
             SELECT class_section_id
@@ -1345,6 +1421,8 @@ async def remove_program_section_enrollment(
 ):
     """Remove a program section enrollment from an evaluation period"""
     try:
+        current_user_id = current_user['id']
+        
         # Get enrollment details before deleting
         enrollment_info = db.execute(text("""
             SELECT pps.program_section_id, ps.section_name, p.program_name
@@ -1448,6 +1526,8 @@ async def enroll_program_section_in_period(
     for ALL courses they are enrolled in.
     """
     try:
+        current_user_id = current_user['id']
+        
         # Verify period exists
         period = db.query(EvaluationPeriod).filter(EvaluationPeriod.id == period_id).first()
         if not period:
