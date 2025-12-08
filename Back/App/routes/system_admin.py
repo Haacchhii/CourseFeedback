@@ -28,16 +28,18 @@ import json
 import asyncio
 from config import now_local
 from services.welcome_email_service import send_welcome_email, send_bulk_welcome_emails
+from services.resend_email_service import send_welcome_email_resend
 from utils.validation import InputValidator, validate_export_filters, ValidationError
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Helper function for background email sending (sync wrapper)
+# Helper function for background email sending
 async def send_email_background_async(email: str, first_name: str, last_name: str, school_id: str, role: str, temp_password: str):
-    """Async wrapper for background email sending"""
+    """Async wrapper for background email sending via Resend (fast and reliable)"""
     try:
-        result = await send_welcome_email(
+        # Use Resend for faster, more reliable email delivery
+        result = await send_welcome_email_resend(
             email=email,
             first_name=first_name,
             last_name=last_name,
@@ -45,9 +47,9 @@ async def send_email_background_async(email: str, first_name: str, last_name: st
             role=role,
             temp_password=temp_password
         )
-        logger.info(f"Background email result for {email}: {result.get('message', 'Unknown')}")
+        logger.info(f"📧 Background email for {email}: {result.get('message', 'Unknown')}")
     except Exception as e:
-        logger.error(f"Background email failed for {email}: {e}")
+        logger.error(f"❌ Background email failed for {email}: {e}")
 
 # ===========================
 # Pydantic Models for Requests
