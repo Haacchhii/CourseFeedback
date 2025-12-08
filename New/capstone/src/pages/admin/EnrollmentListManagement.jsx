@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Upload, Search, Filter, Users, TrendingUp, AlertCircle, CheckCircle, X, Download, FileText } from 'lucide-react';
+import { Upload, Search, Filter, Users, TrendingUp, AlertCircle, CheckCircle, X, Download, FileText, Eye } from 'lucide-react';
 import { adminAPI, apiClient } from '../../services/api';
+import AlertModal from '../../components/Modal';
 
 const EnrollmentListManagement = () => {
   const [enrollmentList, setEnrollmentList] = useState([]);
@@ -17,6 +18,22 @@ const EnrollmentListManagement = () => {
   const [uploadResult, setUploadResult] = useState(null);
   const [programs, setPrograms] = useState([]);
   const [colleges, setColleges] = useState([]);
+
+  // CSV Preview State
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [csvFile, setCsvFile] = useState(null);
+  const [csvPreview, setCsvPreview] = useState([]);
+  const [csvErrors, setCsvErrors] = useState([]);
+
+  // Modal State
+  const [showAlertModal, setShowAlertModal] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({ title: '', message: '', type: 'info' });
+
+  // Modal Helper Function
+  const showAlert = (message, title = 'Notification', type = 'info') => {
+    setAlertConfig({ title, message, type });
+    setShowAlertModal(true);
+  };
 
   useEffect(() => {
     fetchPrograms();
@@ -110,24 +127,113 @@ const EnrollmentListManagement = () => {
     setTimeout(() => fetchEnrollmentList(), 100);
   };
 
-  const handleFileUpload = async (event) => {
+  const handleFileSelect = (event) => {
     const file = event.target.files[0];
     if (!file) return;
+
+    setCsvFile(file);
+    setCsvErrors([]);
+    setCsvPreview([]);
+
+    // Parse CSV for preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target.result;
+        const lines = text.split('\n').filter(line => line.trim());
+
+        if (lines.length < 2) {
+          setCsvErrors(['CSV file is empty or has no data rows']);
+          return;
+        }
+
+        // Parse header
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        const requiredHeaders = ['student_number', 'first_name', 'last_name', 'email', 'program_code', 'year_level'];
+        const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+
+        if (missingHeaders.length > 0) {
+          setCsvErrors([`Missing required columns: ${missingHeaders.join(', ')}`]);
+          return;
+        }
+
+        // Parse data rows (preview first 10)
+        const preview = [];
+        const errors = [];
+
+        for (let i = 1; i < Math.min(lines.length, 11); i++) {
+          const values = lines[i].split(',').map(v => v.trim());
+          const row = {};
+
+          headers.forEach((header, index) => {
+            row[header] = values[index] || '';
+          });
+
+          // Validate row
+          const rowErrors = [];
+          if (!row.student_number) rowErrors.push('Missing student number');
+          if (!row.first_name) rowErrors.push('Missing first name');
+          if (!row.last_name) rowErrors.push('Missing last name');
+          if (!row.email || !row.email.includes('@')) rowErrors.push('Invalid email');
+          if (!row.program_code) rowErrors.push('Missing program code');
+          if (!row.year_level || ![1, 2, 3, 4, '1', '2', '3', '4'].includes(row.year_level)) {
+            rowErrors.push('Invalid year level (must be 1-4)');
+          }
+
+          if (rowErrors.length > 0) {
+            errors.push({ row: i, errors: rowErrors, data: row });
+          }
+
+          preview.push({ ...row, rowNumber: i, hasErrors: rowErrors.length > 0 });
+        }
+
+        setCsvPreview(preview);
+        setCsvErrors(errors);
+        setShowPreviewModal(true);
+      } catch (err) {
+        setCsvErrors([`Failed to parse CSV: ${err.message}`]);
+      }
+    };
+
+    reader.readAsText(file);
+  };
+
+  const handleConfirmUpload = async () => {
+    if (!csvFile) return;
 
     setUploading(true);
     setUploadResult(null);
     setError(null);
+    setShowPreviewModal(false);
 
     try {
-      const response = await adminAPI.uploadEnrollmentList(file);
+      const response = await adminAPI.uploadEnrollmentList(csvFile);
       setUploadResult(response);
+      
+      // Show success modal
+      const successCount = response?.success_count || response?.created || 0;
+      const updatedCount = response?.updated_count || response?.updated || 0;
+      const totalProcessed = successCount + updatedCount;
+      
+      showAlert(
+        `Successfully processed ${totalProcessed} student(s)\n• Created: ${successCount}\n• Updated: ${updatedCount}`,
+        'Upload Successful',
+        'success'
+      );
+      
       fetchEnrollmentList();
       fetchStats();
+      setCsvFile(null);
+      setCsvPreview([]);
+      setCsvErrors([]);
     } catch (err) {
-      setError(err.response?.data?.detail || err.message || 'Failed to upload file. Please check the format and try again.');
+      showAlert(
+        err.response?.data?.detail || err.message || 'Failed to upload file. Please check the format and try again.',
+        'Upload Failed',
+        'error'
+      );
     } finally {
       setUploading(false);
-      event.target.value = ''; // Reset file input
     }
   };
 
@@ -279,7 +385,7 @@ const EnrollmentListManagement = () => {
                 <input
                   type="file"
                   accept=".csv"
-                  onChange={handleFileUpload}
+                  onChange={handleFileSelect}
                   disabled={uploading}
                   className="hidden"
                   id="csv-upload"
@@ -524,6 +630,176 @@ const EnrollmentListManagement = () => {
           </div>
         </div>
       </div>
+
+      {/* CSV Preview Modal */}
+      {showPreviewModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] flex flex-col shadow-2xl">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] px-6 py-4 flex items-center justify-between flex-shrink-0 rounded-t-2xl">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                  <Eye className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">CSV Preview</h2>
+                  <p className="text-sm text-white/80">{csvFile?.name}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowPreviewModal(false);
+                  setCsvFile(null);
+                  setCsvPreview([]);
+                  setCsvErrors([]);
+                }}
+                className="text-white hover:bg-white/20 rounded-lg p-2 transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {/* Errors Section */}
+              {csvErrors.length > 0 && (
+                <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <h3 className="text-sm font-bold text-red-900 mb-2">Validation Errors Found</h3>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {csvErrors.slice(0, 10).map((err, idx) => (
+                          <div key={idx} className="flex items-start gap-2 text-sm text-red-800">
+                            <span className="font-bold">Row {err.row}:</span>
+                            <span>{err.errors.join(', ')}</span>
+                          </div>
+                        ))}
+                        {csvErrors.length > 10 && (
+                          <p className="text-sm text-red-700 font-bold text-center py-2 bg-red-100 rounded">
+                            + {csvErrors.length - 10} more errors
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Preview Table */}
+              {csvPreview.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-bold text-gray-900">Data Preview</h3>
+                    <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">
+                      Showing first {csvPreview.length} rows
+                    </span>
+                  </div>
+                  <div className="border-2 border-gray-200 rounded-lg overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Status</th>
+                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Student #</th>
+                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Name</th>
+                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Email</th>
+                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Program</th>
+                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Year</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {csvPreview.map((row, idx) => (
+                            <tr key={idx} className={row.hasErrors ? 'bg-red-50' : 'hover:bg-gray-50'}>
+                              <td className="px-4 py-3">
+                                {row.hasErrors ? (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800">
+                                    <X className="w-3 h-3 mr-1" />
+                                    Error
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800">
+                                    <CheckCircle className="w-3 h-3 mr-1" />
+                                    Valid
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-sm font-medium text-gray-900">{row.student_number}</td>
+                              <td className="px-4 py-3 text-sm text-gray-900">
+                                {row.last_name}, {row.first_name} {row.middle_name}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-600">{row.email}</td>
+                              <td className="px-4 py-3 text-sm text-gray-900">{row.program_code}</td>
+                              <td className="px-4 py-3 text-sm text-gray-900">Year {row.year_level}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Info Box */}
+              {csvErrors.length === 0 && csvPreview.length > 0 && (
+                <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4">
+                  <div className="flex items-start gap-2">
+                    <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h3 className="text-sm font-bold text-green-900">Ready to Upload</h3>
+                      <p className="text-sm text-green-800 mt-1">
+                        All rows passed validation. Click "Confirm Upload" to import the students.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex-shrink-0 px-6 py-4 bg-gray-50 border-t flex items-center justify-between rounded-b-2xl">
+              <button
+                onClick={() => {
+                  setShowPreviewModal(false);
+                  setCsvFile(null);
+                  setCsvPreview([]);
+                  setCsvErrors([]);
+                }}
+                className="px-6 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-semibold transition-all"
+                disabled={uploading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmUpload}
+                disabled={uploading || csvErrors.length > 0 || csvPreview.length === 0}
+                className="px-6 py-2 bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white rounded-lg font-semibold hover:from-[#9a1000] hover:to-[#7a0000] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {uploading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Uploading...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    <span>Confirm Upload</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={showAlertModal}
+        onClose={() => setShowAlertModal(false)}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        variant={alertConfig.type === 'error' ? 'danger' : alertConfig.type}
+      />
     </div>
   );
 };
