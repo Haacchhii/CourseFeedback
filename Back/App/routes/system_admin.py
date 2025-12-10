@@ -2795,21 +2795,32 @@ async def delete_section(
         
         class_code = result[0]
         
-        # Check if there are any evaluations for this section
-        evaluation_count = db.execute(text("""
-            SELECT COUNT(*) FROM evaluations WHERE class_section_id = :section_id
+        # Check if there are any SUBMITTED evaluations for this section
+        # Only count evaluations that have been submitted (submission_date IS NOT NULL)
+        # Pending evaluations (created when enrolling in period) should not block deletion
+        submitted_evaluation_count = db.execute(text("""
+            SELECT COUNT(*) FROM evaluations 
+            WHERE class_section_id = :section_id
+            AND submission_date IS NOT NULL
         """), {"section_id": section_id}).scalar() or 0
         
-        if evaluation_count > 0:
+        if submitted_evaluation_count > 0:
             raise HTTPException(
                 status_code=400,
-                detail=f"Cannot delete section '{class_code}' with {evaluation_count} existing evaluations. The evaluation data must be preserved."
+                detail=f"Cannot delete section '{class_code}' with {submitted_evaluation_count} submitted evaluations. The evaluation data must be preserved."
             )
         
         # Delete related records in order (to avoid foreign key constraint errors)
         # Use raw SQL to avoid ORM model issues with missing columns
         
-        # 1. Delete analysis results (if table exists and has records)
+        # 1. Delete pending/unsubmitted evaluations first (these are safe to delete)
+        db.execute(text("""
+            DELETE FROM evaluations 
+            WHERE class_section_id = :section_id 
+            AND submission_date IS NULL
+        """), {"section_id": section_id})
+        
+        # 2. Delete analysis results (if table exists and has records)
         try:
             db.execute(text("DELETE FROM analysis_results WHERE class_section_id = :section_id"), {"section_id": section_id})
         except Exception as e:
