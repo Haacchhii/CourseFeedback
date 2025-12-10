@@ -2619,7 +2619,8 @@ async def create_section(
                             JOIN users u ON ss.student_id = u.id
                             JOIN students s ON s.user_id = u.id
                             WHERE ss.section_id = :section_id
-                            AND s.is_active = true
+                            AND u.is_active = true
+                            AND u.role = 'student'
                         """),
                         {"section_id": section_data.program_section_id}
                     )
@@ -2646,24 +2647,34 @@ async def create_section(
                             enrolled_count += 1
                 else:
                     # Fallback: Find all students matching the course's program and year level
-                    matching_students = db.query(Student).filter(
-                        Student.program_id == course.program_id,
-                        Student.year_level == course.year_level,
-                        Student.is_active == True
-                    ).all()
+                    # Join with users table to check is_active status properly
+                    result = db.execute(
+                        text("""
+                            SELECT s.id as student_id
+                            FROM students s
+                            JOIN users u ON s.user_id = u.id
+                            WHERE s.program_id = :program_id
+                            AND s.year_level = :year_level
+                            AND u.is_active = true
+                            AND u.role = 'student'
+                        """),
+                        {"program_id": course.program_id, "year_level": course.year_level}
+                    )
+                    matching_students = result.fetchall()
                     
                     logger.info(f"[AUTO_ENROLL] Found {len(matching_students)} students matching program/year (fallback mode)")
                     
-                    for student in matching_students:
+                    for row in matching_students:
+                        student_id = row.student_id
                         # Check if not already enrolled
                         existing_enrollment = db.query(Enrollment).filter(
                             Enrollment.class_section_id == new_section.id,
-                            Enrollment.student_id == student.id
+                            Enrollment.student_id == student_id
                         ).first()
                         
                         if not existing_enrollment:
                             new_enrollment = Enrollment(
-                                student_id=student.id,
+                                student_id=student_id,
                                 class_section_id=new_section.id,
                                 enrolled_at=now_local(),
                                 status='active'
