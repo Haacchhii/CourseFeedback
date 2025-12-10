@@ -2940,7 +2940,7 @@ async def get_available_students(
 ):
     """Get students with accounts who are NOT enrolled in this section"""
     try:
-        # First get the section's program and year level
+        # First get the section's program
         section_query = text("""
             SELECT c.program_id, c.year_level
             FROM class_sections cs
@@ -2954,9 +2954,9 @@ async def get_available_students(
             raise HTTPException(status_code=404, detail="Section not found")
         
         program_id = section_result[0]
-        year_level = section_result[1]
         
         # Query students with accounts who are not enrolled in this section
+        # Only filter by program_id (not year_level) to allow flexibility
         query_str = """
             SELECT 
                 s.id,
@@ -2970,7 +2970,6 @@ async def get_available_students(
             JOIN users u ON s.user_id = u.id
             LEFT JOIN programs p ON s.program_id = p.id
             WHERE s.program_id = :program_id 
-            AND s.year_level = :year_level
             AND u.is_active = true
             AND s.id NOT IN (
                 SELECT student_id 
@@ -2981,8 +2980,7 @@ async def get_available_students(
         
         params = {
             "section_id": section_id,
-            "program_id": program_id,
-            "year_level": year_level
+            "program_id": program_id
         }
         
         if search:
