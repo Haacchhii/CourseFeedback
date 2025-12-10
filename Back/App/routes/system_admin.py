@@ -1259,13 +1259,11 @@ async def delete_evaluation_period(
         if not period:
             raise HTTPException(status_code=404, detail="Evaluation period not found")
         
-        # Check if there are any evaluations for this period (via enrollments)
+        # Check if there are any evaluations for this period (direct check on evaluations table)
         evaluation_count = db.execute(text("""
-            SELECT COUNT(DISTINCT e.id)
-            FROM evaluations e
-            JOIN enrollments en ON e.student_id = en.student_id 
-                AND e.class_section_id = en.class_section_id
-            WHERE en.evaluation_period_id = :period_id
+            SELECT COUNT(*)
+            FROM evaluations
+            WHERE evaluation_period_id = :period_id
         """), {"period_id": period_id}).scalar() or 0
         
         if evaluation_count > 0:
@@ -2371,34 +2369,17 @@ async def delete_course(
     current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """Delete a course"""
-    try:
-        course = db.query(Course).filter(Course.id == course_id).first()
-        if not course:
-            raise HTTPException(status_code=404, detail="Course not found")
-        
-        course_name = course.subject_name
-        db.delete(course)
-        db.commit()
-        
-        # Log audit event
-        await create_audit_log(
-            db, current_user_id, "COURSE_DELETED", "Course Management",
-            severity="Warning",
-            details={"course_id": course_id, "course_name": course_name}
-        )
-        
-        return {
-            "success": True,
-            "message": "Course deleted successfully"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error deleting course: {e}")
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+    """
+    Delete a course - DISABLED
+    
+    Courses are part of the core curriculum and cannot be deleted.
+    They are embedded into the system structure.
+    Use class section management instead to manage course offerings per period.
+    """
+    raise HTTPException(
+        status_code=403,
+        detail="Courses cannot be deleted as they are part of the core curriculum. Use class section management to control course offerings."
+    )
 
 @router.get("/programs")
 async def get_programs(
@@ -2789,8 +2770,9 @@ async def delete_section(
     current_user: dict = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """Delete a class section and all its enrollments"""
+    """Delete a class section (only if no evaluations exist)"""
     try:
+        current_user_id = current_user['id']
         logger.info(f"[DELETE_SECTION] Starting deletion for section_id={section_id}")
         
         # Get class_code directly from database using raw SQL (avoid ORM issues)
@@ -2802,26 +2784,34 @@ async def delete_section(
         
         class_code = result[0]
         
+        # Check if there are any evaluations for this section
+        evaluation_count = db.execute(text("""
+            SELECT COUNT(*) FROM evaluations WHERE class_section_id = :section_id
+        """), {"section_id": section_id}).scalar() or 0
+        
+        if evaluation_count > 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot delete section '{class_code}' with {evaluation_count} existing evaluations. The evaluation data must be preserved."
+            )
+        
         # Delete related records in order (to avoid foreign key constraint errors)
         # Use raw SQL to avoid ORM model issues with missing columns
         
-        # 1. Delete evaluations for this section
-        db.execute(text("DELETE FROM evaluations WHERE class_section_id = :section_id"), {"section_id": section_id})
-        
-        # 2. Delete analysis results (if table exists and has records)
+        # 1. Delete analysis results (if table exists and has records)
         try:
             db.execute(text("DELETE FROM analysis_results WHERE class_section_id = :section_id"), {"section_id": section_id})
         except Exception as e:
             # Ignore if table doesn't exist or has schema issues
             logger.warning(f"Could not delete analysis_results for section {section_id}: {e}")
         
-        # 3. Delete period enrollments (tracks which sections are enrolled in evaluation periods)
+        # 2. Delete period enrollments (tracks which sections are enrolled in evaluation periods)
         db.execute(text("DELETE FROM period_enrollments WHERE class_section_id = :section_id"), {"section_id": section_id})
         
-        # 4. Delete all enrollments
+        # 3. Delete all enrollments
         db.execute(text("DELETE FROM enrollments WHERE class_section_id = :section_id"), {"section_id": section_id})
         
-        # 5. Finally delete the section itself
+        # 4. Finally delete the section itself
         result = db.execute(text("DELETE FROM class_sections WHERE id = :section_id"), {"section_id": section_id})
         logger.info(f"[DELETE_SECTION] Deleted section {section_id}, rows affected: {result.rowcount}")
         

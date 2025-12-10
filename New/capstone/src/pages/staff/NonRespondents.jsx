@@ -3,7 +3,7 @@ import { secretaryAPI, deptHeadAPI } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 import ActiveFilters from '../../components/ActiveFilters'
 import Pagination from '../../components/Pagination'
-import { Download, Search, Users, AlertCircle } from 'lucide-react'
+import { Search, Users, AlertCircle } from 'lucide-react'
 import { useDebounce } from '../../hooks/useDebounce'
 
 export default function NonRespondents() {
@@ -90,36 +90,6 @@ export default function NonRespondents() {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   )
-
-  // Export to CSV
-  const exportToCSV = () => {
-    if (!filteredData.length) return
-
-    const headers = ['Student Number', 'Name', 'Program', 'Section', 'Year Level', 'Pending Count', 'Completed', 'Total Courses', 'Pending Courses']
-    const rows = filteredData.map(s => [
-      s.student_number,
-      s.full_name,
-      s.program,
-      s.section,
-      s.year_level,
-      s.pending_count,
-      s.completed_count,
-      s.total_courses,
-      s.pending_courses.map(c => `${c.course_code}: ${c.course_name}`).join('; ')
-    ])
-
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-    ].join('\n')
-
-    const blob = new Blob([csvContent], { type: 'text/csv' })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `non-respondents-${new Date().toISOString().split('T')[0]}.csv`
-    a.click()
-  }
 
   // Clear filters
   const clearFilter = (filterKey) => {
@@ -272,18 +242,6 @@ export default function NonRespondents() {
           totalResults={filteredData.length}
           itemLabel="students"
         />
-
-        {/* Export Button */}
-        <div className="flex justify-end mb-4">
-          <button
-            onClick={exportToCSV}
-            disabled={!filteredData.length}
-            className="lpu-btn-primary inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Download className="w-4 h-4" />
-            Export to CSV
-          </button>
-        </div>
 
         {/* Table */}
         <div className="lpu-card overflow-hidden">

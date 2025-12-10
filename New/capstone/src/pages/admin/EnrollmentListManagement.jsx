@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Upload, Search, Filter, Users, TrendingUp, AlertCircle, CheckCircle, X, Download, FileText, Eye } from 'lucide-react';
 import { adminAPI, apiClient } from '../../services/api';
-import AlertModal from '../../components/Modal';
+import { AlertModal } from '../../components/Modal';
 
 const EnrollmentListManagement = () => {
   const [enrollmentList, setEnrollmentList] = useState([]);

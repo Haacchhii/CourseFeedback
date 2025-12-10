@@ -170,6 +170,20 @@ class AnomalyDetector:
         is_anomaly, score, reason = self._rule_based_detection(ratings, features)
         
         return is_anomaly, score, reason
+
+    # Compatibility alias used by integration tests
+    def detect_anomaly(self, evaluation: Dict) -> Dict[str, float]:
+        """
+        Backward-compatible wrapper that returns a dict.
+        Accepts evaluation dict with ratings and optional sentiment fields.
+        """
+        ratings = evaluation.get("ratings") or {}
+        is_anomaly, score, reason = self.detect(ratings)
+        return {
+            "is_anomaly": bool(is_anomaly),
+            "anomaly_score": float(score),
+            "reason": reason
+        }
     
     def _rule_based_detection(self, ratings: Dict[str, int], features: np.ndarray) -> Tuple[bool, float, str]:
         """

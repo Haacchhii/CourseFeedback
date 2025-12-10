@@ -9,6 +9,7 @@ import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/use
 import CompletionTracker from '../../components/staff/CompletionTracker'
 import CourseCompletionTable from '../../components/staff/CourseCompletionTable'
 import ContactAdminModal from '../../components/staff/ContactAdminModal'
+import { transformPrograms } from '../../utils/programMapping'
 
 const SENTIMENT_COLORS = ['#10b981', '#f59e0b', '#ef4444'] // Green, Yellow, Red
 
@@ -256,7 +257,7 @@ export default function Dashboard() {
             </div>
             <div className="bg-white/20 backdrop-blur-sm rounded-xl px-6 lg:px-8 py-4 lg:py-5 text-left lg:text-right w-full lg:w-auto">
               <p className="text-[#ffd700] text-sm font-medium">Welcome back,</p>
-              <p className="text-white font-bold text-lg lg:text-xl mt-1">{currentUser.name}</p>
+              <p className="text-white font-bold text-lg lg:text-xl mt-1">{currentUser?.first_name || currentUser?.name || 'User'} {currentUser?.last_name || ''}</p>
               <div className="flex items-center justify-start lg:justify-end space-x-2 mt-2">
                 <div className="w-2 h-2 bg-[#ffd700] rounded-full animate-pulse"></div>
                 <span className="text-white text-xs font-medium">Online</span>

@@ -1,0 +1,107 @@
+Appendix I: User’s Manual
+Introduction
+The Rich-Genie E-commerce Website is an online platform created to assist Rich-Genie Marketing, a local distributor of snacks and candies in Batangas, with its product sales, inventory, and customer transaction management.
+This website is used instead of the traditional system of SMS or phone-based ordering system as an online platform where customers can browse their product, order and pay online. It also enables the administrators and employees to track orders and payments digitally as well as to track the stocks of products.
+Intended Users
+•	Administrators – Manage users, products, orders, and reports.
+•	Employees – Process deliveries, payments, and refunds.
+•	Customers – Browse products, add to cart, purchase, and track orders.
+System Requirements
+Hardware Requirements
+Component	Minimum Specification
+Processor	Intel i3 / AMD Ryzen 3 or higher
+Memory	4 GB RAM or higher
+Storage	2 GB of free disk space
+Display	1366×768 resolution or higher
+Internet	Stable connection (5 Mbps or higher)
+
+Software Requirements
+Software	Minimum Version
+Web Browser	Google Chrome, Firefox, Edge (latest)
+Operating System	Windows 10 / macOS 10.15 / Linux
+Development Tools (for deployment)	Node.js 18+, Python 3.10+, Firebase CLI
+Optional	GitHub Desktop for version control
+
+Installation Guide
+1.  Open your preferred web browser (e.g., Chrome).
+2.  Go to the website URL: https://richgenie-ecommerceplatform.web.app/
+3.  Wait for the homepage to load.
+4.  You can now browse products or log in to your account.
+
+Using the System
+1. Login and Registration
+To log in, enter your registered email and password, then click “Sign In.”
+If you do not have an account, click “Sign Up” and complete the registration form with your name, email, password, phone number, and city.
+If you forgot your password, click “Forgot Password” to reset it via email.
+ 
+2. Customer Features
+Home Page
+•	Displays basic
+•	Navigation bar includes Home, Products, About, Cart, and Profile.
+Products Page
+•	Browse all available products with filters by category or price.
+•	Click “Add to Cart” to include items for purchase.
+Checkout
+•	Review your cart, input your delivery address, and confirm the order.
+•	The system generates an order summary and sends it to your account.
+Track Orders
+•	Check your order status (Pending, Processing, Delivered).
+•	Cancel orders if necessary, before dispatch.
+ 
+3. Admin Features
+Admin Dashboard
+•	Overview of total sales, page visits, and top-selling products.
+•	View real-time insights and analytics powered by Chart.js.
+Product Management
+•	Add new products by providing name, price, stock quantity, and images.
+•	Edit or remove existing items as necessary.
+User Management
+•	Add, update, or remove employee and customer accounts.
+•	Assign user roles and reset passwords.
+Order Management
+•	Displays a real-time list of all customer orders.
+•	View and edit complete order details, including items, total cost, and delivery address.
+Delivery Report
+•	Provides a summarized list of all delivery activities.
+•	Tracks the number of successful, pending, and cancelled deliveries.
+Payment Tracking
+•	Displays all payment transactions and refund requests made through the website.
+•	Admins can verify, approve, or reject payment records.
+Apriori System
+•	The Apriori Algorithm runs in the background using customer transaction data.
+•	Admins can trigger a manual rerun of the algorithm via a dashboard options. 
+Activity Logs
+•	View recent system activities and monitor user interactions.
+•	Filter logs by user, activity, or severity.
+ 
+4. Employee Features
+Order Management
+•	View all customer orders with filters by Order ID, Date, or Distributor.
+•	Update delivery status (e.g., Processing → Out for Delivery → Delivered).
+Product Management
+•	View and edit product information
+•	Can add new product
+Payment Tracking
+•	Manage payment verification and refund requests.
+•	Update payment status directly on the dashboard.
+ 
+5. Apriori Recommendation Module
+The Apriori module runs automatically on new transactional data to:
+•	Identify frequently bought-together products.
+•	Suggest related products on the Product and Checkout pages.
+Example:
+If many customers buy Chocolate Chips with Gummy Bears,
+the system will display “Customers Also Bought: Gummy Bears” under Chocolate Chips.
+ 
+Troubleshooting / FAQs
+Problem	Possible Cause	Solution
+Unable to log in	Wrong password or unverified email	Use “Forgot Password” to reset credentials. Check your inbox for a verification link.
+Website is slow or not loading	Internet connection issue or heavy load	Refresh the page or check your internet connection. Try again after a few minutes.
+Product recommendations not showing	Apriori algorithm not yet updated	Wait for the daily data refresh or contact the admin to rerun the Python script.
+Payment status not updating	Delay in Firestore sync	Log out and back in. The system auto-refreshes after sync completion.
+Support / Contact Information
+For questions, assistance, or bug reporting:
+Rich-Genie Marketing – Technical Support
+Email: richgeniemarketing@yahoo.com
+Phone: (+63) 928 – 118 – 9065
+Address: Melo’s Compound, Alangilan, Batangas City

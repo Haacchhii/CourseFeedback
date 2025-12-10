@@ -3,6 +3,24 @@ import { studentAPI } from '../../services/api'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
+import { toDisplayCode } from '../../utils/programMapping'
+
+// Helper function to calculate time remaining
+function getTimeRemaining(endDateStr) {
+  if (!endDateStr) return null
+  
+  const endDate = new Date(endDateStr + 'T23:59:59')
+  const now = new Date()
+  const diff = endDate - now
+  
+  if (diff <= 0) return { expired: true, days: 0, hours: 0, minutes: 0 }
+  
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+  
+  return { expired: false, days, hours, minutes }
+}
 
 export default function StudentCourses(){
   const nav = useNavigate()
@@ -17,6 +35,8 @@ export default function StudentCourses(){
   const [selectedPeriod, setSelectedPeriod] = useState('')
   const [availablePeriods, setAvailablePeriods] = useState([])
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [evaluationStatus, setEvaluationStatus] = useState(null)
+  const [timeRemaining, setTimeRemaining] = useState(null)
 
   // Get student info
   useEffect(() => {
@@ -52,8 +72,27 @@ export default function StudentCourses(){
         courses = coursesData.data
       }
       setStudentCourses(courses)
+      
+      // Extract evaluation status info from API response
+      if (coursesData?.evaluation_status) {
+        setEvaluationStatus(coursesData.evaluation_status)
+      }
     }
   }, [coursesData])
+  
+  // Update time remaining countdown every minute
+  useEffect(() => {
+    if (!evaluationStatus?.period_end_date) return
+    
+    const updateCountdown = () => {
+      setTimeRemaining(getTimeRemaining(evaluationStatus.period_end_date))
+    }
+    
+    updateCountdown() // Initial calculation
+    const interval = setInterval(updateCountdown, 60000) // Update every minute
+    
+    return () => clearInterval(interval)
+  }, [evaluationStatus?.period_end_date])
   
   function logout(){ 
     authLogout()
@@ -124,6 +163,78 @@ export default function StudentCourses(){
             </p>
           </div>
         </div>
+
+        {/* Evaluation Period Countdown Warning */}
+        {evaluationStatus?.active_period_exists && timeRemaining && !timeRemaining.expired && (
+          <div className={`rounded-card shadow-card border p-4 lg:p-5 mb-6 lg:mb-8 ${
+            timeRemaining.days <= 1 
+              ? 'bg-red-50 border-red-300' 
+              : timeRemaining.days <= 3 
+                ? 'bg-amber-50 border-amber-300' 
+                : 'bg-blue-50 border-blue-300'
+          }`}>
+            <div className="flex items-center gap-4">
+              <div className={`p-3 rounded-full ${
+                timeRemaining.days <= 1 
+                  ? 'bg-red-100' 
+                  : timeRemaining.days <= 3 
+                    ? 'bg-amber-100' 
+                    : 'bg-blue-100'
+              }`}>
+                <svg className={`w-6 h-6 ${
+                  timeRemaining.days <= 1 
+                    ? 'text-red-600' 
+                    : timeRemaining.days <= 3 
+                      ? 'text-amber-600' 
+                      : 'text-blue-600'
+                }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className={`font-semibold ${
+                  timeRemaining.days <= 1 
+                    ? 'text-red-800' 
+                    : timeRemaining.days <= 3 
+                      ? 'text-amber-800' 
+                      : 'text-blue-800'
+                }`}>
+                  {timeRemaining.days <= 1 
+                    ? '⚠️ Evaluation Period Ending Soon!' 
+                    : timeRemaining.days <= 3 
+                      ? '⏰ Evaluation Period Deadline Approaching' 
+                      : '📋 Active Evaluation Period'}
+                </h3>
+                <p className={`text-sm ${
+                  timeRemaining.days <= 1 
+                    ? 'text-red-700' 
+                    : timeRemaining.days <= 3 
+                      ? 'text-amber-700' 
+                      : 'text-blue-700'
+                }`}>
+                  {evaluationStatus.active_period_name && (
+                    <span className="font-medium">{evaluationStatus.active_period_name}: </span>
+                  )}
+                  <span className="font-bold">
+                    {timeRemaining.days > 0 && `${timeRemaining.days} day${timeRemaining.days !== 1 ? 's' : ''}, `}
+                    {timeRemaining.hours} hour{timeRemaining.hours !== 1 ? 's' : ''}, {timeRemaining.minutes} minute{timeRemaining.minutes !== 1 ? 's' : ''} remaining
+                  </span>
+                </p>
+                {evaluationStatus.evaluable_courses > 0 && (
+                  <p className={`text-xs mt-1 ${
+                    timeRemaining.days <= 1 
+                      ? 'text-red-600' 
+                      : timeRemaining.days <= 3 
+                        ? 'text-amber-600' 
+                        : 'text-blue-600'
+                  }`}>
+                    You have {evaluationStatus.evaluable_courses} course{evaluationStatus.evaluable_courses !== 1 ? 's' : ''} pending evaluation
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Filters Section */}
         <div className="bg-white rounded-card shadow-card border border-gray-200 p-6 lg:p-8 mb-6 lg:mb-8">
