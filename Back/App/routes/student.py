@@ -290,6 +290,7 @@ async def get_student_evaluation_history(
             evaluations.append(evaluation_data)
         
         # Get available periods for filtering (show all periods where student was enrolled)
+        # Only count SUBMITTED evaluations (submission_date IS NOT NULL)
         periods_result = db.execute(text("""
             SELECT DISTINCT
                 ep.id,
@@ -299,7 +300,7 @@ async def get_student_evaluation_history(
                 ep.start_date,
                 ep.end_date,
                 ep.status,
-                COUNT(e.id) as evaluation_count
+                COUNT(CASE WHEN e.submission_date IS NOT NULL THEN e.id END) as evaluation_count
             FROM evaluation_periods ep
             LEFT JOIN evaluations e ON ep.id = e.evaluation_period_id 
                 AND e.student_id = :student_id
@@ -1007,13 +1008,15 @@ async def get_course_details(course_id: int,
     db: Session = Depends(get_db)):
     """Get detailed information about a specific course"""
     try:
+        # Only count SUBMITTED evaluations (where submission_date IS NOT NULL)
         result = db.execute(text("""
             SELECT 
                 c.id, c.subject_code, c.subject_name,
                 c.semester, c.year_level, c.units,
                 p.program_name,
-                COUNT(DISTINCT e.id) as evaluation_count,
+                COUNT(DISTINCT CASE WHEN e.submission_date IS NOT NULL THEN e.id END) as evaluation_count,
                 AVG(
+                    CASE WHEN e.submission_date IS NOT NULL THEN
                     (e.ratings::jsonb->>'1')::numeric + 
                     (e.ratings::jsonb->>'2')::numeric + 
                     (e.ratings::jsonb->>'3')::numeric +
@@ -1035,6 +1038,7 @@ async def get_course_details(course_id: int,
                     (e.ratings::jsonb->>'19')::numeric +
                     (e.ratings::jsonb->>'20')::numeric +
                     (e.ratings::jsonb->>'21')::numeric
+                    END
                 ) / 21.0 as average_rating
             FROM courses c
             LEFT JOIN programs p ON c.program_id = p.id

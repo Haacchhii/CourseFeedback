@@ -1259,18 +1259,27 @@ async def delete_evaluation_period(
         if not period:
             raise HTTPException(status_code=404, detail="Evaluation period not found")
         
-        # Check if there are any evaluations for this period (direct check on evaluations table)
-        evaluation_count = db.execute(text("""
+        # Check if there are any SUBMITTED evaluations for this period
+        # Only count evaluations that have been submitted (submission_date IS NOT NULL)
+        submitted_evaluation_count = db.execute(text("""
             SELECT COUNT(*)
             FROM evaluations
             WHERE evaluation_period_id = :period_id
+            AND submission_date IS NOT NULL
         """), {"period_id": period_id}).scalar() or 0
         
-        if evaluation_count > 0:
+        if submitted_evaluation_count > 0:
             raise HTTPException(
                 status_code=400, 
-                detail=f"Cannot delete period with {evaluation_count} existing evaluations. Close the period instead."
+                detail=f"Cannot delete period with {submitted_evaluation_count} submitted evaluations. Close the period instead."
             )
+        
+        # Delete any pending (unsubmitted) evaluations for this period
+        db.execute(text("""
+            DELETE FROM evaluations
+            WHERE evaluation_period_id = :period_id
+            AND submission_date IS NULL
+        """), {"period_id": period_id})
         
         # Check if there are any enrollments for this period
         enrollment_count = db.query(func.count(Enrollment.id)).filter(
@@ -4051,20 +4060,22 @@ async def get_dashboard_stats(
         total_courses = db.query(func.count(Course.id)).scalar() or 0
         total_programs = db.query(func.count(func.distinct(Program.id))).scalar() or 0
         
-        # Evaluation stats
-        total_evaluations = db.query(func.count(Evaluation.id)).scalar() or 0
+        # Evaluation stats - only count SUBMITTED evaluations (submission_date IS NOT NULL)
+        total_evaluations = db.query(func.count(Evaluation.id)).filter(
+            Evaluation.submission_date.isnot(None)
+        ).scalar() or 0
         
-        # Calculate participation rate
+        # Calculate participation rate based on submitted evaluations
         total_possible_evaluations = db.query(func.count(Enrollment.id)).scalar() or 0
         participation_rate = round((total_evaluations / total_possible_evaluations * 100), 1) if total_possible_evaluations > 0 else 0
         
-        # Program stats
+        # Program stats - only count submitted evaluations
         program_stats_query = text("""
             SELECT 
                 p.program_code as program,
                 COUNT(DISTINCT c.id) as courses,
                 COUNT(DISTINCT s.id) as students,
-                COUNT(DISTINCT e.id) as evaluations
+                COUNT(DISTINCT CASE WHEN e.submission_date IS NOT NULL THEN e.id END) as evaluations
             FROM programs p
             LEFT JOIN courses c ON p.id = c.program_id
             LEFT JOIN students s ON p.id = s.program_id
@@ -4083,13 +4094,20 @@ async def get_dashboard_stats(
                 "evaluations": row[3] or 0
             }
         
-        # Sentiment stats (if sentiment analysis is available)
+        # Sentiment stats (if sentiment analysis is available) - only count submitted evaluations
         sentiment_stats = {
-            "positive": db.query(func.count(Evaluation.id)).filter(Evaluation.sentiment_score > 0.3).scalar() or 0,
-            "neutral": db.query(func.count(Evaluation.id)).filter(
-                and_(Evaluation.sentiment_score >= -0.3, Evaluation.sentiment_score <= 0.3)
+            "positive": db.query(func.count(Evaluation.id)).filter(
+                Evaluation.sentiment_score > 0.3,
+                Evaluation.submission_date.isnot(None)
             ).scalar() or 0,
-            "negative": db.query(func.count(Evaluation.id)).filter(Evaluation.sentiment_score < -0.3).scalar() or 0
+            "neutral": db.query(func.count(Evaluation.id)).filter(
+                and_(Evaluation.sentiment_score >= -0.3, Evaluation.sentiment_score <= 0.3),
+                Evaluation.submission_date.isnot(None)
+            ).scalar() or 0,
+            "negative": db.query(func.count(Evaluation.id)).filter(
+                Evaluation.sentiment_score < -0.3,
+                Evaluation.submission_date.isnot(None)
+            ).scalar() or 0
         }
         
         return {
