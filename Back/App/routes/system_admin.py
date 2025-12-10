@@ -2616,14 +2616,28 @@ async def create_section(
         if auto_enroll:
             logger.info(f"[AUTO_ENROLL] Starting auto-enrollment for section {new_section.id}")
             try:
+                # Get the active evaluation period for auto-enrollment
+                active_period = db.execute(
+                    text("""
+                        SELECT id FROM evaluation_periods 
+                        WHERE status = 'active' 
+                        AND CURRENT_DATE BETWEEN start_date AND end_date 
+                        LIMIT 1
+                    """)
+                ).fetchone()
+                active_period_id = active_period[0] if active_period else None
+                logger.info(f"[AUTO_ENROLL] Active evaluation period ID: {active_period_id}")
+                
                 # If program_section_id is provided, enroll students from that specific section
                 if section_data.program_section_id:
                     logger.info(f"[AUTO_ENROLL] Using program_section_id: {section_data.program_section_id}")
                     # Query students linked to this program section via section_students
+                    # section_students.student_id references users.id
+                    # We need students.id for the enrollments table
                     from sqlalchemy import text
                     result = db.execute(
                         text("""
-                            SELECT DISTINCT u.id, s.id as student_id
+                            SELECT s.id as student_id
                             FROM section_students ss
                             JOIN users u ON ss.student_id = u.id
                             JOIN students s ON s.user_id = u.id
@@ -2636,9 +2650,12 @@ async def create_section(
                     student_rows = result.fetchall()
                     
                     logger.info(f"[AUTO_ENROLL] Found {len(student_rows)} students in program section {section_data.program_section_id}")
+                    if student_rows:
+                        logger.info(f"[AUTO_ENROLL] Student IDs: {[row[0] for row in student_rows]}")
                     
                     for row in student_rows:
-                        student_id = row.student_id
+                        student_id = row[0]  # Use index access for reliability
+                        logger.info(f"[AUTO_ENROLL] Enrolling student_id={student_id} into section {new_section.id}")
                         # Check if not already enrolled
                         existing_enrollment = db.query(Enrollment).filter(
                             Enrollment.class_section_id == new_section.id,
@@ -2650,10 +2667,14 @@ async def create_section(
                                 student_id=student_id,
                                 class_section_id=new_section.id,
                                 enrolled_at=now_local(),
-                                status='active'
+                                status='active',
+                                evaluation_period_id=active_period_id  # Link to active evaluation period
                             )
                             db.add(new_enrollment)
                             enrolled_count += 1
+                            logger.info(f"[AUTO_ENROLL] ✅ Enrolled student {student_id} with period {active_period_id}")
+                        else:
+                            logger.info(f"[AUTO_ENROLL] ⏭️ Student {student_id} already enrolled")
                 else:
                     # Fallback: Find all students matching the course's program and year level
                     # Join with users table to check is_active status properly
@@ -2674,7 +2695,7 @@ async def create_section(
                     logger.info(f"[AUTO_ENROLL] Found {len(matching_students)} students matching program/year (fallback mode)")
                     
                     for row in matching_students:
-                        student_id = row.student_id
+                        student_id = row[0]  # Use index access for reliability
                         # Check if not already enrolled
                         existing_enrollment = db.query(Enrollment).filter(
                             Enrollment.class_section_id == new_section.id,
@@ -2686,10 +2707,12 @@ async def create_section(
                                 student_id=student_id,
                                 class_section_id=new_section.id,
                                 enrolled_at=now_local(),
-                                status='active'
+                                status='active',
+                                evaluation_period_id=active_period_id  # Link to active evaluation period
                             )
                             db.add(new_enrollment)
                             enrolled_count += 1
+                            logger.info(f"[AUTO_ENROLL] ✅ Enrolled student {student_id} with period {active_period_id} (fallback mode)")
                 
                 db.commit()
                 logger.info(f"[AUTO_ENROLL] Successfully enrolled {enrolled_count} students into section {new_section.id}")
@@ -2998,6 +3021,17 @@ async def enroll_students(
         if not section:
             raise HTTPException(status_code=404, detail="Section not found")
         
+        # Get active evaluation period
+        active_period = db.execute(
+            text("""
+                SELECT id FROM evaluation_periods 
+                WHERE status = 'active' 
+                AND CURRENT_DATE BETWEEN start_date AND end_date 
+                LIMIT 1
+            """)
+        ).fetchone()
+        active_period_id = active_period[0] if active_period else None
+        
         enrolled_count = 0
         skipped_count = 0
         
@@ -3012,12 +3046,13 @@ async def enroll_students(
                 skipped_count += 1
                 continue
             
-            # Create enrollment
+            # Create enrollment with evaluation period
             enrollment = Enrollment(
                 student_id=student_id,
                 class_section_id=section_id,
                 enrolled_at=now_local(),
-                status='active'
+                status='active',
+                evaluation_period_id=active_period_id
             )
             db.add(enrollment)
             enrolled_count += 1
@@ -3128,12 +3163,24 @@ async def bulk_enroll_student(
                 f"enrolling in section {section.id} (program {section.program_id})"
             )
         
-        # Create enrollment
+        # Get active evaluation period
+        active_period = db.execute(
+            text("""
+                SELECT id FROM evaluation_periods 
+                WHERE status = 'active' 
+                AND CURRENT_DATE BETWEEN start_date AND end_date 
+                LIMIT 1
+            """)
+        ).fetchone()
+        active_period_id = active_period[0] if active_period else None
+        
+        # Create enrollment with evaluation period
         new_enrollment = Enrollment(
             student_id=student.id,
             class_section_id=section.id,
             enrollment_date=now_local(),
-            status='enrolled'
+            status='enrolled',
+            evaluation_period_id=active_period_id
         )
         db.add(new_enrollment)
         db.commit()
