@@ -2960,6 +2960,8 @@ async def enroll_students(
 ):
     """Enroll multiple students in a section"""
     try:
+        current_user_id = current_user['id']
+        
         # Verify section exists
         section = db.query(ClassSection).filter(ClassSection.id == section_id).first()
         if not section:
@@ -5115,6 +5117,8 @@ async def enroll_program_section_to_class(
 ):
     """Bulk enroll all students from a program section into a class section"""
     try:
+        current_user_id = current_user['id']
+        
         # Check if class section exists
         check_class_section = text("SELECT id FROM class_sections WHERE id = :class_section_id")
         class_section = db.execute(check_class_section, {"class_section_id": class_section_id}).fetchone()
