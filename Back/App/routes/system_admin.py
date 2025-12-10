@@ -4608,6 +4608,7 @@ async def create_program_section(
 ):
     """Create a new program section"""
     try:
+        current_user_id = current_user['id']
         # Check if section already exists
         check_query = text("""
             SELECT id FROM program_sections
@@ -4690,6 +4691,8 @@ async def update_program_section(
 ):
     """Update a program section"""
     try:
+        current_user_id = current_user['id']
+        
         # Check if section exists
         check_query = text("SELECT id FROM program_sections WHERE id = :section_id")
         existing = db.execute(check_query, {"section_id": section_id}).fetchone()
@@ -4773,6 +4776,8 @@ async def delete_program_section(
 ):
     """Delete a program section"""
     try:
+        current_user_id = current_user['id']
+        
         # Check if section exists
         check_query = text("SELECT section_name FROM program_sections WHERE id = :section_id")
         existing = db.execute(check_query, {"section_id": section_id}).fetchone()
@@ -4962,6 +4967,8 @@ async def assign_students_to_section(
 ):
     """Assign multiple students to a program section"""
     try:
+        current_user_id = current_user['id']
+        
         # Check if section exists
         check_query = text("SELECT id FROM program_sections WHERE id = :section_id")
         existing = db.execute(check_query, {"section_id": section_id}).fetchone()
@@ -5045,6 +5052,8 @@ async def remove_student_from_section(
 ):
     """Remove a student from a program section"""
     try:
+        current_user_id = current_user['id']
+        
         # Check if assignment exists
         check_query = text("""
             SELECT id FROM section_students 
