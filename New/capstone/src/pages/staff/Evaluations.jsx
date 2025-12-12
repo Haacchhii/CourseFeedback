@@ -70,7 +70,7 @@ export default function Evaluations() {
         }
         if (periodsResponse?.data) {
           setEvaluationPeriods(periodsResponse.data)
-          const active = periodsResponse.data.find(p => p.status === 'Open' || p.status === 'active')
+          const active = periodsResponse.data.find(p => p.status === 'Open' || p.status === 'active' || p.status === 'Active')
           if (active) {
             setActivePeriod(active)
           }

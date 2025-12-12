@@ -618,9 +618,7 @@ async def bulk_import_users(
                         year_level=user_data.year_level or 1
                     )
                     db.add(student)
-                elif user_data.role == "instructor":
-                    instructor = Instructor(user_id=new_user.id)
-                    db.add(instructor)
+                # instructor role removed from system
                 elif user_data.role == "secretary":
                     secretary = Secretary(user_id=new_user.id)
                     db.add(secretary)
@@ -745,15 +743,22 @@ async def delete_user(
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         
-        # Check if user has any related data
-        has_evaluations = db.query(Evaluation).filter(Evaluation.student_id == user_id).first() is not None
-        has_enrollments = db.query(Enrollment).filter(Enrollment.student_id == user_id).first() is not None
-        has_audit_logs = db.query(AuditLog).filter(AuditLog.user_id == user_id).first() is not None
-        
-        # Check if user is a student with a student record
+        # Check if user is a student with a student record (need student.id for evaluations/enrollments)
         student_record = None
+        student_id_for_queries = None
         if user.role == 'student':
             student_record = db.query(Student).filter(Student.user_id == user_id).first()
+            if student_record:
+                student_id_for_queries = student_record.id
+        
+        # Check if user has any related data
+        # Note: Evaluations and Enrollments use student.id, not user.id
+        has_evaluations = False
+        has_enrollments = False
+        if student_id_for_queries:
+            has_evaluations = db.query(Evaluation).filter(Evaluation.student_id == student_id_for_queries).first() is not None
+            has_enrollments = db.query(Enrollment).filter(Enrollment.student_id == student_id_for_queries).first() is not None
+        has_audit_logs = db.query(AuditLog).filter(AuditLog.user_id == user_id).first() is not None
         
         # Check if user is department head with a record
         dept_head_record = None
@@ -771,10 +776,11 @@ async def delete_user(
         # Force delete overrides normal logic
         if force:
             # Force delete - remove ALL related data first
-            if has_evaluations:
-                db.query(Evaluation).filter(Evaluation.student_id == user_id).delete()
-            if has_enrollments:
-                db.query(Enrollment).filter(Enrollment.student_id == user_id).delete()
+            # Use the correct student_id from student record, not user_id
+            if has_evaluations and student_id_for_queries:
+                db.query(Evaluation).filter(Evaluation.student_id == student_id_for_queries).delete()
+            if has_enrollments and student_id_for_queries:
+                db.query(Enrollment).filter(Enrollment.student_id == student_id_for_queries).delete()
             # Note: Keep audit logs for compliance, just mark user as deleted
             
             # Delete role-specific records
@@ -1339,8 +1345,9 @@ async def get_active_period(
 ):
     """Get the currently active evaluation period"""
     try:
+        # Check for both 'active' and 'Open' statuses for consistency
         period = db.query(EvaluationPeriod).filter(
-            EvaluationPeriod.status == "active"
+            or_(EvaluationPeriod.status == "active", EvaluationPeriod.status == "Open")
         ).first()
         
         if not period:
@@ -1350,10 +1357,20 @@ async def get_active_period(
                 "message": "No active evaluation period"
             }
         
-        # Calculate stats
-        completed = db.query(func.count(Evaluation.id)).scalar() or 0
+        # Calculate stats - filter by this period's ID, not all evaluations
+        completed = db.query(func.count(Evaluation.id)).filter(
+            Evaluation.evaluation_period_id == period.id
+        ).scalar() or 0
         period.completed_evaluations = completed
         db.commit()
+        
+        # Calculate days remaining properly
+        today = date.today()
+        if isinstance(period.end_date, datetime):
+            end_date = period.end_date.date()
+        else:
+            end_date = period.end_date
+        days_remaining = max(0, (end_date - today).days)
         
         return {
             "success": True,
@@ -1364,10 +1381,11 @@ async def get_active_period(
                 "academic_year": period.academic_year,
                 "start_date": period.start_date.isoformat(),
                 "end_date": period.end_date.isoformat(),
+                "status": "Open",  # Normalize to 'Open' for frontend
                 "total_students": period.total_students,
                 "completed_evaluations": period.completed_evaluations,
                 "participation_rate": (completed / period.total_students * 100) if period.total_students > 0 else 0,
-                "days_remaining": (period.end_date - datetime.now()).days
+                "days_remaining": days_remaining
             }
         }
         
@@ -2056,6 +2074,7 @@ async def get_all_courses(
     page_size: int = Query(10, ge=1, le=10000),  # Increased limit to 10000 to accommodate large course lists
     search: Optional[str] = None,
     program_id: Optional[int] = None,
+    program_code: Optional[str] = None,  # Added program_code filter
     year_level: Optional[int] = None,
     semester: Optional[int] = None,
     status: Optional[str] = None,  # Add status filter (Active, Archived)
@@ -2133,6 +2152,10 @@ async def get_all_courses(
         if program_id:
             query_str += " AND c.program_id = :program_id"
             params['program_id'] = program_id
+        
+        if program_code:
+            query_str += " AND p.program_code = :program_code"
+            params['program_code'] = program_code
         
         if year_level:
             query_str += " AND c.year_level = :year_level"
@@ -2244,6 +2267,8 @@ async def create_course(
 ):
     """Create a new course"""
     try:
+        current_user_id = current_user['id']
+        
         # Get program ID from program code
         program = db.query(Program).filter(Program.program_code == course_data.program).first()
         if not program:
@@ -2319,6 +2344,8 @@ async def update_course(
 ):
     """Update an existing course"""
     try:
+        current_user_id = current_user['id']
+        
         course = db.query(Course).filter(Course.id == course_id).first()
         if not course:
             raise HTTPException(status_code=404, detail="Course not found")
@@ -2490,12 +2517,15 @@ async def get_sections(
             params['semester'] = semester
         
         # Program section filter - use subquery to check if section has students from that program section
+        # section_students.student_id references users.id, but enrollments.student_id references students.id
+        # So we need to join: enrollments -> students -> section_students (via user_id)
         if program_section_id:
             where_conditions.append("""
                 cs.id IN (
                     SELECT DISTINCT e2.class_section_id 
                     FROM enrollments e2
-                    JOIN section_students ss ON e2.student_id = ss.student_id
+                    JOIN students st ON e2.student_id = st.id
+                    JOIN section_students ss ON st.user_id = ss.student_id
                     WHERE ss.section_id = :program_section_id
                 )
             """)
@@ -2617,11 +2647,12 @@ async def create_section(
             logger.info(f"[AUTO_ENROLL] Starting auto-enrollment for section {new_section.id}")
             try:
                 # Get the active evaluation period for auto-enrollment
+                # Status can be 'Open' or 'active' depending on the system
                 active_period = db.execute(
                     text("""
                         SELECT id FROM evaluation_periods 
-                        WHERE status = 'active' 
-                        AND CURRENT_DATE BETWEEN start_date AND end_date 
+                        WHERE LOWER(status) IN ('open', 'active')
+                        ORDER BY created_at DESC 
                         LIMIT 1
                     """)
                 ).fetchone()
@@ -2751,6 +2782,8 @@ async def update_section(
 ):
     """Update an existing class section"""
     try:
+        current_user_id = current_user['id']
+        
         section = db.query(ClassSection).filter(ClassSection.id == section_id).first()
         if not section:
             raise HTTPException(status_code=404, detail="Section not found")
@@ -3094,6 +3127,8 @@ async def bulk_enroll_student(
     Supports flexible identifiers for both students and sections
     """
     try:
+        current_user_id = current_user['id']
+        
         # Find student by identifier
         student = None
         identifier_type = enrollment.identifier_type.lower()
@@ -3218,6 +3253,8 @@ async def remove_student_from_section(
 ):
     """Remove a student from a section"""
     try:
+        current_user_id = current_user['id']
+        
         # Find enrollment
         enrollment = db.query(Enrollment).filter(
             Enrollment.class_section_id == section_id,
@@ -3280,6 +3317,10 @@ async def get_audit_logs(
     page_size: int = Query(15, ge=1, le=100),
     action: Optional[str] = None,
     severity: Optional[str] = None,
+    category: Optional[str] = None,
+    status: Optional[str] = None,
+    search: Optional[str] = None,
+    user: Optional[str] = None,
     current_user: dict = Depends(require_staff),
     user_id: Optional[int] = None,
     start_date: Optional[datetime] = None,
@@ -3300,9 +3341,30 @@ async def get_audit_logs(
             conditions.append("al.severity = :severity")
             params["severity"] = severity
         
+        if category:
+            conditions.append("al.category = :category")
+            params["category"] = category
+        
+        if status:
+            conditions.append("al.status = :status")
+            params["status"] = status
+        
         if user_id:
             conditions.append("al.user_id = :user_id")
             params["user_id"] = user_id
+        
+        # Handle user filter (can be user_id as string or email/name search)
+        if user:
+            if user.isdigit():
+                conditions.append("al.user_id = :user_filter_id")
+                params["user_filter_id"] = int(user)
+            else:
+                conditions.append("(u.email ILIKE :user_search OR u.first_name ILIKE :user_search OR u.last_name ILIKE :user_search)")
+                params["user_search"] = f"%{user}%"
+        
+        if search:
+            conditions.append("(al.action ILIKE :search OR al.category ILIKE :search OR CAST(al.details AS TEXT) ILIKE :search)")
+            params["search"] = f"%{search}%"
         
         if start_date:
             conditions.append("al.created_at >= :start_date")
@@ -3314,9 +3376,10 @@ async def get_audit_logs(
         
         where_clause = " AND ".join(conditions)
         
-        # Get total count
+        # Get total count (include LEFT JOIN for user search)
         count_query = text(f"""
             SELECT COUNT(*) FROM audit_logs al
+            LEFT JOIN users u ON al.user_id = u.id
             WHERE {where_clause}
         """)
         total = db.execute(count_query, params).scalar()
@@ -3718,7 +3781,7 @@ async def export_evaluations(
                 e.rating_content,
                 e.rating_engagement,
                 e.rating_overall,
-                e.sentiment_label,
+                e.sentiment,
                 e.sentiment_score,
                 e.anomaly_score,
                 e.is_anomaly
@@ -3761,7 +3824,7 @@ async def export_evaluations(
                 "rating_engagement": row[15],
                 "rating_overall": row[16],
                 # ML analysis
-                "sentiment_label": row[17],
+                "sentiment": row[17],
                 "sentiment_score": float(row[18]) if row[18] else None,
                 "anomaly_score": float(row[19]) if row[19] else None,
                 "is_anomaly": row[20]
@@ -4199,13 +4262,15 @@ async def send_email_notification(
 ):
     """Send email notifications to students"""
     try:
+        current_user_id = current_user['id']
         from services.email_service import email_service
         
         # Log action
-        log_audit(
+        await create_audit_log(
             db=db,
             user_id=current_user_id,
             action=f"send_email_notification_{request.notification_type}",
+            resource="Email Notification",
             details={"notification_type": request.notification_type, "period_id": request.period_id}
         )
         
@@ -5345,8 +5410,22 @@ async def get_non_respondents(
             
             evaluation_period_id = active_period.id
         
+        # Build WHERE conditions dynamically to avoid NULL parameter issues
+        where_conditions = ["u.is_active = true"]
+        params = {"period_id": evaluation_period_id}
+        
+        if program_id is not None:
+            where_conditions.append("COALESCE(ps.program_id, s.program_id) = :program_id")
+            params["program_id"] = program_id
+        
+        if year_level is not None:
+            where_conditions.append("s.year_level = :year_level")
+            params["year_level"] = year_level
+        
+        where_clause = " AND ".join(where_conditions)
+        
         # Build query for non-respondents
-        query = text("""
+        query = text(f"""
             WITH enrolled_students AS (
                 SELECT DISTINCT
                     s.id as student_id,
@@ -5360,12 +5439,11 @@ async def get_non_respondents(
                     COUNT(DISTINCT e.class_section_id) as total_courses
                 FROM students s
                 JOIN users u ON s.user_id = u.id
-                LEFT JOIN program_sections ps ON s.section_id = ps.id
-                LEFT JOIN programs p ON ps.program_id = p.id
+                LEFT JOIN section_students ss ON s.id = ss.student_id
+                LEFT JOIN program_sections ps ON ss.section_id = ps.id
+                LEFT JOIN programs p ON COALESCE(ps.program_id, s.program_id) = p.id
                 JOIN enrollments e ON s.id = e.student_id
-                WHERE u.is_active = true
-                    AND (:program_id IS NULL OR ps.program_id = :program_id)
-                    AND (:year_level IS NULL OR s.year_level = :year_level)
+                WHERE {where_clause}
                 GROUP BY s.id, s.student_number, u.first_name, u.last_name, 
                          s.year_level, p.program_code, ps.section_name, ps.id
             ),
@@ -5394,11 +5472,7 @@ async def get_non_respondents(
             ORDER BY pending_count DESC, es.student_number ASC
         """)
         
-        result = db.execute(query, {
-            "period_id": evaluation_period_id,
-            "program_id": program_id,
-            "year_level": year_level
-        }).fetchall()
+        result = db.execute(query, params).fetchall()
         
         # Get pending courses for each non-respondent
         non_respondents = []
@@ -5449,22 +5523,31 @@ async def get_non_respondents(
                 "total_courses": row.total_courses
             })
         
-        # Calculate statistics
-        total_query = text("""
+        # Calculate statistics - build dynamic query to avoid NULL parameter issues
+        stats_conditions = ["u.is_active = true"]
+        stats_params = {}
+        
+        if program_id is not None:
+            stats_conditions.append("COALESCE(ps.program_id, s.program_id) = :program_id")
+            stats_params["program_id"] = program_id
+        
+        if year_level is not None:
+            stats_conditions.append("s.year_level = :year_level")
+            stats_params["year_level"] = year_level
+        
+        stats_where = " AND ".join(stats_conditions)
+        
+        total_query = text(f"""
             SELECT COUNT(DISTINCT s.id) as total
             FROM students s
             JOIN users u ON s.user_id = u.id
-            LEFT JOIN program_sections ps ON s.section_id = ps.id
+            LEFT JOIN section_students ss ON s.id = ss.student_id
+            LEFT JOIN program_sections ps ON ss.section_id = ps.id
             JOIN enrollments e ON s.id = e.student_id
-            WHERE u.is_active = true
-                AND (:program_id IS NULL OR ps.program_id = :program_id)
-                AND (:year_level IS NULL OR s.year_level = :year_level)
+            WHERE {stats_where}
         """)
         
-        total_students = db.execute(total_query, {
-            "program_id": program_id,
-            "year_level": year_level
-        }).scalar() or 0
+        total_students = db.execute(total_query, stats_params).scalar() or 0
         
         non_responded = len(non_respondents)
         responded = total_students - non_responded

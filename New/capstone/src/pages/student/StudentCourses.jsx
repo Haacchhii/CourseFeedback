@@ -318,15 +318,7 @@ export default function StudentCourses(){
                               </svg>
                               Evaluated
                             </span>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                nav(`/student/evaluate/${c.class_section_id || c.id}`)
-                              }}
-                              className="text-sm text-blue-600 hover:text-blue-800 font-medium hover:underline"
-                            >
-                              Edit
-                            </button>
+                            {/* Edit button removed - evaluations cannot be edited once submitted */}
                           </div>
                         ) : (
                           <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-orange-100 text-orange-800">

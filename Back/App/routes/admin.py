@@ -452,73 +452,8 @@ async def get_all_evaluations(
             "message": "Error loading evaluations"
         }
 
-@router.get("/courses")
-async def get_all_courses(
-    department_id: Optional[int] = Query(None),
-    semester: Optional[str] = Query(None),
-    academic_year: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
-):
-    """Get all courses with optional filters"""
-    try:
-        base_query = """
-            SELECT 
-                c.id, c.name, c.code, c.description, c.credits,
-                c.semester, c.academic_year,
-                d.name as department_name,
-                COUNT(e.id) as evaluation_count
-            FROM courses c
-            LEFT JOIN departments d ON c.department_id = d.id
-            LEFT JOIN evaluations e ON c.id = e.course_id
-            WHERE 1=1
-        """
-        
-        conditions = []
-        params = {}
-        
-        if department_id:
-            conditions.append("AND c.department_id = :department_id")
-            params["department_id"] = department_id
-            
-        if semester:
-            conditions.append("AND c.semester = :semester")
-            params["semester"] = semester
-            
-        if academic_year:
-            conditions.append("AND c.academic_year = :academic_year")
-            params["academic_year"] = academic_year
-        
-        final_query = base_query + " " + " ".join(conditions) + """
-            GROUP BY c.id, c.name, c.code, c.description, c.credits, 
-                     c.semester, c.academic_year, d.name
-            ORDER BY c.name
-        """
-        
-        result = db.execute(text(final_query), params)
-        
-        courses = [
-            {
-                "id": row[0],
-                "name": row[1],
-                "code": row[2],
-                "description": row[3] or "",
-                "credits": row[4],
-                "semester": row[5],
-                "academic_year": row[6],
-                "department_name": row[7] or "Unknown",
-                "evaluation_count": row[8]
-            }
-            for row in result
-        ]
-        
-        return {
-            "success": True,
-            "data": courses
-        }
-        
-    except Exception as e:
-        logger.error(f"Error getting courses: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch courses")
+# NOTE: /courses endpoint removed - use the one in system_admin.py instead
+# which has proper filtering by program_id, year_level, semester
 
 
 # ===========================

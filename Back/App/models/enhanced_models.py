@@ -296,15 +296,14 @@ class AnalysisResult(Base):
     # Statistical measures
     avg_overall_rating = Column(Float, nullable=True)
     avg_sentiment_score = Column(Float, nullable=True)
-    confidence_interval = Column(Float, nullable=True)
+    # Note: confidence_interval, model_version, processing_time_ms removed - not in database
     
     # Detailed results in JSON format
     detailed_results = Column(JSONB, nullable=True)
     
     # Metadata
     analysis_date = Column(DateTime, default=now_local)
-    model_version = Column(String(20), nullable=True)
-    processing_time_ms = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=now_local)  # Match actual database column
     
     # Relationships
     class_section = relationship("ClassSection", back_populates="analysis_results")

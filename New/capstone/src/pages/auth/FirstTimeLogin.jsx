@@ -113,7 +113,7 @@ export default function FirstTimeLogin() {
       
       // Store updated user data
       const updatedUser = { ...userData, first_login: false }
-      localStorage.setItem('user', JSON.stringify(updatedUser))
+      localStorage.setItem('currentUser', JSON.stringify(updatedUser))
       
       // Show success message
       alert('✅ Password changed successfully! Redirecting to your dashboard...')
@@ -122,8 +122,8 @@ export default function FirstTimeLogin() {
       const roleRoutes = {
         admin: '/admin/dashboard',
         system_admin: '/admin/dashboard',
-        department_head: '/depthead/dashboard',
-        secretary: '/secretary/dashboard',
+        department_head: '/dashboard',
+        secretary: '/dashboard',
         // instructor role removed from system
         student: '/student/courses'
       }

@@ -399,6 +399,84 @@ export default function EvaluationPeriodManagement() {
     )
   }
 
+  const handleEnrollAllSections = async () => {
+    if (!currentPeriod?.id || availableProgramSections.length === 0) return
+    
+    // Filter out sections that are already enrolled
+    const enrolledIds = new Set(enrolledProgramSections.map(s => s.program_section_id || s.programSectionId))
+    const sectionsToEnroll = availableProgramSections.filter(s => !enrolledIds.has(s.id))
+    
+    if (sectionsToEnroll.length === 0) {
+      showAlert('All program sections are already enrolled in this evaluation period.', 'Already Enrolled', 'info')
+      return
+    }
+    
+    const confirmMsg = `Enroll ALL ${sectionsToEnroll.length} program sections for evaluation?\n\nThis will enable evaluation for:\n${sectionsToEnroll.slice(0, 5).map(s => `• ${s.sectionName || s.section_name} (${s.programCode || s.program_code})`).join('\n')}${sectionsToEnroll.length > 5 ? `\n... and ${sectionsToEnroll.length - 5} more sections` : ''}\n\nAll students in these sections will be able to evaluate their enrolled courses.`
+    
+    showConfirm(
+      confirmMsg,
+      async () => {
+        try {
+          setSubmitting(true)
+          
+          let totalStudents = 0
+          let totalEvaluations = 0
+          let successCount = 0
+          let failCount = 0
+          const errors = []
+          
+          // Enroll sections one by one
+          for (const section of sectionsToEnroll) {
+            try {
+              const response = await adminAPI.enrollProgramSectionInPeriod(currentPeriod.id, section.id)
+              const data = response.data || response
+              
+              if (data.success !== false) {
+                successCount++
+                const enrollData = data.data || data
+                totalStudents += enrollData.students_enrolled || 0
+                totalEvaluations += enrollData.evaluations_created || 0
+              } else {
+                failCount++
+                errors.push(`${section.sectionName || section.section_name}: ${data.message}`)
+              }
+            } catch (err) {
+              failCount++
+              const errorMsg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Unknown error'
+              errors.push(`${section.sectionName || section.section_name}: ${errorMsg}`)
+            }
+          }
+          
+          // Show summary
+          let summaryMsg = `Bulk Enrollment Complete!\n\n📊 Summary:\n• ${successCount} sections enrolled successfully\n• ${totalStudents} total students enrolled\n• ${totalEvaluations} evaluation records created`
+          
+          if (failCount > 0) {
+            summaryMsg += `\n\n⚠️ ${failCount} section(s) failed:\n${errors.slice(0, 3).join('\n')}${errors.length > 3 ? `\n... and ${errors.length - 3} more` : ''}`
+          }
+          
+          showAlert(summaryMsg, failCount === 0 ? 'Bulk Enrollment Successful' : 'Bulk Enrollment Completed with Issues', failCount === 0 ? 'success' : 'warning')
+          
+          // Reload period statistics and enrolled sections
+          const periodsResponse = await adminAPI.getPeriods()
+          const periods = periodsResponse?.data || []
+          const current = periods.find(p => isOpen(p.status)) || null
+          const past = periods.filter(p => isClosed(p.status))
+          setCurrentPeriod(current)
+          setPastPeriods(past)
+          
+          await loadEnrolledSections()
+        } catch (err) {
+          showAlert(err.message || 'Failed to enroll all sections', 'Bulk Enrollment Failed', 'error')
+        } finally {
+          setSubmitting(false)
+        }
+      },
+      'Enroll All Program Sections',
+      'Enroll All',
+      'Cancel'
+    )
+  }
+
   const handleRemoveEnrollment = async (enrollmentId, classCode, subject) => {
     showConfirm(
       `Remove "${classCode}" from this evaluation period?\n\nThis will delete all evaluation records for students in this program section.`,
@@ -611,15 +689,27 @@ export default function EvaluationPeriodManagement() {
                   </h3>
                   <p className="text-sm text-gray-600 mt-1">Program sections enrolled for evaluation during this period</p>
                 </div>
-                <button 
-                  onClick={() => setShowEnrollModal(true)}
-                  className="px-6 py-3 bg-gradient-to-r from-yellow-600 to-amber-700 hover:from-yellow-600 hover:to-amber-700 text-white font-semibold rounded-xl shadow-lg transition-all flex items-center space-x-2"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                  </svg>
-                  <span>Enroll Section</span>
-                </button>
+                <div className="flex items-center space-x-3">
+                  <button 
+                    onClick={handleEnrollAllSections}
+                    disabled={submitting || availableProgramSections.length === 0}
+                    className="px-5 py-3 bg-gradient-to-r from-[#7a0000] to-[#9a1000] hover:from-[#9a1000] hover:to-[#7a0000] disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-xl shadow-lg transition-all flex items-center space-x-2 disabled:cursor-not-allowed"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span>Enroll All</span>
+                  </button>
+                  <button 
+                    onClick={() => setShowEnrollModal(true)}
+                    className="px-6 py-3 bg-gradient-to-r from-yellow-600 to-amber-700 hover:from-yellow-600 hover:to-amber-700 text-white font-semibold rounded-xl shadow-lg transition-all flex items-center space-x-2"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                    <span>Enroll Section</span>
+                  </button>
+                </div>
               </div>
 
               {loadingEnrollments ? (
@@ -643,39 +733,42 @@ export default function EvaluationPeriodManagement() {
                   </button>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {enrolledProgramSections.map((section) => (
-                    <div key={section.id} className="bg-gradient-to-r from-yellow-600 to-amber-700 border-2 border-yellow-200 rounded-xl p-6 hover:shadow-lg transition-all">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3 mb-2">
-                            <h4 className="text-xl font-bold text-yellow-900">{section.section_name || section.sectionName}</h4>
-                            <span className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-semibold">
-                              Year {section.year_level || section.yearLevel} - Sem {section.semester}
+                    <div key={section.id} className="bg-gradient-to-br from-amber-50 to-yellow-50 border-2 border-amber-200 rounded-xl p-5 hover:shadow-lg hover:border-amber-300 transition-all">
+                      <div className="flex justify-between items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 mb-2">
+                            <h4 className="text-lg font-bold text-gray-900 truncate">{section.section_name || section.sectionName}</h4>
+                            <span className="px-2 py-0.5 bg-[#7a0000] text-white rounded-md text-xs font-semibold whitespace-nowrap">
+                              Year {section.year_level || section.yearLevel}
+                            </span>
+                            <span className="px-2 py-0.5 bg-amber-600 text-white rounded-md text-xs font-semibold whitespace-nowrap">
+                              Sem {section.semester}
                             </span>
                           </div>
-                          <p className="text-sm text-yellow-700 mb-3">{section.program_name || section.programName}</p>
-                          <div className="flex items-center space-x-4 text-sm">
-                            <span className="px-3 py-1 bg-yellow-200 text-yellow-800 rounded-full font-semibold">
+                          <p className="text-sm text-gray-600 mb-3 truncate">{section.program_name || section.programName}</p>
+                          <div className="flex flex-wrap items-center gap-2 text-xs">
+                            <span className="px-2.5 py-1 bg-gray-100 text-gray-700 rounded-lg font-semibold border border-gray-200">
                               {section.program_code || section.programCode}
                             </span>
-                            <span className="text-yellow-700 font-semibold">
-                              👥 {section.enrolled_count || section.enrolledCount} {(section.enrolled_count || section.enrolledCount) === 1 ? 'student' : 'students'}
+                            <span className="px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg font-semibold border border-blue-100">
+                              👥 {section.enrolled_count || section.enrolledCount} students
                             </span>
-                            <span className="text-yellow-700 font-semibold">
-                              ✅ {section.evaluations_created || section.evaluationsCreated || 0} evaluations created
+                            <span className="px-2.5 py-1 bg-green-50 text-green-700 rounded-lg font-semibold border border-green-100">
+                              ✅ {section.evaluations_created || section.evaluationsCreated || 0} evals
                             </span>
                           </div>
-                          <p className="text-xs text-yellow-600 mt-2">
-                            Enrolled on {new Date(section.created_at || section.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          <p className="text-xs text-gray-500 mt-2">
+                            Enrolled {new Date(section.created_at || section.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                           </p>
                         </div>
                         <button
                           onClick={() => handleRemoveEnrollment(section.id, section.section_name || section.sectionName, section.program_name || section.programName)}
                           disabled={submitting}
-                          className="px-4 py-2 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white rounded-lg transition-all font-semibold text-sm flex items-center space-x-2"
+                          className="px-3 py-2 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white rounded-lg transition-all font-semibold text-xs flex items-center gap-1 flex-shrink-0"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                           </svg>
                           <span>Remove</span>

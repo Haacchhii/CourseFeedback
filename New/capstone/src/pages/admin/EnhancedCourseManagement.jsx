@@ -33,6 +33,22 @@ export default function EnhancedCourseManagement() {
   const [totalCourses, setTotalCourses] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   
+  // Debounced search term for server-side filtering
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
+  
+  // Debounce search term to avoid excessive API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+    }, 500) // 500ms debounce
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+  
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [debouncedSearchTerm, programFilter, statusFilter])
+  
   // Section Management State
   const [sections, setSections] = useState([])
   const [selectedSection, setSelectedSection] = useState(null)
@@ -129,7 +145,9 @@ export default function EnhancedCourseManagement() {
         adminAPI.getCourses({ 
           page: currentPage, 
           page_size: pageSize,
-          status: statusFilter !== 'all' ? statusFilter : undefined
+          status: statusFilter !== 'all' ? statusFilter : undefined,
+          search: debouncedSearchTerm.trim() || undefined,
+          program_code: programFilter !== 'all' ? programFilter : undefined
         }),
         adminAPI.getInstructors(),
         adminAPI.getPrograms()
@@ -141,7 +159,7 @@ export default function EnhancedCourseManagement() {
         pagination: coursesData?.pagination || {}
       }
     },
-    [currentUser?.id, currentUser?.role, currentPage, pageSize, statusFilter],
+    [currentUser?.id, currentUser?.role, currentPage, pageSize, statusFilter, debouncedSearchTerm, programFilter],
     30000 // 30 seconds timeout - should be fast with pagination
   )
 
@@ -1184,13 +1202,14 @@ student2@example.com,IT-PROG1-2024,email,
               program_id: parseInt(newFormData.program_id),
               year_level: parseInt(newFormData.year_level),
               semester: parseInt(newFormData.semester),
-              page_size: 1000
+              page_size: 1000,
+              show_all_periods: true  // Get all courses regardless of evaluation period
             }),
             adminAPI.getProgramSections({
-              program_id: parseInt(newFormData.program_id),
-              year_level: parseInt(newFormData.year_level),
+              programId: parseInt(newFormData.program_id),
+              yearLevel: parseInt(newFormData.year_level),
               semester: parseInt(newFormData.semester),
-              is_active: true
+              isActive: true
             })
           ])
           console.log('[Quick Bulk] Found courses:', coursesResp?.data?.length || 0)
@@ -2555,9 +2574,9 @@ student2@example.com,IT-PROG1-2024,email,
 
       {/* Section Management Modal */}
       {showSectionModal && selectedSection && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="bg-gradient-to-r from-red-800 to-red-900 p-6 border-b-4 border-indigo-800 sticky top-0 z-10">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-5xl w-full my-4 shadow-2xl max-h-[85vh] flex flex-col">
+            <div className="bg-gradient-to-r from-red-800 to-red-900 p-6 border-b-4 border-indigo-800 flex-shrink-0">
               <div className="flex justify-between items-center">
                 <div>
                   <h2 className="text-2xl font-bold text-white">
@@ -2576,7 +2595,7 @@ student2@example.com,IT-PROG1-2024,email,
               </div>
             </div>
 
-            <div className="p-6">
+            <div className="p-6 overflow-y-auto flex-1">
               <div className="grid md:grid-cols-2 gap-6">
                 {/* Enrolled Students */}
                 <div className="bg-gray-50 rounded-xl p-4">
@@ -2586,7 +2605,7 @@ student2@example.com,IT-PROG1-2024,email,
                     </span>
                     Enrolled Students
                   </h3>
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
                     {enrolledStudents.length === 0 ? (
                       <p className="text-gray-500 text-center py-8">No students enrolled</p>
                     ) : (
@@ -2631,7 +2650,7 @@ student2@example.com,IT-PROG1-2024,email,
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                     />
                   </div>
-                  <div className="space-y-2 max-h-72 overflow-y-auto mb-4">
+                  <div className="space-y-2 max-h-48 overflow-y-auto mb-4">
                     {availableStudents
                       .filter(s =>
                         !studentSearchTerm ||
@@ -2668,7 +2687,7 @@ student2@example.com,IT-PROG1-2024,email,
                   <button
                     onClick={handleEnrollStudents}
                     disabled={selectedStudentIds.length === 0 || submitting}
-                    className="w-full px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center mb-2"
+                    className="w-full px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center"
                   >
                     {submitting ? (
                       <>
@@ -2678,17 +2697,6 @@ student2@example.com,IT-PROG1-2024,email,
                     ) : (
                       <span>Enroll {selectedStudentIds.length > 0 ? `(${selectedStudentIds.length})` : ''} Students</span>
                     )}
-                  </button>
-                  
-                  <button
-                    onClick={openProgramSectionModal}
-                    disabled={submitting}
-                    className="w-full px-4 py-3 bg-yellow-600 hover:bg-amber-700 text-white rounded-lg font-semibold transition-all disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                    </svg>
-                    Enroll Program Section
                   </button>
                 </div>
               </div>
@@ -3108,8 +3116,8 @@ student2@example.com,IT-PROG1-2024,email,
 
       {/* Bulk Enrollment Modal */}
       {showBulkEnrollModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full my-4 max-h-[85vh] flex flex-col">
             <div className="sticky top-0 bg-gradient-to-r from-yellow-600 to-amber-700 text-white p-6 rounded-t-2xl">
               <div className="flex justify-between items-center">
                 <div>
@@ -3328,8 +3336,8 @@ student2@example.com,IT-PROG1-2024,email,
       {/* Quick Bulk Enrollment Modal */}
       {showQuickBulkEnrollModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full my-8">
-            <div className="sticky top-0 bg-gradient-to-r from-red-800 to-red-900 text-white p-6 rounded-t-2xl">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full my-4 max-h-[85vh] flex flex-col">
+            <div className="bg-gradient-to-r from-red-800 to-red-900 text-white p-6 rounded-t-2xl flex-shrink-0">
               <div className="flex justify-between items-center">
                 <div>
                   <h2 className="text-2xl font-bold">⚡ Quick Bulk Section Creation</h2>
@@ -3351,7 +3359,7 @@ student2@example.com,IT-PROG1-2024,email,
               </div>
             </div>
 
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-6 overflow-y-auto flex-1">
               {/* Info Box */}
               <div className="bg-red-50 border-2 border-yellow-200 rounded-xl p-4">
                 <div className="flex items-start gap-3">

@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { secretaryAPI, deptHeadAPI } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
-import ActiveFilters from '../../components/ActiveFilters'
-import Pagination from '../../components/Pagination'
-import { Search, Users, AlertCircle } from 'lucide-react'
-import { useDebounce } from '../../hooks/useDebounce'
+import { Search, Users, AlertCircle, ChevronDown, ChevronRight, GraduationCap, BookOpen } from 'lucide-react'
 
 export default function NonRespondents() {
   const { user } = useAuth()
@@ -12,22 +9,15 @@ export default function NonRespondents() {
   const [error, setError] = useState(null)
   const [data, setData] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const debouncedSearchQuery = useDebounce(searchQuery, 500) // Debounce search
-  const [selectedYearLevel, setSelectedYearLevel] = useState('all')
-  const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 15
 
   // Evaluation Period states
   const [evaluationPeriods, setEvaluationPeriods] = useState([])
   const [selectedPeriod, setSelectedPeriod] = useState(null)
   const [activePeriod, setActivePeriod] = useState(null)
 
-  const yearLevels = [
-    { value: '1', label: 'Year 1' },
-    { value: '2', label: 'Year 2' },
-    { value: '3', label: 'Year 3' },
-    { value: '4', label: 'Year 4' }
-  ]
+  // Expanded states for accordion
+  const [expandedProgramSections, setExpandedProgramSections] = useState({})
+  const [expandedCourseSections, setExpandedCourseSections] = useState({})
 
   // Determine which API to use based on user role
   const api = user?.role === 'secretary' ? secretaryAPI : deptHeadAPI
@@ -39,7 +29,7 @@ export default function NonRespondents() {
       try {
         const periodsData = await api.getEvaluationPeriods()
         setEvaluationPeriods(periodsData.data || [])
-        const active = periodsData.data?.find(p => p.status === 'active' || p.status === 'Active')
+        const active = periodsData.data?.find(p => p.status === 'Open' || p.status === 'active' || p.status === 'Active')
         if (active) {
           setActivePeriod(active.id)
           setSelectedPeriod(active.id)
@@ -55,7 +45,7 @@ export default function NonRespondents() {
     if (selectedPeriod || activePeriod) {
       fetchNonRespondents()
     }
-  }, [selectedYearLevel, selectedPeriod])
+  }, [selectedPeriod])
 
   const fetchNonRespondents = async () => {
     try {
@@ -63,12 +53,17 @@ export default function NonRespondents() {
       setError(null)
       
       const params = {}
-      if (selectedYearLevel !== 'all') params.year_level = selectedYearLevel
       if (selectedPeriod) params.evaluation_period_id = selectedPeriod
 
       const response = await api.getNonRespondents(params)
-      setData(response.data || response)
-      setCurrentPage(1)
+      const rawData = response.data || response
+      
+      // Group data by program section, then by course section
+      const grouped = groupByProgramAndCourse(rawData.non_respondents || [])
+      setData({
+        ...rawData,
+        groupedData: grouped
+      })
     } catch (err) {
       console.error('Error fetching non-respondents:', err)
       setError(err.message || 'Failed to load non-respondents data')
@@ -77,34 +72,104 @@ export default function NonRespondents() {
     }
   }
 
-  // Filtered and paginated data
-  const filteredData = data?.non_respondents?.filter(student =>
-    debouncedSearchQuery === '' ||
-    student.student_number.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-    student.full_name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-    student.program.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
-  ) || []
-
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage)
-  const paginatedData = filteredData.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  )
-
-  // Clear filters
-  const clearFilter = (filterKey) => {
-    if (filterKey === 'yearLevel') setSelectedYearLevel('all')
-    if (filterKey === 'search') setSearchQuery('')
+  // Group non-respondents by program section, then by course section
+  const groupByProgramAndCourse = (nonRespondents) => {
+    const grouped = {}
+    
+    nonRespondents.forEach(student => {
+      const programSectionKey = `${student.program}-${student.section || 'No Section'}`
+      
+      if (!grouped[programSectionKey]) {
+        grouped[programSectionKey] = {
+          program: student.program,
+          section: student.section || 'No Section',
+          yearLevel: student.year_level,
+          courseSections: {},
+          totalStudents: 0
+        }
+      }
+      
+      // Group by each pending course
+      student.pending_courses?.forEach(course => {
+        const courseKey = course.course_code || course.class_code || 'Unknown Course'
+        
+        if (!grouped[programSectionKey].courseSections[courseKey]) {
+          grouped[programSectionKey].courseSections[courseKey] = {
+            courseCode: courseKey,
+            courseName: course.course_name || course.subject_name || courseKey,
+            students: []
+          }
+        }
+        
+        // Add student if not already in this course section
+        const existingStudent = grouped[programSectionKey].courseSections[courseKey].students.find(
+          s => s.student_id === student.student_id
+        )
+        if (!existingStudent) {
+          grouped[programSectionKey].courseSections[courseKey].students.push({
+            student_id: student.student_id,
+            student_number: student.student_number,
+            full_name: student.full_name,
+            year_level: student.year_level
+          })
+        }
+      })
+      
+      grouped[programSectionKey].totalStudents++
+    })
+    
+    return grouped
   }
 
-  const clearAllFilters = () => {
-    setSelectedYearLevel('all')
-    setSearchQuery('')
+  const toggleProgramSection = (key) => {
+    setExpandedProgramSections(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }))
   }
 
-  const activeFilters = {}
-  if (selectedYearLevel !== 'all') activeFilters.yearLevel = selectedYearLevel
-  if (searchQuery) activeFilters.search = searchQuery
+  const toggleCourseSection = (programKey, courseKey) => {
+    const combinedKey = `${programKey}-${courseKey}`
+    setExpandedCourseSections(prev => ({
+      ...prev,
+      [combinedKey]: !prev[combinedKey]
+    }))
+  }
+
+  // Filter grouped data by search
+  const filterGroupedData = (groupedData) => {
+    if (!searchQuery) return groupedData
+    
+    const filtered = {}
+    Object.entries(groupedData).forEach(([key, programSection]) => {
+      const filteredCourseSections = {}
+      
+      Object.entries(programSection.courseSections).forEach(([courseKey, courseSection]) => {
+        const filteredStudents = courseSection.students.filter(student =>
+          student.student_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          student.full_name.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+        
+        if (filteredStudents.length > 0) {
+          filteredCourseSections[courseKey] = {
+            ...courseSection,
+            students: filteredStudents
+          }
+        }
+      })
+      
+      if (Object.keys(filteredCourseSections).length > 0) {
+        filtered[key] = {
+          ...programSection,
+          courseSections: filteredCourseSections
+        }
+      }
+    })
+    
+    return filtered
+  }
+
+  const filteredGroupedData = data?.groupedData ? filterGroupedData(data.groupedData) : {}
 
   if (loading) {
     return (
@@ -131,7 +196,7 @@ export default function NonRespondents() {
             <div>
               <h1 className="lpu-header-title text-3xl lg:text-4xl">Non-Respondent Tracking</h1>
               <p className="lpu-header-subtitle text-base lg:text-lg mt-1">
-                Students who haven't completed evaluations
+                Students who haven't completed evaluations by section
               </p>
             </div>
           </div>
@@ -154,200 +219,178 @@ export default function NonRespondents() {
           </div>
         ) : (
           <>
-        {/* Statistics Cards */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 lg:gap-6 mb-8">
-          <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-card shadow-card p-6">
-            <h3 className="text-sm font-semibold text-white/80 mb-2">Total Students</h3>
-            <p className="text-4xl font-bold text-white">{data?.total_students || 0}</p>
-          </div>
-          
-          <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-card shadow-card p-6">
-            <h3 className="text-sm font-semibold text-white/80 mb-2">Responded</h3>
-            <p className="text-4xl font-bold text-white">{data?.responded || 0}</p>
-          </div>
-          
-          <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-card shadow-card p-6">
-            <h3 className="text-sm font-semibold text-white/80 mb-2">Non-Responded</h3>
-            <p className="text-4xl font-bold text-white">{data?.non_responded || 0}</p>
-          </div>
-          
-          <div className="bg-gradient-to-br from-[#C41E3A] to-[#9D1535] rounded-card shadow-card p-6">
-            <h3 className="text-sm font-semibold text-white/80 mb-2">Response Rate</h3>
-            <p className="text-4xl font-bold text-white">{data?.response_rate || '0%'}</p>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="lpu-card p-6 mb-6">
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">Filters</h3>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Student number or name..."
-                  className="lpu-select pl-10"
-                />
+            {/* Statistics Cards */}
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 lg:gap-6 mb-8">
+              <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-card shadow-card p-6">
+                <h3 className="text-sm font-semibold text-white/80 mb-2">Total Students</h3>
+                <p className="text-4xl font-bold text-white">{data?.total_students || 0}</p>
+              </div>
+              
+              <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-card shadow-card p-6">
+                <h3 className="text-sm font-semibold text-white/80 mb-2">Responded</h3>
+                <p className="text-4xl font-bold text-white">{data?.responded || 0}</p>
+              </div>
+              
+              <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-card shadow-card p-6">
+                <h3 className="text-sm font-semibold text-white/80 mb-2">Non-Responded</h3>
+                <p className="text-4xl font-bold text-white">{data?.non_responded || 0}</p>
+              </div>
+              
+              <div className="bg-gradient-to-br from-[#C41E3A] to-[#9D1535] rounded-card shadow-card p-6">
+                <h3 className="text-sm font-semibold text-white/80 mb-2">Response Rate</h3>
+                <p className="text-4xl font-bold text-white">{data?.response_rate || '0%'}</p>
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Evaluation Period</label>
-              <select
-                value={selectedPeriod || ''}
-                onChange={(e) => setSelectedPeriod(e.target.value)}
-                className="lpu-select"
-              >
-                <option value="">Select Period</option>
-                {evaluationPeriods.map((period) => (
-                  <option key={period.id} value={period.id}>
-                    {period.name} {period.status === 'active' || period.status === 'Active' ? '(Active)' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Filters */}
+            <div className="lpu-card p-6 mb-6">
+              <h3 className="text-lg font-semibold text-gray-700 mb-4">Filters</h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Search Student</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Student number or name..."
+                      className="lpu-select pl-10"
+                    />
+                  </div>
+                </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Year Level</label>
-              <select
-                value={selectedYearLevel}
-                onChange={(e) => setSelectedYearLevel(e.target.value)}
-                className="lpu-select"
-              >
-                <option value="all">All Year Levels</option>
-                {yearLevels.map((y) => (
-                  <option key={y.value} value={y.value}>{y.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Active Filters Display */}
-        <ActiveFilters
-          filters={activeFilters}
-          filterLabels={{
-            yearLevel: 'Year Level',
-            search: 'Search'
-          }}
-          filterOptions={{
-            yearLevel: yearLevels
-          }}
-          onClearFilter={clearFilter}
-          onClearAll={clearAllFilters}
-          totalResults={filteredData.length}
-          itemLabel="students"
-        />
-
-        {/* Table */}
-        <div className="lpu-card overflow-hidden">
-          {error ? (
-            <div className="p-8 text-center">
-              <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-              <p className="text-red-600 mb-4">{error}</p>
-              <button onClick={fetchNonRespondents} className="lpu-btn-secondary">
-                Retry
-              </button>
-            </div>
-          ) : paginatedData.length === 0 ? (
-            <div className="p-8 text-center">
-              <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No non-respondents found</p>
-              <p className="text-sm text-gray-500 mt-2">All students have completed their evaluations!</p>
-            </div>
-          ) : (
-            <>
-              <div className="overflow-x-auto">
-                <table className="table-auto">
-                  <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
-                    <tr>
-                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
-                        Student Number
-                      </th>
-                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
-                        Name
-                      </th>
-                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
-                        Program
-                      </th>
-                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
-                        Section
-                      </th>
-                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
-                        Year
-                      </th>
-                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
-                        Pending
-                      </th>
-                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
-                        Progress
-                      </th>
-                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
-                        Pending Courses
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {paginatedData.map((student) => (
-                      <tr key={student.student_id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {student.student_number}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {student.full_name}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {student.program}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {student.section}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-600">
-                          {student.year_level}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                            {student.pending_count}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 text-center">
-                          {student.completed_count}/{student.total_courses}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">
-                          <div className="max-w-xs">
-                            {student.pending_courses.slice(0, 2).map((course, idx) => (
-                              <div key={idx} className="text-xs">
-                                {course.course_code}
-                              </div>
-                            ))}
-                            {student.pending_courses.length > 2 && (
-                              <div className="text-xs text-gray-500">
-                                +{student.pending_courses.length - 2} more
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Evaluation Period</label>
+                  <select
+                    value={selectedPeriod || ''}
+                    onChange={(e) => setSelectedPeriod(e.target.value)}
+                    className="lpu-select"
+                  >
+                    <option value="">Select Period</option>
+                    {evaluationPeriods.map((period) => (
+                      <option key={period.id} value={period.id}>
+                        {period.name} {period.status === 'active' || period.status === 'Active' ? '(Active)' : ''}
+                      </option>
                     ))}
-                  </tbody>
-                </table>
+                  </select>
+                </div>
               </div>
+            </div>
 
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                totalItems={filteredData.length}
-                onPageChange={setCurrentPage}
-                itemLabel="students"
-              />
-            </>
-          )}
-        </div>
-        </>
+            {/* Program Sections Accordion */}
+            {error ? (
+              <div className="lpu-card p-8 text-center">
+                <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                <p className="text-red-600 mb-4">{error}</p>
+                <button onClick={fetchNonRespondents} className="lpu-btn-secondary">
+                  Retry
+                </button>
+              </div>
+            ) : Object.keys(filteredGroupedData).length === 0 ? (
+              <div className="lpu-card p-8 text-center">
+                <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600">No non-respondents found</p>
+                <p className="text-sm text-gray-500 mt-2">All students have completed their evaluations!</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {Object.entries(filteredGroupedData).map(([programKey, programSection]) => (
+                  <div key={programKey} className="lpu-card overflow-hidden">
+                    {/* Program Section Header */}
+                    <button
+                      onClick={() => toggleProgramSection(programKey)}
+                      className="w-full flex items-center justify-between p-5 bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white hover:from-[#8a1000] hover:to-[#aa2000] transition-all"
+                    >
+                      <div className="flex items-center gap-4">
+                        <GraduationCap className="w-6 h-6" />
+                        <div className="text-left">
+                          <h3 className="text-lg font-bold">{programSection.program} - {programSection.section}</h3>
+                          <p className="text-sm text-white/80">Year {programSection.yearLevel} • {Object.keys(programSection.courseSections).length} courses with pending evaluations</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="bg-white/20 px-3 py-1 rounded-full text-sm font-semibold">
+                          {programSection.totalStudents} students
+                        </span>
+                        {expandedProgramSections[programKey] ? (
+                          <ChevronDown className="w-6 h-6" />
+                        ) : (
+                          <ChevronRight className="w-6 h-6" />
+                        )}
+                      </div>
+                    </button>
+
+                    {/* Course Sections */}
+                    {expandedProgramSections[programKey] && (
+                      <div className="p-4 bg-gray-50 space-y-3">
+                        {Object.entries(programSection.courseSections).map(([courseKey, courseSection]) => {
+                          const combinedKey = `${programKey}-${courseKey}`
+                          return (
+                            <div key={courseKey} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                              {/* Course Section Header */}
+                              <button
+                                onClick={() => toggleCourseSection(programKey, courseKey)}
+                                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-all"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <BookOpen className="w-5 h-5 text-[#7a0000]" />
+                                  <div className="text-left">
+                                    <h4 className="font-semibold text-gray-900">{courseSection.courseCode}</h4>
+                                    <p className="text-sm text-gray-600">{courseSection.courseName}</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm font-semibold">
+                                    {courseSection.students.length} pending
+                                  </span>
+                                  {expandedCourseSections[combinedKey] ? (
+                                    <ChevronDown className="w-5 h-5 text-gray-500" />
+                                  ) : (
+                                    <ChevronRight className="w-5 h-5 text-gray-500" />
+                                  )}
+                                </div>
+                              </button>
+
+                              {/* Students Table */}
+                              {expandedCourseSections[combinedKey] && (
+                                <div className="border-t border-gray-200">
+                                  <table className="w-full">
+                                    <thead className="bg-gray-100">
+                                      <tr>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Student Number</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Name</th>
+                                        <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Year Level</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-200">
+                                      {courseSection.students.map((student) => (
+                                        <tr key={student.student_id} className="hover:bg-gray-50">
+                                          <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                                            {student.student_number}
+                                          </td>
+                                          <td className="px-4 py-3 text-sm text-gray-700">
+                                            {student.full_name}
+                                          </td>
+                                          <td className="px-4 py-3 text-sm text-gray-600 text-center">
+                                            {student.year_level}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

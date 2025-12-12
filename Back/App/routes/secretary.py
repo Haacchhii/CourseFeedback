@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text, func, and_, or_
 from database.connection import get_db
 from models.enhanced_models import (
-    User, Secretary, Course, ClassSection, Program, Evaluation, EvaluationPeriod, Enrollment, Student
+    User, Secretary, Course, ClassSection, Program, Evaluation, EvaluationPeriod, Enrollment, Student, AnalysisResult
 )
 from typing import Optional, List
 from pydantic import BaseModel
@@ -1970,15 +1970,29 @@ async def get_non_respondents(
 ):
     """
     Get list of students who haven't completed evaluations for active period
-    Secretary can only see non-respondents from their assigned program
+    Secretary can only see non-respondents from their assigned programs
     """
     try:
-        # Get secretary's program
+        # Get secretary's programs (array of program IDs)
         secretary = db.query(Secretary).filter(Secretary.user_id == current_user['id']).first()
-        if not secretary or not secretary.program_id:
-            raise HTTPException(status_code=403, detail="You must be assigned to a program")
+        if not secretary:
+            raise HTTPException(status_code=403, detail="Secretary record not found")
         
-        program_id = secretary.program_id
+        # Secretary has programs array, not single program_id
+        program_ids = secretary.programs or []
+        if not program_ids:
+            # If no programs assigned, return empty result
+            return {
+                "total_students": 0,
+                "responded": 0,
+                "non_responded": 0,
+                "response_rate": "0%",
+                "non_respondents": [],
+                "message": "No programs assigned to this secretary"
+            }
+        
+        # Use the first program for filtering (or could filter by all)
+        program_id = program_ids[0] if len(program_ids) == 1 else None
         
         # Get active period if not specified
         if not evaluation_period_id:
@@ -1997,8 +2011,19 @@ async def get_non_respondents(
             
             evaluation_period_id = active_period.id
         
-        # Build query for non-respondents (filtered by secretary's program)
-        query = text("""
+        # Build query for non-respondents (filtered by secretary's programs)
+        # If secretary has multiple programs, filter by all of them
+        if len(program_ids) > 1:
+            program_filter = f"AND COALESCE(ps.program_id, s.program_id) IN ({','.join(str(p) for p in program_ids)})"
+        else:
+            program_filter = "AND COALESCE(ps.program_id, s.program_id) = :program_id"
+        
+        # Handle year_level filter - build it in Python to avoid PostgreSQL type ambiguity
+        year_level_filter = ""
+        if year_level is not None:
+            year_level_filter = "AND s.year_level = :year_level"
+        
+        query = text(f"""
             WITH enrolled_students AS (
                 SELECT DISTINCT
                     s.id as student_id,
@@ -2012,12 +2037,13 @@ async def get_non_respondents(
                     COUNT(DISTINCT e.class_section_id) as total_courses
                 FROM students s
                 JOIN users u ON s.user_id = u.id
-                LEFT JOIN program_sections ps ON s.section_id = ps.id
-                LEFT JOIN programs p ON ps.program_id = p.id
+                LEFT JOIN section_students ss ON s.id = ss.student_id
+                LEFT JOIN program_sections ps ON ss.section_id = ps.id
+                LEFT JOIN programs p ON COALESCE(ps.program_id, s.program_id) = p.id
                 JOIN enrollments e ON s.id = e.student_id
                 WHERE u.is_active = true
-                    AND ps.program_id = :program_id
-                    AND (:year_level IS NULL OR s.year_level = :year_level)
+                    {program_filter}
+                    {year_level_filter}
                 GROUP BY s.id, s.student_number, u.first_name, u.last_name, 
                          s.year_level, p.program_code, ps.section_name, ps.id
             ),
@@ -2046,11 +2072,15 @@ async def get_non_respondents(
             ORDER BY pending_count DESC, es.student_number ASC
         """)
         
-        result = db.execute(query, {
+        # Build parameters - only include year_level if it's specified
+        query_params = {
             "period_id": evaluation_period_id,
             "program_id": program_id,
-            "year_level": year_level
-        }).fetchall()
+        }
+        if year_level is not None:
+            query_params["year_level"] = year_level
+        
+        result = db.execute(query, query_params).fetchall()
         
         # Get pending courses for each non-respondent
         non_respondents = []

@@ -100,8 +100,8 @@ export default function Courses() {
         
         if (periodsData?.data && Array.isArray(periodsData.data)) {
           setEvaluationPeriods(periodsData.data)
-          // Find and set the active period
-          const active = periodsData.data.find(p => p.status === 'active')
+          // Find and set the active period (check both 'Open' and 'active' statuses)
+          const active = periodsData.data.find(p => p.status === 'Open' || p.status === 'active' || p.status === 'Active')
           if (active) {
             setActivePeriod(active)
           }
@@ -1257,10 +1257,10 @@ export default function Courses() {
 
       {/* Enhanced Course Detail Modal */}
       {selectedCourse && courseDetails && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden">
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl max-w-5xl w-full my-4 max-h-[85vh] flex flex-col">
             {/* Enhanced Modal Header */}
-            <div className="lpu-header">
+            <div className="lpu-header flex-shrink-0">
               <div className="p-6">
                 <div className="flex justify-between items-center">
                   <div>
@@ -1319,7 +1319,7 @@ export default function Courses() {
             </div>
 
             {/* Modal Content */}
-            <div className="p-6 overflow-y-auto max-h-[70vh]">
+            <div className="p-6 overflow-y-auto flex-1">
               {activeTab === 'overview' && (
                 <div className="space-y-6">
                   {/* Overall Rating and Evaluations Side by Side */}

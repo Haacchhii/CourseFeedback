@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Upload, Search, Filter, Users, TrendingUp, AlertCircle, CheckCircle, X, Download, FileText, Eye } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Upload, Search, Filter, Users, TrendingUp, AlertCircle, CheckCircle, X, Download, FileText, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
 import { adminAPI, apiClient } from '../../services/api';
 import { AlertModal } from '../../components/Modal';
 
@@ -18,6 +18,10 @@ const EnrollmentListManagement = () => {
   const [uploadResult, setUploadResult] = useState(null);
   const [programs, setPrograms] = useState([]);
   const [colleges, setColleges] = useState([]);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // CSV Preview State
   const [showPreviewModal, setShowPreviewModal] = useState(false);
@@ -34,6 +38,18 @@ const EnrollmentListManagement = () => {
     setAlertConfig({ title, message, type });
     setShowAlertModal(true);
   };
+  
+  // Pagination calculations
+  const totalPages = Math.ceil(enrollmentList.length / itemsPerPage);
+  const paginatedList = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return enrollmentList.slice(startIndex, startIndex + itemsPerPage);
+  }, [enrollmentList, currentPage, itemsPerPage]);
+  
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [enrollmentList]);
 
   useEffect(() => {
     fetchPrograms();
@@ -523,7 +539,7 @@ const EnrollmentListManagement = () => {
             <div className="mt-6 flex gap-3">
               <button
                 onClick={handleApplyFilters}
-                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-card hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg transition-all font-medium flex items-center gap-2"
+                className="px-6 py-3 bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white rounded-card hover:from-[#9a1000] hover:to-[#7a0000] shadow-md hover:shadow-lg transition-all font-medium flex items-center gap-2"
               >
                 <Filter className="w-5 h-5" />
                 Apply Filters
@@ -586,7 +602,7 @@ const EnrollmentListManagement = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {enrollmentList.map((student) => (
+                  {paginatedList.map((student) => (
                     <tr key={student.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {student.student_number}
@@ -628,6 +644,99 @@ const EnrollmentListManagement = () => {
               </table>
             )}
           </div>
+          
+          {/* Pagination Controls */}
+          {enrollmentList.length > 0 && (
+            <div className="p-4 lg:p-6 border-t border-gray-200 bg-gray-50">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                {/* Items per page selector */}
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-gray-600">Show:</label>
+                  <select
+                    value={itemsPerPage}
+                    onChange={(e) => {
+                      setItemsPerPage(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#7a0000] focus:border-[#7a0000]"
+                  >
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                  <span className="text-sm text-gray-600">per page</span>
+                </div>
+                
+                {/* Page info */}
+                <div className="text-sm text-gray-600">
+                  Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, enrollmentList.length)} of {enrollmentList.length} students
+                </div>
+                
+                {/* Pagination buttons */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    First
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="p-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  
+                  {/* Page numbers */}
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
+                            currentPage === pageNum
+                              ? 'bg-[#7a0000] text-white'
+                              : 'border border-gray-300 text-gray-700 hover:bg-gray-100'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="p-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Last
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

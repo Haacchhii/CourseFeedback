@@ -1,0 +1,451 @@
+{
+  "timestamp": "2025-12-11T19:10:09.149334",
+  "results": {
+    "working": [
+      {
+        "name": "Program Sections",
+        "path": "/api/admin/program-sections",
+        "method": "GET",
+        "status": 200,
+        "success": true
+      },
+      {
+        "name": "Students List",
+        "path": "/api/admin/students",
+        "method": "GET",
+        "status": 200,
+        "success": true
+      },
+      {
+        "name": "Evaluations List",
+        "path": "/api/admin/evaluations",
+        "method": "GET",
+        "status": 200,
+        "success": true
+      },
+      {
+        "name": "Secretary Dashboard",
+        "path": "/api/secretary/dashboard?user_id=2",
+        "method": "GET",
+        "status": 200,
+        "success": true
+      },
+      {
+        "name": "Courses List",
+        "path": "/api/secretary/courses?user_id=2",
+        "method": "GET",
+        "status": 200,
+        "success": true
+      },
+      {
+        "name": "Evaluations",
+        "path": "/api/secretary/evaluations?user_id=2",
+        "method": "GET",
+        "status": 200,
+        "success": true
+      },
+      {
+        "name": "Sentiment Analysis",
+        "path": "/api/secretary/sentiment-analysis?user_id=2",
+        "method": "GET",
+        "status": 200,
+        "success": true
+      },
+      {
+        "name": "Anomaly Detection",
+        "path": "/api/secretary/anomalies?user_id=2",
+        "method": "GET",
+        "status": 200,
+        "success": true
+      },
+      {
+        "name": "Completion Rates",
+        "path": "/api/secretary/completion-rates?user_id=2",
+        "method": "GET",
+        "status": 200,
+        "success": true
+      },
+      {
+        "name": "ML Insights",
+        "path": "/api/secretary/ml-insights-summary?user_id=2",
+        "method": "GET",
+        "status": 200,
+        "success": true
+      },
+      {
+        "name": "Dept Head Dashboard",
+        "path": "/api/dept-head/dashboard?user_id=3",
+        "method": "GET",
+        "status": 200,
+        "success": true
+      },
+      {
+        "name": "Courses List",
+        "path": "/api/dept-head/courses?user_id=3",
+        "method": "GET",
+        "status": 200,
+        "success": true
+      },
+      {
+        "name": "Evaluations",
+        "path": "/api/dept-head/evaluations?user_id=3",
+        "method": "GET",
+        "status": 200,
+        "success": true
+      },
+      {
+        "name": "Sentiment Analysis",
+        "path": "/api/dept-head/sentiment-analysis?user_id=3",
+        "method": "GET",
+        "status": 200,
+        "success": true
+      },
+      {
+        "name": "Anomaly Detection",
+        "path": "/api/dept-head/anomalies?user_id=3",
+        "method": "GET",
+        "status": 200,
+        "success": true
+      },
+      {
+        "name": "Trend Analysis",
+        "path": "/api/dept-head/trends?user_id=3",
+        "method": "GET",
+        "status": 200,
+        "success": true
+      },
+      {
+        "name": "Completion Rates",
+        "path": "/api/dept-head/completion-rates?user_id=3",
+        "method": "GET",
+        "status": 200,
+        "success": true
+      },
+      {
+        "name": "ML Insights",
+        "path": "/api/dept-head/ml-insights-summary?user_id=3",
+        "method": "GET",
+        "status": 200,
+        "success": true
+      },
+      {
+        "name": "All Periods (Public)",
+        "path": "/api/evaluation-periods/periods",
+        "method": "GET",
+        "status": 200,
+        "success": true
+      },
+      {
+        "name": "Active Period (Public)",
+        "path": "/api/evaluation-periods/periods/active",
+        "method": "GET",
+        "status": 200,
+        "success": true
+      }
+    ],
+    "broken": [
+      {
+        "name": "Completion Rates",
+        "path": "/api/admin/completion-rates",
+        "method": "GET",
+        "status": 422,
+        "success": false,
+        "error": [
+          {
+            "type": "missing",
+            "loc": [
+              "query",
+              "user_id"
+            ],
+            "msg": "Field required",
+            "input": null,
+            "url": "https://errors.pydantic.dev/2.11/v/missing"
+          }
+        ]
+      },
+      {
+        "name": "Programs",
+        "path": "/api/secretary/programs",
+        "method": "GET",
+        "status": 422,
+        "success": false,
+        "error": [
+          {
+            "type": "missing",
+            "loc": [
+              "query",
+              "user_id"
+            ],
+            "msg": "Field required",
+            "input": null,
+            "url": "https://errors.pydantic.dev/2.11/v/missing"
+          }
+        ]
+      },
+      {
+        "name": "Year Levels",
+        "path": "/api/secretary/year-levels",
+        "method": "GET",
+        "status": 422,
+        "success": false,
+        "error": [
+          {
+            "type": "missing",
+            "loc": [
+              "query",
+              "user_id"
+            ],
+            "msg": "Field required",
+            "input": null,
+            "url": "https://errors.pydantic.dev/2.11/v/missing"
+          }
+        ]
+      },
+      {
+        "name": "Programs",
+        "path": "/api/dept-head/programs",
+        "method": "GET",
+        "status": 422,
+        "success": false,
+        "error": [
+          {
+            "type": "missing",
+            "loc": [
+              "query",
+              "user_id"
+            ],
+            "msg": "Field required",
+            "input": null,
+            "url": "https://errors.pydantic.dev/2.11/v/missing"
+          }
+        ]
+      },
+      {
+        "name": "Year Levels",
+        "path": "/api/dept-head/year-levels",
+        "method": "GET",
+        "status": 422,
+        "success": false,
+        "error": [
+          {
+            "type": "missing",
+            "loc": [
+              "query",
+              "user_id"
+            ],
+            "msg": "Field required",
+            "input": null,
+            "url": "https://errors.pydantic.dev/2.11/v/missing"
+          }
+        ]
+      },
+      {
+        "name": "Notifications",
+        "path": "/api/notifications",
+        "method": "GET",
+        "status": 422,
+        "success": false,
+        "error": [
+          {
+            "type": "missing",
+            "loc": [
+              "query",
+              "user_id"
+            ],
+            "msg": "Field required",
+            "input": null,
+            "url": "https://errors.pydantic.dev/2.11/v/missing"
+          }
+        ]
+      },
+      {
+        "name": "Unread Count",
+        "path": "/api/notifications/unread-count",
+        "method": "GET",
+        "status": 422,
+        "success": false,
+        "error": [
+          {
+            "type": "missing",
+            "loc": [
+              "query",
+              "user_id"
+            ],
+            "msg": "Field required",
+            "input": null,
+            "url": "https://errors.pydantic.dev/2.11/v/missing"
+          }
+        ]
+      }
+    ],
+    "auth_required": [
+      {
+        "name": "Dashboard Statistics",
+        "path": "/api/admin/dashboard-stats",
+        "method": "GET",
+        "status": 403,
+        "success": false
+      },
+      {
+        "name": "Department Overview",
+        "path": "/api/admin/department-overview",
+        "method": "GET",
+        "status": 403,
+        "success": false
+      },
+      {
+        "name": "User List",
+        "path": "/api/admin/users",
+        "method": "GET",
+        "status": 403,
+        "success": false
+      },
+      {
+        "name": "User List (Paginated)",
+        "path": "/api/admin/users?page=1&page_size=10",
+        "method": "GET",
+        "status": 403,
+        "success": false
+      },
+      {
+        "name": "User Statistics",
+        "path": "/api/admin/users/stats",
+        "method": "GET",
+        "status": 403,
+        "success": false
+      },
+      {
+        "name": "Courses List",
+        "path": "/api/admin/courses",
+        "method": "GET",
+        "status": 403,
+        "success": false
+      },
+      {
+        "name": "Programs List",
+        "path": "/api/admin/programs",
+        "method": "GET",
+        "status": 403,
+        "success": false
+      },
+      {
+        "name": "Class Sections",
+        "path": "/api/admin/sections",
+        "method": "GET",
+        "status": 403,
+        "success": false
+      },
+      {
+        "name": "Non-Respondents",
+        "path": "/api/admin/non-respondents",
+        "method": "GET",
+        "status": 403,
+        "success": false
+      },
+      {
+        "name": "All Periods",
+        "path": "/api/admin/evaluation-periods",
+        "method": "GET",
+        "status": 403,
+        "success": false
+      },
+      {
+        "name": "Active Period",
+        "path": "/api/admin/evaluation-periods/active",
+        "method": "GET",
+        "status": 403,
+        "success": false
+      },
+      {
+        "name": "Audit Logs",
+        "path": "/api/admin/audit-logs",
+        "method": "GET",
+        "status": 403,
+        "success": false
+      },
+      {
+        "name": "Audit Stats",
+        "path": "/api/admin/audit-logs/stats",
+        "method": "GET",
+        "status": 403,
+        "success": false
+      },
+      {
+        "name": "Export History",
+        "path": "/api/admin/export/history",
+        "method": "GET",
+        "status": 403,
+        "success": false
+      },
+      {
+        "name": "Email Config",
+        "path": "/api/admin/email-config-status",
+        "method": "GET",
+        "status": 403,
+        "success": false
+      },
+      {
+        "name": "Enrollment Stats",
+        "path": "/api/admin/enrollment-list/stats",
+        "method": "GET",
+        "status": 403,
+        "success": false
+      },
+      {
+        "name": "Non-Respondents",
+        "path": "/api/secretary/non-respondents?user_id=2",
+        "method": "GET",
+        "status": 403,
+        "success": false
+      },
+      {
+        "name": "Non-Respondents",
+        "path": "/api/dept-head/non-respondents?user_id=3",
+        "method": "GET",
+        "status": 403,
+        "success": false
+      },
+      {
+        "name": "Student Courses",
+        "path": "/api/student/1/courses",
+        "method": "GET",
+        "status": 403,
+        "success": false
+      },
+      {
+        "name": "Student Evaluations",
+        "path": "/api/student/1/evaluations",
+        "method": "GET",
+        "status": 403,
+        "success": false
+      },
+      {
+        "name": "Evaluation History",
+        "path": "/api/student/1/evaluation-history",
+        "method": "GET",
+        "status": 403,
+        "success": false
+      },
+      {
+        "name": "Available Periods",
+        "path": "/api/student/1/evaluation-periods",
+        "method": "GET",
+        "status": 403,
+        "success": false
+      },
+      {
+        "name": "Pending Evaluations",
+        "path": "/api/student/1/pending-evaluations",
+        "method": "GET",
+        "status": 403,
+        "success": false
+      }
+    ]
+  },
+  "summary": {
+    "working": 20,
+    "broken": 7,
+    "auth_issues": 23,
+    "total": 50
+  }
+}

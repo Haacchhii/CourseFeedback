@@ -145,68 +145,125 @@ async def get_enrollment_stats(
 ):
     """
     Get enrollment list statistics
-    Shows summary by college and program
+    Shows summary by department and program
+    Uses students table data (with is_active boolean column)
     
     Access: Admin only
     """
     try:
         from sqlalchemy import text
         
-        # Get total count
-        total = db.execute(text("""
-            SELECT COUNT(*) FROM enrollment_list WHERE status = 'active'
-        """)).fetchone()[0]
+        # Check if enrollment_list table exists and has data
+        try:
+            enrollment_list_count = db.execute(text("""
+                SELECT COUNT(*) FROM enrollment_list
+            """)).fetchone()[0]
+        except:
+            enrollment_list_count = 0
         
-        # Get by college
-        by_college = db.execute(text("""
-            SELECT college_code, college_name, COUNT(*) as count
-            FROM enrollment_list
-            WHERE status = 'active'
-            GROUP BY college_code, college_name
-            ORDER BY college_code
-        """)).fetchall()
+        if enrollment_list_count > 0:
+            # Use enrollment_list table (has status column)
+            total = db.execute(text("""
+                SELECT COUNT(*) FROM enrollment_list WHERE status = 'active'
+            """)).fetchone()[0]
+            
+            status_counts = db.execute(text("""
+                SELECT status, COUNT(*) as count
+                FROM enrollment_list
+                GROUP BY status
+            """)).fetchall()
+            by_status = {row[0]: row[1] for row in status_counts}
+            
+            by_college_rows = db.execute(text("""
+                SELECT college_code, COUNT(*) as count
+                FROM enrollment_list
+                WHERE status = 'active'
+                GROUP BY college_code
+                ORDER BY college_code
+            """)).fetchall()
+            by_college = {row[0]: row[1] for row in by_college_rows}
+            
+            by_program_rows = db.execute(text("""
+                SELECT p.program_code, COUNT(*) as count
+                FROM enrollment_list e
+                JOIN programs p ON e.program_id = p.id
+                WHERE e.status = 'active'
+                GROUP BY p.program_code
+                ORDER BY p.program_code
+            """)).fetchall()
+            by_program = {row[0]: row[1] for row in by_program_rows}
+            
+            by_year_rows = db.execute(text("""
+                SELECT year_level, COUNT(*) as count
+                FROM enrollment_list
+                WHERE status = 'active'
+                GROUP BY year_level
+                ORDER BY year_level
+            """)).fetchall()
+            by_year = {str(row[0]): row[1] for row in by_year_rows}
+        else:
+            # Fallback to students table (has is_active boolean column)
+            # Get total active students
+            total = db.execute(text("""
+                SELECT COUNT(*) FROM students WHERE is_active = true
+            """)).fetchone()[0]
+            
+            # Get by active status (convert boolean to 'active'/'inactive')
+            active_count = db.execute(text("""
+                SELECT COUNT(*) FROM students WHERE is_active = true
+            """)).fetchone()[0]
+            inactive_count = db.execute(text("""
+                SELECT COUNT(*) FROM students WHERE is_active = false
+            """)).fetchone()[0]
+            by_status = {'active': active_count, 'inactive': inactive_count}
+            
+            # Get by program
+            by_program_rows = db.execute(text("""
+                SELECT p.program_code, COUNT(*) as count
+                FROM students s
+                JOIN programs p ON s.program_id = p.id
+                WHERE s.is_active = true
+                GROUP BY p.program_code
+                ORDER BY p.program_code
+            """)).fetchall()
+            by_program = {row[0]: row[1] for row in by_program_rows}
+            
+            # Get by year level
+            by_year_rows = db.execute(text("""
+                SELECT year_level, COUNT(*) as count
+                FROM students
+                WHERE is_active = true
+                GROUP BY year_level
+                ORDER BY year_level
+            """)).fetchall()
+            by_year = {str(row[0]): row[1] for row in by_year_rows}
+            
+            # Get by department (from programs table)
+            by_college_rows = db.execute(text("""
+                SELECT p.department, COUNT(*) as count
+                FROM students s
+                JOIN programs p ON s.program_id = p.id
+                WHERE s.is_active = true
+                GROUP BY p.department
+                ORDER BY p.department
+            """)).fetchall()
+            by_college = {row[0]: row[1] for row in by_college_rows}
         
-        # Get by program
-        by_program = db.execute(text("""
-            SELECT p.program_code, p.program_name, COUNT(*) as count
-            FROM enrollment_list e
-            JOIN programs p ON e.program_id = p.id
-            WHERE e.status = 'active'
-            GROUP BY p.program_code, p.program_name
-            ORDER BY p.program_code
-        """)).fetchall()
-        
-        # Get by year level
-        by_year = db.execute(text("""
-            SELECT year_level, COUNT(*) as count
-            FROM enrollment_list
-            WHERE status = 'active'
-            GROUP BY year_level
-            ORDER BY year_level
-        """)).fetchall()
-        
+        # Return flat structure that frontend expects
         return {
-            "success": True,
-            "data": {
-                "total_students": total,
-                "by_college": [
-                    {"code": row[0], "name": row[1], "count": row[2]}
-                    for row in by_college
-                ],
-                "by_program": [
-                    {"code": row[0], "name": row[1], "count": row[2]}
-                    for row in by_program
-                ],
-                "by_year_level": [
-                    {"year": row[0], "count": row[1]}
-                    for row in by_year
-                ]
-            }
+            "total_students": total,
+            "by_status": by_status,
+            "by_college": by_college,
+            "by_program": by_program,
+            "by_year": by_year
         }
         
     except Exception as e:
         logger.error(f"Error getting enrollment stats: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/enrollment-list/upload")
 
 
 @router.post("/enrollment-list/upload")

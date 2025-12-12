@@ -518,12 +518,9 @@ async def get_department_courses(
         for row in results:
             section, course, program, eval_count, avg_rating, enrolled_count = row
             
-            # Construct instructor full name
+            # Course evaluation system - no instructor tracking
+            # instructor_id removed from class_sections table
             instructor_full_name = "N/A"
-            if section.instructor:
-                first = section.instructor.first_name or ""
-                last = section.instructor.last_name or ""
-                instructor_full_name = f"{first} {last}".strip() or "N/A"
             
             # Calculate response rate (cap at 100%)
             enrolled = int(enrolled_count or 0)
