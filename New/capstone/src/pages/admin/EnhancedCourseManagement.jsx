@@ -822,10 +822,24 @@ export default function EnhancedCourseManagement() {
         adminAPI.getAvailableStudents(section.id)
       ])
       
-      setEnrolledStudents(enrolledResp?.data || [])
-      setAvailableStudents(availableResp?.data || [])
+      console.log('[SECTION_MODAL] Enrolled response:', enrolledResp)
+      console.log('[SECTION_MODAL] Enrolled response keys:', Object.keys(enrolledResp || {}))
+      console.log('[SECTION_MODAL] Enrolled response.data:', enrolledResp?.data)
+      console.log('[SECTION_MODAL] Enrolled response.success:', enrolledResp?.success)
+      console.log('[SECTION_MODAL] Available response:', availableResp)
+      
+      // Handle both response formats: direct data array or nested in data property
+      const enrolledData = Array.isArray(enrolledResp) ? enrolledResp : (enrolledResp?.data || [])
+      const availableData = Array.isArray(availableResp) ? availableResp : (availableResp?.data || [])
+      
+      console.log('[SECTION_MODAL] Setting enrolled students:', enrolledData)
+      console.log('[SECTION_MODAL] Setting available students:', availableData)
+      
+      setEnrolledStudents(enrolledData)
+      setAvailableStudents(availableData)
       setSelectedStudentIds([])
     } catch (err) {
+      console.error('[SECTION_MODAL] Error loading section data:', err)
       showAlert(`Error loading section data: ${err.message}`, 'Error', 'error')
     } finally {
       setSubmitting(false)
@@ -848,8 +862,12 @@ export default function EnhancedCourseManagement() {
         adminAPI.getAvailableStudents(selectedSection.id)
       ])
       
-      setEnrolledStudents(enrolledResp?.data || [])
-      setAvailableStudents(availableResp?.data || [])
+      // Handle both response formats: direct data array or nested in data property
+      const enrolledData = Array.isArray(enrolledResp) ? enrolledResp : (enrolledResp?.data || [])
+      const availableData = Array.isArray(availableResp) ? availableResp : (availableResp?.data || [])
+      
+      setEnrolledStudents(enrolledData)
+      setAvailableStudents(availableData)
       setSelectedStudentIds([])
       
       // Reload sections list to update enrolled count on cards
@@ -884,8 +902,12 @@ export default function EnhancedCourseManagement() {
         adminAPI.getAvailableStudents(selectedSection.id)
       ])
       
-      setEnrolledStudents(enrolledResp?.data || [])
-      setAvailableStudents(availableResp?.data || [])
+      // Handle both response formats: direct data array or nested in data property
+      const enrolledData = Array.isArray(enrolledResp) ? enrolledResp : (enrolledResp?.data || [])
+      const availableData = Array.isArray(availableResp) ? availableResp : (availableResp?.data || [])
+      
+      setEnrolledStudents(enrolledData)
+      setAvailableStudents(availableData)
       
           // Reload sections list to update enrolled count on cards
           await loadSections()
@@ -2069,7 +2091,7 @@ student2@example.com,IT-PROG1-2024,email,
       {/* Add Course Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl">
+          <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl">
             <div className="bg-gradient-to-r from-red-800 to-red-900 p-6 border-b-4 border-indigo-800 flex-shrink-0">
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-white">➕ Add New Course</h2>
@@ -2209,7 +2231,7 @@ student2@example.com,IT-PROG1-2024,email,
       {/* Edit Course Modal */}
       {showEditModal && selectedCourse && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl">
+          <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl">
             <div className="bg-gradient-to-r from-yellow-600 to-amber-700 p-6 border-b-4 border-yellow-800 flex-shrink-0">
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-white">✏️ Edit Course</h2>
@@ -2546,7 +2568,7 @@ student2@example.com,IT-PROG1-2024,email,
       {/* Section Management Modal */}
       {showSectionModal && selectedSection && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-5xl w-full my-4 shadow-2xl max-h-[85vh] flex flex-col">
+          <div className="bg-white rounded-2xl max-w-7xl w-full my-4 shadow-2xl max-h-[90vh] flex flex-col">
             <div className="bg-gradient-to-r from-red-800 to-red-900 p-6 border-b-4 border-indigo-800 flex-shrink-0">
               <div className="flex justify-between items-center">
                 <div>
@@ -2576,7 +2598,7 @@ student2@example.com,IT-PROG1-2024,email,
                     </span>
                     Enrolled Students
                   </h3>
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
                     {enrolledStudents.length === 0 ? (
                       <p className="text-gray-500 text-center py-8">No students enrolled</p>
                     ) : (
@@ -2621,7 +2643,7 @@ student2@example.com,IT-PROG1-2024,email,
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] text-sm"
                     />
                   </div>
-                  <div className="space-y-2 max-h-48 overflow-y-auto mb-4">
+                  <div className="space-y-2 max-h-80 overflow-y-auto mb-4">
                     {availableStudents
                       .filter(s =>
                         !studentSearchTerm ||
@@ -2679,7 +2701,7 @@ student2@example.com,IT-PROG1-2024,email,
       {/* Program Section Enrollment Modal */}
       {showProgramSectionModal && selectedSection && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="bg-gradient-to-r from-yellow-600 to-amber-700 p-6 border-b-4 border-yellow-800">
               <div className="flex justify-between items-center">
                 <div>
@@ -2793,7 +2815,7 @@ student2@example.com,IT-PROG1-2024,email,
       {/* Create Section Modal */}
       {showCreateSectionModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="bg-gradient-to-r from-red-700 to-red-900 p-6 border-b-4 border-yellow-800">
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-white">➕ Create New Section</h2>
@@ -2996,7 +3018,7 @@ student2@example.com,IT-PROG1-2024,email,
       {/* Edit Section Modal */}
       {showEditSectionModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="bg-gradient-to-r from-red-800 to-red-900 p-6 border-b-4 border-yellow-800">
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-white">✏️ Edit Section</h2>
@@ -3088,7 +3110,7 @@ student2@example.com,IT-PROG1-2024,email,
       {/* Bulk Enrollment Modal */}
       {showBulkEnrollModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full my-4 max-h-[85vh] flex flex-col">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full my-4 max-h-[90vh] flex flex-col">
             <div className="sticky top-0 bg-gradient-to-r from-yellow-600 to-amber-700 text-white p-6 rounded-t-2xl">
               <div className="flex justify-between items-center">
                 <div>
@@ -3307,7 +3329,7 @@ student2@example.com,IT-PROG1-2024,email,
       {/* Quick Bulk Enrollment Modal */}
       {showQuickBulkEnrollModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full my-4 max-h-[85vh] flex flex-col">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full my-4 max-h-[90vh] flex flex-col">
             <div className="bg-gradient-to-r from-red-800 to-red-900 text-white p-6 rounded-t-2xl flex-shrink-0">
               <div className="flex justify-between items-center">
                 <div>

@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { studentAPI } from '../../services/api'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
@@ -29,8 +29,6 @@ export default function StudentCourses(){
   // State
   const [currentStudent, setCurrentStudent] = useState(null)
   const [studentCourses, setStudentCourses] = useState([])
-  const [query, setQuery] = useState('')
-  const [semester, setSemester] = useState('All')
   const [evaluationHistory, setEvaluationHistory] = useState([])
   const [selectedPeriod, setSelectedPeriod] = useState('')
   const [availablePeriods, setAvailablePeriods] = useState([])
@@ -127,25 +125,6 @@ export default function StudentCourses(){
     }
   }, [currentStudent?.id, selectedPeriod])
 
-  const semesters = useMemo(() => {
-    if (!Array.isArray(studentCourses)) return ['All']
-    const s = Array.from(new Set(studentCourses.map(c => c.semester).filter(Boolean)));
-    return ['All', ...s]
-  }, [studentCourses])
-
-  const filtered = useMemo(() => {
-    if (!Array.isArray(studentCourses)) return []
-    return studentCourses.filter(c => {
-      if(semester && semester !== 'All' && c.semester !== semester) return false
-      if(!query) return true
-      const q = query.toLowerCase()
-      const id = c.id?.toString().toLowerCase() || ''
-      const name = c.name?.toLowerCase() || ''
-      const classCode = c.class_code?.toLowerCase() || c.classCode?.toLowerCase() || ''
-      return id.includes(q) || name.includes(q) || classCode.includes(q)
-    })
-  }, [query, semester, studentCourses])
-
   // Loading and error states
   if (!currentStudent) return <LoadingSpinner message="Loading student info..." />
   if (loading) return <LoadingSpinner message="Loading your courses..." />
@@ -236,40 +215,9 @@ export default function StudentCourses(){
           </div>
         )}
 
-        {/* Filters Section */}
-        <div className="bg-white rounded-card shadow-card border border-gray-200 p-6 lg:p-8 mb-6 lg:mb-8">
-          <div className="flex flex-col sm:flex-row gap-4 lg:gap-5">
-            <div className="flex-1">
-              <input
-                type="search"
-                name="course-search"
-                autoComplete="off"
-                spellCheck={false}
-                className="lpu-input"
-                placeholder="Search by course code or name..."
-                value={query}
-                onChange={e=>setQuery(e.target.value)}
-              />
-            </div>
-            <div className="sm:w-48">
-              <select
-                className="lpu-select"
-                value={semester}
-                onChange={e=>setSemester(e.target.value)}
-              >
-                {semesters.map(s => (
-                  <option key={s} value={s === 'All' ? 'All' : s}>
-                    {s === 'All' ? 'All Semesters' : `Semester ${s}`}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
         {/* Courses List */}
         <div className="bg-white rounded-card shadow-card border border-gray-200 overflow-hidden">
-          {filtered.length === 0 ? (
+          {studentCourses.length === 0 ? (
             <div className="text-center py-12">
               <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
@@ -289,7 +237,7 @@ export default function StudentCourses(){
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 bg-white">
-                  {filtered.map(c => (
+                  {studentCourses.map(c => (
                     <tr
                       key={c.class_section_id || `${c.id}-${c.class_code}`}
                       onClick={() => nav(`/student/evaluate/${c.class_section_id || c.id}`)}

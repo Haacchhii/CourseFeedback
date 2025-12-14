@@ -287,35 +287,20 @@ const ProgramSections = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9]">
-      {/* Header */}
-      <header className="lpu-header">
-        <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-8 lg:py-10 max-w-screen-2xl">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <img 
-                src="/lpu-logo.png" 
-                alt="University Logo" 
-                className="w-32 h-32 object-contain"
-              />
-              <div>
-                <h1 className="lpu-header-title text-3xl">Program Sections Management</h1>
-                <p className="lpu-header-subtitle text-lg">Manage program sections and student assignments</p>
-              </div>
-            </div>
-            <button
-              onClick={handleCreateSection}
-              className="bg-white hover:bg-[#ffd700] text-[#7a0000] font-semibold px-6 py-3 rounded-xl shadow-lg transition-all flex items-center space-x-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
-              </svg>
-              <span>Create Section</span>
-            </button>
-          </div>
-        </div>
-      </header>
-
       <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-10 lg:py-12 max-w-screen-2xl">
+
+      {/* Create Section Button */}
+      <div className="mb-6">
+        <button
+          onClick={handleCreateSection}
+          className="bg-[#7a0000] hover:bg-[#5a0000] text-white font-semibold px-6 py-3 rounded-xl shadow-lg transition-all flex items-center space-x-2"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
+          </svg>
+          <span>Create Section</span>
+        </button>
+      </div>
 
       {/* Filters */}
       <div className="bg-white p-6 lg:p-8 rounded-card shadow-card mb-12">

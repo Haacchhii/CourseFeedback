@@ -2981,6 +2981,15 @@ async def get_section_students(
 ):
     """Get all enrolled students for a specific section"""
     try:
+        logger.info(f"[GET_SECTION_STUDENTS] Fetching students for section_id={section_id}")
+        
+        # First check if any enrollments exist for this section
+        enrollment_check = db.execute(
+            text("SELECT COUNT(*) as count FROM enrollments WHERE class_section_id = :section_id"),
+            {"section_id": section_id}
+        ).fetchone()
+        logger.info(f"[GET_SECTION_STUDENTS] Found {enrollment_check[0]} enrollments for section {section_id}")
+        
         # Query enrolled students with their details
         query = text("""
             SELECT 
@@ -3002,6 +3011,10 @@ async def get_section_students(
         
         result = db.execute(query, {"section_id": section_id})
         students = [dict(row._mapping) for row in result]
+        
+        logger.info(f"[GET_SECTION_STUDENTS] Returning {len(students)} students")
+        if students:
+            logger.info(f"[GET_SECTION_STUDENTS] First student: {students[0]}")
         
         return {
             "success": True,
