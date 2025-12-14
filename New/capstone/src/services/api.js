@@ -1065,11 +1065,11 @@ export const adminAPI = {
   },
 
   /**
-   * Get students assigned to a section
-   * @param {number} sectionId - Section ID
+   * Get students assigned to a program section
+   * @param {number} sectionId - Program Section ID
    * @returns {Promise} List of students
    */
-  getSectionStudents: async (sectionId) => {
+  getProgramSectionStudents: async (sectionId) => {
     return apiClient.get(`/admin/program-sections/${sectionId}/students`)
   },
 
