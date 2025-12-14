@@ -66,7 +66,7 @@ class EmailService:
         html_body: str,
         text_body: Optional[str] = None,
         attachments: Optional[List[Dict]] = None,
-        max_retries: int = 3
+        max_retries: int = 1
     ) -> bool:
         """
         Send an email using Resend API (primary) or SMTP (fallback) with retry logic
@@ -77,7 +77,7 @@ class EmailService:
             html_body: HTML email body
             text_body: Plain text email body (optional)
             attachments: List of attachment dicts with 'filename' and 'content' keys
-            max_retries: Maximum number of retry attempts (default: 3)
+            max_retries: Maximum number of retry attempts (default: 1, reduced to prevent blocking)
             
         Returns:
             bool: True if sent successfully, False otherwise
@@ -86,9 +86,7 @@ class EmailService:
             print("⚠️ Email service not configured. Skipping email send.")
             return False
         
-        # Retry logic with exponential backoff
-        import time
-        
+        # Simplified retry logic - only 1 quick retry to prevent API blocking
         for attempt in range(1, max_retries + 1):
             try:
                 result = self._send_email_attempt(to_emails, subject, html_body, text_body, attachments)
@@ -97,21 +95,16 @@ class EmailService:
                     
                 # If attempt failed and we have retries left
                 if attempt < max_retries:
-                    wait_time = 2 ** attempt  # Exponential backoff: 2s, 4s, 8s
-                    print(f"⏳ Retry attempt {attempt}/{max_retries} in {wait_time}s...")
-                    time.sleep(wait_time)
+                    print(f"⏳ Retry attempt {attempt}/{max_retries}...")
+                    # No sleep - retry immediately to avoid blocking
                 else:
-                    print(f"❌ All {max_retries} email send attempts failed")
+                    print(f"❌ Email send failed after {max_retries} attempt(s)")
                     return False
                     
             except Exception as e:
                 print(f"❌ Email send attempt {attempt} error: {str(e)}")
-                if attempt < max_retries:
-                    wait_time = 2 ** attempt
-                    print(f"⏳ Retrying in {wait_time}s...")
-                    time.sleep(wait_time)
-                else:
-                    print(f"❌ All {max_retries} attempts exhausted")
+                if attempt >= max_retries:
+                    print(f"❌ Email send failed - check email configuration")
                     return False
         
         return False
