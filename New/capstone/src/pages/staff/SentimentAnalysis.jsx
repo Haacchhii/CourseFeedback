@@ -824,12 +824,12 @@ export default function SentimentAnalysis() {
                 </div>
               ) : filteredAnomalies.length > 0 ? (
                 <table className="w-full">
-                  <thead className="bg-gray-50 border-b">
-                    <tr>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Course</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Anomaly Type</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Rating</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Date</th>
+                  <thead>
+                    <tr className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white">
+                      <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Course</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Anomaly Type</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Rating</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Date</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">

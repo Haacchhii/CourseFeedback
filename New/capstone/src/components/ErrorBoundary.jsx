@@ -46,7 +46,7 @@ class ErrorBoundary extends React.Component {
             </button>
             <a
               href="/debug"
-              className="mt-4 ml-2 inline-block bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+              className="mt-4 ml-2 inline-block bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white px-4 py-2 rounded hover:from-[#9a1000] hover:to-[#7a0000]"
             >
               Go to Debug Page
             </a>

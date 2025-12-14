@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Upload, Search, Filter, Users, TrendingUp, AlertCircle, CheckCircle, X, Download, FileText, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Upload, Search, Filter, Users, TrendingUp, AlertCircle, CheckCircle, X, Download, FileText, Eye } from 'lucide-react';
 import { adminAPI, apiClient } from '../../services/api';
 import { AlertModal } from '../../components/Modal';
+import Pagination from '../../components/Pagination';
 
 const EnrollmentListManagement = () => {
   const [enrollmentList, setEnrollmentList] = useState([]);
@@ -566,7 +567,7 @@ const EnrollmentListManagement = () => {
           <div className="overflow-x-auto">
             {loading ? (
               <div className="flex items-center justify-center py-12">
-                <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                <div className="w-8 h-8 border-4 border-[#7a0000] border-t-transparent rounded-full animate-spin" />
               </div>
             ) : enrollmentList.length === 0 ? (
               <div className="text-center py-12 text-gray-500">
@@ -575,28 +576,28 @@ const EnrollmentListManagement = () => {
                 <p className="text-sm mt-1">Try adjusting your search or filters</p>
               </div>
             ) : (
-              <table className="table-auto">
-                <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
-                  <tr>
-                    <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white">
+                    <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider">
                       Student Number
                     </th>
-                    <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
+                    <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider">
                       Name
                     </th>
-                    <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
+                    <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider">
                       Email
                     </th>
-                    <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
+                    <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider">
                       Program
                     </th>
-                    <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
+                    <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider">
                       Year Level
                     </th>
-                    <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
+                    <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider">
                       College
                     </th>
-                    <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">
+                    <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider">
                       Status
                     </th>
                   </tr>
@@ -647,95 +648,19 @@ const EnrollmentListManagement = () => {
           
           {/* Pagination Controls */}
           {enrollmentList.length > 0 && (
-            <div className="p-4 lg:p-6 border-t border-gray-200 bg-gray-50">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                {/* Items per page selector */}
-                <div className="flex items-center gap-2">
-                  <label className="text-sm text-gray-600">Show:</label>
-                  <select
-                    value={itemsPerPage}
-                    onChange={(e) => {
-                      setItemsPerPage(Number(e.target.value));
-                      setCurrentPage(1);
-                    }}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#7a0000] focus:border-[#7a0000]"
-                  >
-                    <option value={10}>10</option>
-                    <option value={25}>25</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                  </select>
-                  <span className="text-sm text-gray-600">per page</span>
-                </div>
-                
-                {/* Page info */}
-                <div className="text-sm text-gray-600">
-                  Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, enrollmentList.length)} of {enrollmentList.length} students
-                </div>
-                
-                {/* Pagination buttons */}
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setCurrentPage(1)}
-                    disabled={currentPage === 1}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    First
-                  </button>
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    className="p-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <ChevronLeft className="w-5 h-5" />
-                  </button>
-                  
-                  {/* Page numbers */}
-                  <div className="flex items-center gap-1">
-                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                      let pageNum;
-                      if (totalPages <= 5) {
-                        pageNum = i + 1;
-                      } else if (currentPage <= 3) {
-                        pageNum = i + 1;
-                      } else if (currentPage >= totalPages - 2) {
-                        pageNum = totalPages - 4 + i;
-                      } else {
-                        pageNum = currentPage - 2 + i;
-                      }
-                      return (
-                        <button
-                          key={pageNum}
-                          onClick={() => setCurrentPage(pageNum)}
-                          className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
-                            currentPage === pageNum
-                              ? 'bg-[#7a0000] text-white'
-                              : 'border border-gray-300 text-gray-700 hover:bg-gray-100'
-                          }`}
-                        >
-                          {pageNum}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages}
-                    className="p-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => setCurrentPage(totalPages)}
-                    disabled={currentPage === totalPages}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Last
-                  </button>
-                </div>
-              </div>
-            </div>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={enrollmentList.length}
+              onPageChange={setCurrentPage}
+              itemLabel="students"
+              itemsPerPage={itemsPerPage}
+              onItemsPerPageChange={(value) => {
+                setItemsPerPage(value);
+                setCurrentPage(1);
+              }}
+              showItemsPerPage={true}
+            />
           )}
         </div>
       </div>
@@ -807,14 +732,14 @@ const EnrollmentListManagement = () => {
                   <div className="border-2 border-gray-200 rounded-lg overflow-hidden">
                     <div className="overflow-x-auto">
                       <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Status</th>
-                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Student #</th>
-                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Name</th>
-                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Email</th>
-                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Program</th>
-                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase">Year</th>
+                        <thead>
+                          <tr className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white">
+                            <th className="px-4 py-3 text-left text-sm font-semibold uppercase">Status</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold uppercase">Student #</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold uppercase">Name</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold uppercase">Email</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold uppercase">Program</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold uppercase">Year</th>
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">

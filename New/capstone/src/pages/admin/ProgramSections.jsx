@@ -384,15 +384,15 @@ const ProgramSections = () => {
       ) : (
         <div className="bg-white rounded-card shadow-card overflow-hidden">
           <table className="min-w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Section Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Program</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Year/Semester</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">School Year</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Students</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+            <thead>
+              <tr className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white">
+                <th className="px-6 py-3 text-left text-sm font-semibold uppercase tracking-wider">Section Name</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold uppercase tracking-wider">Program</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold uppercase tracking-wider">Year/Semester</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold uppercase tracking-wider">School Year</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold uppercase tracking-wider">Students</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">

@@ -762,7 +762,7 @@ export default function DataExportCenter() {
 
         {/* Custom Export Tab - REMOVED */}
         {false && activeTab === 'custom' && (
-          <div className="bg-white rounded-xl shadow-md p-8">
+          <div className="bg-white rounded-card shadow-card p-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">🎯 Custom Export Configuration</h2>
             
             <div className="space-y-6">
@@ -895,15 +895,15 @@ export default function DataExportCenter() {
             
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b-2 border-gray-200">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Filename</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Type</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Format</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Size</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Date</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
-                    <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">Actions</th>
+                <thead>
+                  <tr className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white">
+                    <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Filename</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Type</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Format</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Size</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Date</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -1012,7 +1012,7 @@ export default function DataExportCenter() {
                       <select
                         value={exportFilters.userRole}
                         onChange={(e) => setExportFilters({...exportFilters, userRole: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000]"
                       >
                         <option value="all">All Roles</option>
                         <option value="student">Students</option>
@@ -1026,7 +1026,7 @@ export default function DataExportCenter() {
                       <select
                         value={exportFilters.userProgram}
                         onChange={(e) => setExportFilters({...exportFilters, userProgram: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000]"
                       >
                         <option value="all">All Programs</option>
                         {programs.map(prog => (
@@ -1039,7 +1039,7 @@ export default function DataExportCenter() {
                       <select
                         value={exportFilters.userStatus}
                         onChange={(e) => setExportFilters({...exportFilters, userStatus: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000]"
                       >
                         <option value="all">All Status</option>
                         <option value="active">Active</option>
@@ -1064,7 +1064,7 @@ export default function DataExportCenter() {
                       <select
                         value={exportFilters.evalDateRange}
                         onChange={(e) => setExportFilters({...exportFilters, evalDateRange: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000]"
                       >
                         <option value="all">All Time</option>
                         <option value="current_semester">Current Semester</option>
@@ -1078,7 +1078,7 @@ export default function DataExportCenter() {
                       <select
                         value={exportFilters.evalProgram}
                         onChange={(e) => setExportFilters({...exportFilters, evalProgram: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000]"
                       >
                         <option value="all">All Programs</option>
                         {programs.map(prog => (
@@ -1091,7 +1091,7 @@ export default function DataExportCenter() {
                       <select
                         value={exportFilters.evalPeriod}
                         onChange={(e) => setExportFilters({...exportFilters, evalPeriod: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000]"
                       >
                         <option value="all">All Periods</option>
                         {evaluationPeriods.map(period => (
@@ -1119,7 +1119,7 @@ export default function DataExportCenter() {
                       <select
                         value={exportFilters.courseProgram}
                         onChange={(e) => setExportFilters({...exportFilters, courseProgram: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000]"
                       >
                         <option value="all">All Programs</option>
                         {programs.map(prog => (
@@ -1132,7 +1132,7 @@ export default function DataExportCenter() {
                       <select
                         value={exportFilters.courseStatus}
                         onChange={(e) => setExportFilters({...exportFilters, courseStatus: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000]"
                       >
                         <option value="all">All Status</option>
                         <option value="Active">Active</option>
@@ -1144,7 +1144,7 @@ export default function DataExportCenter() {
                       <select
                         value={exportFilters.courseYearLevel}
                         onChange={(e) => setExportFilters({...exportFilters, courseYearLevel: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000]"
                       >
                         <option value="all">All Years</option>
                         <option value="1">1st Year</option>
@@ -1171,7 +1171,7 @@ export default function DataExportCenter() {
                       <select
                         value={exportFilters.auditDateRange}
                         onChange={(e) => setExportFilters({...exportFilters, auditDateRange: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000]"
                       >
                         <option value="all">All Time</option>
                         <option value="today">Today</option>
@@ -1186,7 +1186,7 @@ export default function DataExportCenter() {
                       <select
                         value={exportFilters.auditAction}
                         onChange={(e) => setExportFilters({...exportFilters, auditAction: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000]"
                       >
                         <option value="all">All Actions</option>
                         <optgroup label="Authentication">
@@ -1231,7 +1231,7 @@ export default function DataExportCenter() {
                       <select
                         value={exportFilters.auditSeverity}
                         onChange={(e) => setExportFilters({...exportFilters, auditSeverity: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000]"
                       >
                         <option value="all">All Severities</option>
                         <option value="Info">Info</option>

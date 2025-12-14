@@ -14,7 +14,7 @@ export default function NonRespondents() {
   const [selectedProgram, setSelectedProgram] = useState('all')
   const [selectedYearLevel, setSelectedYearLevel] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 15
+  const [itemsPerPage, setItemsPerPage] = useState(15)
 
   // Filter options
   const [programs, setPrograms] = useState([])
@@ -329,24 +329,24 @@ export default function NonRespondents() {
             <>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <thead>
+                    <tr className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white">
+                      <th className="px-6 py-3 text-left text-sm font-semibold uppercase tracking-wider">
                         Student Number
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-sm font-semibold uppercase tracking-wider">
                         Name
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-sm font-semibold uppercase tracking-wider">
                         Program
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-sm font-semibold uppercase tracking-wider">
                         Section
                       </th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-center text-sm font-semibold uppercase tracking-wider">
                         Year
                       </th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-center text-sm font-semibold uppercase tracking-wider">
                         Pending
                       </th>
                       <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -409,6 +409,12 @@ export default function NonRespondents() {
                 totalItems={filteredData.length}
                 onPageChange={setCurrentPage}
                 itemLabel="students"
+                itemsPerPage={itemsPerPage}
+                onItemsPerPageChange={(value) => {
+                  setItemsPerPage(value)
+                  setCurrentPage(1)
+                }}
+                showItemsPerPage={true}
               />
             </>
           )}

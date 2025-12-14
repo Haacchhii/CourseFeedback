@@ -569,21 +569,21 @@ export default function EvaluationPeriodManagement() {
       <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-10 lg:py-12 max-w-screen-2xl">
         {/* Current Period Card */}
         {currentPeriod ? (
-          <div className="bg-white rounded-card shadow-card overflow-hidden mb-12 border-2 border-yellow-200">
-            <div className="bg-gradient-to-r from-yellow-600 to-amber-700 p-6">
+          <div className="bg-white rounded-card shadow-card overflow-hidden mb-12 border-2 border-[#7a0000]/20">
+            <div className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] p-6">
               <div className="flex justify-between items-start">
                 <div>
                   <div className="flex items-center space-x-3 mb-2">
                     <h2 className="text-2xl font-bold text-white">{currentPeriod.name}</h2>
                   <span className={`px-4 py-1 rounded-full text-sm font-bold ${
                     isOpen(currentPeriod.status)
-                      ? 'bg-yellow-400 text-yellow-900'
+                      ? 'bg-green-400 text-green-900'
                       : 'bg-gray-300 text-gray-700'
                   }`}>
                     {isOpen(currentPeriod.status) ? '🟢 OPEN' : '⚫ CLOSED'}
                   </span>
                 </div>
-                <p className="text-yellow-100">
+                <p className="text-white/80">
                   {new Date(currentPeriod.startDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - {new Date(currentPeriod.endDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                 </p>
               </div>
@@ -593,16 +593,16 @@ export default function EvaluationPeriodManagement() {
                     <button onClick={() => openExtendModal(currentPeriod)} className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-all font-semibold">
                       Extend
                     </button>
-                    <button onClick={handleClosePeriod} className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all font-semibold">
+                    <button onClick={handleClosePeriod} className="px-4 py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg transition-all font-semibold">
                       Close Period
                     </button>
                   </>
                 ) : (
                   <>
-                    <button onClick={() => openExtendModal(currentPeriod)} className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all font-semibold">
+                    <button onClick={() => openExtendModal(currentPeriod)} className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-all font-semibold">
                       Extend & Reopen
                     </button>
-                    <button onClick={handleOpenPeriod} className="px-4 py-2 bg-yellow-500 hover:bg-amber-600 text-white rounded-lg transition-all font-semibold">
+                    <button onClick={handleOpenPeriod} className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-all font-semibold">
                       Reopen
                     </button>
                   </>
@@ -622,13 +622,13 @@ export default function EvaluationPeriodManagement() {
                 <p className="text-xs lg:text-sm font-semibold text-gray-600 mb-2 uppercase tracking-wide">Completed</p>
                 <p className="text-4xl lg:text-5xl font-bold text-green-600">{currentPeriod.completedEvaluations}</p>
               </div>
-              <div className="bg-white rounded-card p-7 lg:p-8 border-2 border-gray-200 hover:border-blue-500 transition-all duration-250 shadow-card">
+              <div className="bg-white rounded-card p-7 lg:p-8 border-2 border-gray-200 hover:border-[#7a0000] transition-all duration-250 shadow-card">
                 <p className="text-xs lg:text-sm font-semibold text-gray-600 mb-2 uppercase tracking-wide">Participation Rate</p>
-                <p className="text-4xl lg:text-5xl font-bold text-blue-600">{currentPeriod.participationRate}%</p>
+                <p className="text-4xl lg:text-5xl font-bold text-[#7a0000]">{currentPeriod.participationRate}%</p>
               </div>
-              <div className="bg-white rounded-card p-7 lg:p-8 border-2 border-gray-200 hover:border-orange-500 transition-all duration-250 shadow-card">
+              <div className="bg-white rounded-card p-7 lg:p-8 border-2 border-gray-200 hover:border-[#7a0000] transition-all duration-250 shadow-card">
                 <p className="text-xs lg:text-sm font-semibold text-gray-600 mb-2 uppercase tracking-wide">Days Remaining</p>
-                <p className="text-4xl lg:text-5xl font-bold text-orange-600">{currentPeriod.daysRemaining}</p>
+                <p className="text-4xl lg:text-5xl font-bold text-[#7a0000]">{currentPeriod.daysRemaining}</p>
               </div>
             </div>
 
@@ -636,11 +636,11 @@ export default function EvaluationPeriodManagement() {
             <div className="mb-12">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm font-semibold text-gray-700">Completion Progress</span>
-                <span className="text-sm font-bold text-yellow-600">{currentPeriod.completedEvaluations}/{currentPeriod.totalEvaluations}</span>
+                <span className="text-sm font-bold text-[#7a0000]">{currentPeriod.completedEvaluations}/{currentPeriod.totalEvaluations}</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-6 overflow-hidden shadow-inner">
                 <div 
-                  className="h-full bg-gradient-to-r from-yellow-600 to-amber-700 transition-all duration-500 flex items-center justify-end px-2"
+                  className="h-full bg-gradient-to-r from-[#7a0000] to-[#9a1000] transition-all duration-500 flex items-center justify-end px-2"
                   style={{ width: `${currentPeriod.participationRate}%` }}
                 >
                   <span className="text-xs font-bold text-white">{currentPeriod.participationRate}%</span>
@@ -650,14 +650,14 @@ export default function EvaluationPeriodManagement() {
 
             {/* Warning/Info Messages */}
             {isOpen(currentPeriod.status) && currentPeriod.daysRemaining <= 5 && (
-              <div className="bg-orange-50 border-l-4 border-yellow-500 p-4 mb-6 rounded-lg">
+              <div className="bg-[#7a0000]/5 border-l-4 border-[#7a0000] p-4 mb-6 rounded-lg">
                 <div className="flex items-center">
-                  <svg className="w-6 h-6 text-yellow-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-6 h-6 text-[#7a0000] mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                   </svg>
                   <div>
-                    <p className="font-bold text-orange-900">⚠️ Period ending soon!</p>
-                    <p className="text-sm text-orange-700">Only {currentPeriod.daysRemaining} days remaining.</p>
+                    <p className="font-bold text-[#7a0000]">⚠️ Period ending soon!</p>
+                    <p className="text-sm text-[#7a0000]/80">Only {currentPeriod.daysRemaining} days remaining.</p>
                   </div>
                 </div>
               </div>
@@ -682,7 +682,7 @@ export default function EvaluationPeriodManagement() {
               <div className="flex justify-between items-center mb-6">
                 <div>
                   <h3 className="text-2xl font-bold text-gray-900 flex items-center">
-                    <svg className="w-7 h-7 mr-3 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-7 h-7 mr-3 text-[#7a0000]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
                     </svg>
                     Enrolled Program Sections
@@ -702,7 +702,7 @@ export default function EvaluationPeriodManagement() {
                   </button>
                   <button 
                     onClick={() => setShowEnrollModal(true)}
-                    className="px-6 py-3 bg-gradient-to-r from-yellow-600 to-amber-700 hover:from-yellow-600 hover:to-amber-700 text-white font-semibold rounded-xl shadow-lg transition-all flex items-center space-x-2"
+                    className="px-6 py-3 bg-gradient-to-r from-[#7a0000] to-[#9a1000] hover:from-[#9a1000] hover:to-[#7a0000] text-white font-semibold rounded-xl shadow-lg transition-all flex items-center space-x-2"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
@@ -714,7 +714,7 @@ export default function EvaluationPeriodManagement() {
 
               {loadingEnrollments ? (
                 <div className="text-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-600 mx-auto mb-4"></div>
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#7a0000] mx-auto mb-4"></div>
                   <p className="text-gray-600">Loading enrolled sections...</p>
                 </div>
               ) : enrolledProgramSections.length === 0 ? (
@@ -724,7 +724,7 @@ export default function EvaluationPeriodManagement() {
                   <p className="text-gray-600 mb-4">Enroll program sections to enable students to evaluate during this period.</p>
                   <button 
                     onClick={() => setShowEnrollModal(true)}
-                    className="px-6 py-3 bg-yellow-600 hover:bg-amber-700 text-white font-semibold rounded-xl transition-all inline-flex items-center space-x-2"
+                    className="px-6 py-3 bg-gradient-to-r from-[#7a0000] to-[#9a1000] hover:from-[#9a1000] hover:to-[#7a0000] text-white font-semibold rounded-xl transition-all inline-flex items-center space-x-2"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
@@ -735,7 +735,7 @@ export default function EvaluationPeriodManagement() {
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {enrolledProgramSections.map((section) => (
-                    <div key={section.id} className="bg-gradient-to-br from-amber-50 to-yellow-50 border-2 border-amber-200 rounded-xl p-5 hover:shadow-lg hover:border-amber-300 transition-all">
+                    <div key={section.id} className="bg-gradient-to-br from-[#7a0000]/5 to-[#9a1000]/5 border-2 border-[#7a0000]/20 rounded-xl p-5 hover:shadow-lg hover:border-[#7a0000]/40 transition-all">
                       <div className="flex justify-between items-start gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -743,7 +743,7 @@ export default function EvaluationPeriodManagement() {
                             <span className="px-2 py-0.5 bg-[#7a0000] text-white rounded-md text-xs font-semibold whitespace-nowrap">
                               Year {section.year_level || section.yearLevel}
                             </span>
-                            <span className="px-2 py-0.5 bg-amber-600 text-white rounded-md text-xs font-semibold whitespace-nowrap">
+                            <span className="px-2 py-0.5 bg-[#9a1000] text-white rounded-md text-xs font-semibold whitespace-nowrap">
                               Sem {section.semester}
                             </span>
                           </div>
@@ -789,7 +789,7 @@ export default function EvaluationPeriodManagement() {
               <p className="text-gray-600 mb-6">Create a new evaluation period to start collecting feedback</p>
               <button 
                 onClick={() => setShowCreateModal(true)}
-                className="px-8 py-3 bg-yellow-600 hover:bg-amber-700 text-white font-semibold rounded-xl shadow-lg transition-all"
+                className="px-8 py-3 bg-gradient-to-r from-[#7a0000] to-[#9a1000] hover:from-[#9a1000] hover:to-[#7a0000] text-white font-semibold rounded-xl shadow-lg transition-all"
               >
                 Create New Period
               </button>
@@ -799,9 +799,9 @@ export default function EvaluationPeriodManagement() {
 
         {/* Past Periods Section */}
         <div className="bg-white rounded-card shadow-card overflow-hidden">
-          <div className="bg-gradient-to-r from-gray-700 to-gray-800 p-6">
+          <div className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] p-6">
             <h2 className="text-2xl font-bold text-white">📚 Past Evaluation Periods</h2>
-            <p className="text-gray-300 text-sm mt-1">Historical evaluation period records</p>
+            <p className="text-white/80 text-sm mt-1">Historical evaluation period records</p>
           </div>
 
           <div className="p-6 lg:p-8">
@@ -822,15 +822,15 @@ export default function EvaluationPeriodManagement() {
                       <div className="flex items-center space-x-6">
                         <div>
                           <p className="text-xs text-gray-500">Participation</p>
-                          <p className="text-2xl font-bold text-yellow-600">{period.participationRate}%</p>
+                          <p className="text-2xl font-bold text-[#7a0000]">{period.participationRate}%</p>
                         </div>
                         <div>
                           <p className="text-xs text-gray-500">Completed</p>
-                          <p className="text-2xl font-bold text-yellow-600">{period.completedEvaluations}</p>
+                          <p className="text-2xl font-bold text-green-600">{period.completedEvaluations}</p>
                         </div>
                         <div>
                           <p className="text-xs text-gray-500">Total</p>
-                          <p className="text-2xl font-bold text-red-600">{period.totalEvaluations}</p>
+                          <p className="text-2xl font-bold text-[#7a0000]">{period.totalEvaluations}</p>
                         </div>
                       </div>
                     </div>
@@ -838,7 +838,7 @@ export default function EvaluationPeriodManagement() {
                       <button
                         onClick={() => openExtendModal(period)}
                         disabled={submitting}
-                        className="px-4 py-2 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white rounded-lg transition-all font-semibold text-sm flex items-center space-x-2"
+                        className="px-4 py-2 bg-gradient-to-r from-[#7a0000] to-[#9a1000] hover:from-[#9a1000] hover:to-[#7a0000] disabled:from-gray-400 disabled:to-gray-500 text-white rounded-lg transition-all font-semibold text-sm flex items-center space-x-2"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -848,7 +848,7 @@ export default function EvaluationPeriodManagement() {
                       <button
                         onClick={() => handleDeletePastPeriod(period.id, period.name)}
                         disabled={submitting}
-                        className="px-4 py-2 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white rounded-lg transition-all font-semibold text-sm flex items-center space-x-2"
+                        className="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white rounded-lg transition-all font-semibold text-sm flex items-center space-x-2"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -868,7 +868,7 @@ export default function EvaluationPeriodManagement() {
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl">
-            <div className="bg-gradient-to-r from-yellow-600 to-amber-700 p-6 border-b-4 border-yellow-800 flex-shrink-0">
+            <div className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] p-6 border-b-4 border-[#5a0000] flex-shrink-0">
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-white">📅 Create New Evaluation Period</h2>
                 <button onClick={() => setShowCreateModal(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
@@ -887,7 +887,7 @@ export default function EvaluationPeriodManagement() {
                     required
                     value={formData.semester}
                     onChange={(e) => setFormData({...formData, semester: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                   >
                     <option value="1st Semester">1st Semester</option>
                     <option value="2nd Semester">2nd Semester</option>
@@ -902,17 +902,17 @@ export default function EvaluationPeriodManagement() {
                     pattern="\d{4}-\d{4}"
                     value={formData.academicYear}
                     onChange={(e) => setFormData({...formData, academicYear: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                     placeholder="2025-2026"
                   />
                   <p className="text-xs text-gray-500 mt-1">Format: YYYY-YYYY (e.g., 2025-2026)</p>
                 </div>
               </div>
 
-              <div className="bg-red-50 border border-yellow-200 rounded-lg p-4">
-                <p className="text-sm font-semibold text-red-900 mb-1">📝 Period Name Preview:</p>
-                <p className="text-lg font-bold text-red-800">{formData.semester} {formData.academicYear}</p>
-                <p className="text-xs text-red-700 mt-1">Name will be auto-generated from semester and academic year</p>
+              <div className="bg-[#7a0000]/5 border border-[#7a0000]/20 rounded-lg p-4">
+                <p className="text-sm font-semibold text-[#7a0000] mb-1">📝 Period Name Preview:</p>
+                <p className="text-lg font-bold text-[#7a0000]">{formData.semester} {formData.academicYear}</p>
+                <p className="text-xs text-[#7a0000]/70 mt-1">Name will be auto-generated from semester and academic year</p>
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
@@ -924,7 +924,7 @@ export default function EvaluationPeriodManagement() {
                     min={new Date().toISOString().split('T')[0]}
                     value={formData.startDate}
                     onChange={(e) => setFormData({...formData, startDate: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                   />
                   <p className="text-xs text-gray-500 mt-1">⚠️ Cannot select past dates</p>
                 </div>
@@ -936,28 +936,28 @@ export default function EvaluationPeriodManagement() {
                     min={formData.startDate || new Date().toISOString().split('T')[0]}
                     value={formData.endDate}
                     onChange={(e) => setFormData({...formData, endDate: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                   />
                   <p className="text-xs text-gray-500 mt-1">⚠️ Must be after start date</p>
                 </div>
               </div>
 
-              <div className="bg-red-50 border border-yellow-200 rounded-lg p-4">
+              <div className="bg-[#7a0000]/5 border border-[#7a0000]/20 rounded-lg p-4">
                 <label className="flex items-center">
                   <input
                     type="checkbox"
                     checked={formData.notifyUsers}
                     onChange={(e) => setFormData({...formData, notifyUsers: e.target.checked})}
-                    className="w-4 h-4 text-red-600 rounded focus:ring-2 focus:ring-blue-500 mr-3"
+                    className="w-4 h-4 text-[#7a0000] rounded focus:ring-2 focus:ring-[#7a0000] mr-3"
                   />
-                  <span className="text-sm font-semibold text-red-900">
+                  <span className="text-sm font-semibold text-[#7a0000]">
                     📧 Send email notification to all users when period opens
                   </span>
                 </label>
               </div>
 
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <p className="text-sm text-yellow-800">
+              <div className="bg-[#7a0000]/5 border border-[#7a0000]/20 rounded-lg p-4">
+                <p className="text-sm text-[#7a0000]">
                   <strong>⚠️ Note:</strong> The current evaluation period must be closed before creating a new one.
                 </p>
               </div>
@@ -972,7 +972,7 @@ export default function EvaluationPeriodManagement() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-6 py-3 bg-yellow-600 hover:bg-amber-700 text-white rounded-lg font-semibold transition-all"
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-[#7a0000] to-[#9a1000] hover:from-[#9a1000] hover:to-[#7a0000] text-white rounded-lg font-semibold transition-all"
                 >
                   Create Period
                 </button>
@@ -986,7 +986,7 @@ export default function EvaluationPeriodManagement() {
       {showExtendModal && (periodToExtend || currentPeriod) && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full max-h-[85vh] flex flex-col shadow-2xl">
-            <div className={`bg-gradient-to-r ${isClosed((periodToExtend || currentPeriod).status) ? 'from-red-800 to-red-900 border-yellow-700' : 'from-yellow-600 to-amber-700 border-orange-700'} px-5 py-4 border-b-4 flex-shrink-0`}>
+            <div className={`bg-gradient-to-r from-[#7a0000] to-[#9a1000] px-5 py-4 border-b-4 border-[#5a0000] flex-shrink-0`}>
               <div className="flex justify-between items-center">
                 <div>
                   <h2 className="text-lg font-bold text-white">⏰ Extend Period</h2>
@@ -1002,8 +1002,8 @@ export default function EvaluationPeriodManagement() {
             
             <form onSubmit={handleExtendPeriod} className="flex-1 overflow-y-auto p-6 space-y-4">
               {isClosed((periodToExtend || currentPeriod).status) && (
-                <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded">
-                  <p className="text-sm text-red-900">
+                <div className="bg-[#7a0000]/5 border-l-4 border-[#7a0000] p-4 rounded">
+                  <p className="text-sm text-[#7a0000]">
                     <strong>ℹ️ Note:</strong> This period is currently closed. Extending it will automatically reopen the period for new submissions.
                   </p>
                 </div>
@@ -1027,12 +1027,12 @@ export default function EvaluationPeriodManagement() {
                   min={(periodToExtend || currentPeriod).endDate}
                   value={formData.endDate}
                   onChange={(e) => setFormData({...formData, endDate: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                 />
               </div>
 
-              <div className="bg-red-50 border border-yellow-200 rounded-lg p-4">
-                <p className="text-sm text-red-900">
+              <div className="bg-[#7a0000]/5 border border-[#7a0000]/20 rounded-lg p-4">
+                <p className="text-sm text-[#7a0000]">
                   <strong>📧 Email notifications</strong> will be sent to all users informing them of the extension.
                 </p>
               </div>
@@ -1047,7 +1047,7 @@ export default function EvaluationPeriodManagement() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg text-sm font-semibold transition-all"
+                  className="flex-1 px-4 py-2 bg-gradient-to-r from-[#7a0000] to-[#9a1000] hover:from-[#9a1000] hover:to-[#7a0000] text-white rounded-lg text-sm font-semibold transition-all"
                 >
                   Extend Period
                 </button>
@@ -1061,11 +1061,11 @@ export default function EvaluationPeriodManagement() {
       {showEnrollModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-xl w-full max-h-[85vh] overflow-y-auto shadow-2xl">
-              <div className="bg-gradient-to-r from-yellow-600 to-amber-700 px-5 py-4 border-b-4 border-yellow-800">
+              <div className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] px-5 py-4 border-b-4 border-[#5a0000]">
               <div className="flex justify-between items-center">
                 <div>
                   <h2 className="text-lg font-bold text-white">📚 Enroll Program Section</h2>
-                  <p className="text-yellow-100 text-xs mt-1">Enable a student group for evaluation during this period</p>
+                  <p className="text-white/80 text-xs mt-1">Enable a student group for evaluation during this period</p>
                 </div>
                 <button onClick={() => setShowEnrollModal(false)} className="w-8 h-8 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
                   <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1078,7 +1078,7 @@ export default function EvaluationPeriodManagement() {
             <form onSubmit={handleEnrollSection} className="p-4 space-y-3">
               {loadingSections ? (
                 <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-600 mx-auto mb-4"></div>
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#7a0000] mx-auto mb-4"></div>
                   <p className="text-gray-600">Loading sections...</p>
                 </div>
               ) : (
@@ -1086,12 +1086,12 @@ export default function EvaluationPeriodManagement() {
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Program Section *</label>
                     {availableProgramSections.length === 0 ? (
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                        <p className="text-sm font-semibold text-yellow-900 mb-2">⚠️ No Program Sections Found</p>
-                        <p className="text-sm text-yellow-800 mb-3">
+                      <div className="bg-[#7a0000]/5 border border-[#7a0000]/20 rounded-lg p-4">
+                        <p className="text-sm font-semibold text-[#7a0000] mb-2">⚠️ No Program Sections Found</p>
+                        <p className="text-sm text-[#7a0000]/80 mb-3">
                           You need to create program sections before enrolling them in an evaluation period.
                         </p>
-                        <p className="text-xs text-yellow-700">
+                        <p className="text-xs text-[#7a0000]/70">
                           <strong>To create sections:</strong> Go to Course Management → Manage Sections → Create a section (e.g., "BSIT-3A") and assign students to it.
                         </p>
                       </div>
@@ -1101,7 +1101,7 @@ export default function EvaluationPeriodManagement() {
                           required
                           value={enrollFormData.programSectionId}
                           onChange={(e) => setEnrollFormData({...enrollFormData, programSectionId: e.target.value})}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                         >
                           <option value="">Select a program section...</option>
                           {availableProgramSections.map((section) => (
@@ -1115,11 +1115,11 @@ export default function EvaluationPeriodManagement() {
                     )}
                   </div>
 
-                  <div className="bg-red-50 border border-yellow-200 rounded-lg p-4">
-                    <p className="text-sm text-red-900">
+                  <div className="bg-[#7a0000]/5 border border-[#7a0000]/20 rounded-lg p-4">
+                    <p className="text-sm text-[#7a0000]">
                       <strong>ℹ️ What happens:</strong>
                     </p>
-                    <ul className="text-sm text-red-800 mt-2 space-y-1 ml-4 list-disc">
+                    <ul className="text-sm text-[#7a0000]/80 mt-2 space-y-1 ml-4 list-disc">
                       <li>All students in the program section can submit evaluations</li>
                       <li>Evaluations created for ALL courses the students are enrolled in</li>
                       <li>One click enables evaluation for the entire student group</li>
@@ -1128,8 +1128,8 @@ export default function EvaluationPeriodManagement() {
                   </div>
 
                   {enrollFormData.programSectionId && (
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                      <p className="text-sm font-semibold text-yellow-900">
+                    <div className="bg-[#7a0000]/5 border border-[#7a0000]/20 rounded-lg p-4">
+                      <p className="text-sm font-semibold text-[#7a0000]">
                         📋 Selected: {availableProgramSections.find(s => s.id === parseInt(enrollFormData.programSectionId))?.sectionName || availableProgramSections.find(s => s.id === parseInt(enrollFormData.programSectionId))?.section_name}
                       </p>
                       <p className="text-xs text-gray-600 mt-1">
@@ -1152,7 +1152,7 @@ export default function EvaluationPeriodManagement() {
                 <button
                   type="submit"
                   disabled={submitting || availableProgramSections.length === 0}
-                  className="flex-1 px-4 py-2 bg-yellow-600 hover:bg-amber-700 disabled:bg-gray-400 text-white rounded-lg text-sm font-semibold transition-all disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-2 bg-gradient-to-r from-[#7a0000] to-[#9a1000] hover:from-[#9a1000] hover:to-[#7a0000] disabled:from-gray-400 disabled:to-gray-500 text-white rounded-lg text-sm font-semibold transition-all disabled:cursor-not-allowed"
                 >
                   {submitting ? 'Enrolling...' : availableProgramSections.length === 0 ? 'No Sections Available' : 'Enroll Section'}
                 </button>
@@ -1219,6 +1219,7 @@ export default function EvaluationPeriodManagement() {
     </div>
   )
 }
+
 
 
 

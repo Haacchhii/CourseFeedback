@@ -245,7 +245,7 @@ export default function StudentCourses(){
                 name="course-search"
                 autoComplete="off"
                 spellCheck={false}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="lpu-input"
                 placeholder="Search by course code or name..."
                 value={query}
                 onChange={e=>setQuery(e.target.value)}
@@ -253,7 +253,7 @@ export default function StudentCourses(){
             </div>
             <div className="sm:w-48">
               <select
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="lpu-select"
                 value={semester}
                 onChange={e=>setSemester(e.target.value)}
               >
@@ -279,13 +279,13 @@ export default function StudentCourses(){
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b-2 border-gray-200">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Course Code</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Class Code</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Subject Name</th>
-                    <th className="px-6 py-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Semester</th>
-                    <th className="px-6 py-4 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
+                <thead>
+                  <tr className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white">
+                    <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Course Code</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Class Code</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Subject Name</th>
+                    <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider">Semester</th>
+                    <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 bg-white">
@@ -343,7 +343,7 @@ export default function StudentCourses(){
             {availablePeriods.length > 0 && (
               <div className="sm:w-64">
                 <select
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="lpu-select"
                   value={selectedPeriod}
                   onChange={e => setSelectedPeriod(e.target.value)}
                 >
@@ -362,7 +362,7 @@ export default function StudentCourses(){
           <div className="bg-white rounded-card shadow-card border border-gray-200 overflow-hidden">
             {historyLoading ? (
               <div className="text-center py-12">
-                <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
+                <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[#7a0000] border-r-transparent"></div>
                 <p className="text-gray-500 text-sm mt-4">Loading history...</p>
               </div>
             ) : evaluationHistory.length === 0 ? (
@@ -378,13 +378,13 @@ export default function StudentCourses(){
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">Course</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">Evaluation Period</th>
-                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider w-40">Submitted</th>
-                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider w-32">Rating</th>
-                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider w-32">Sentiment</th>
+                  <thead>
+                    <tr className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white">
+                      <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Course</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Evaluation Period</th>
+                      <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider w-40">Submitted</th>
+                      <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider w-32">Rating</th>
+                      <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider w-32">Sentiment</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">

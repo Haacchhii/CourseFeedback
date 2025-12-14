@@ -25,7 +25,7 @@ export default function AuditLogViewer() {
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
-  const logsPerPage = 15
+  const [logsPerPage, setLogsPerPage] = useState(15)
   
   // API State
   const [auditLogs, setAuditLogs] = useState([])
@@ -339,7 +339,7 @@ export default function AuditLogViewer() {
       <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-10 lg:py-12 max-w-screen-2xl">
         {/* Stats Cards */}
         <div className="grid md:grid-cols-4 gap-5 lg:gap-6 mb-12">
-          <div className="bg-white rounded-xl shadow-md p-6">
+          <div className="bg-white rounded-card shadow-card p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs lg:text-sm text-gray-600 uppercase tracking-wide">Total Logs</p>
@@ -353,7 +353,7 @@ export default function AuditLogViewer() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-md p-6">
+          <div className="bg-white rounded-card shadow-card p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs lg:text-sm text-gray-600 uppercase tracking-wide">Last 24 Hours</p>
@@ -367,7 +367,7 @@ export default function AuditLogViewer() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-md p-6">
+          <div className="bg-white rounded-card shadow-card p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs lg:text-sm text-gray-600 uppercase tracking-wide">Critical Events</p>
@@ -381,7 +381,7 @@ export default function AuditLogViewer() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-md p-6">
+          <div className="bg-white rounded-card shadow-card p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs lg:text-sm text-gray-600 uppercase tracking-wide">Failed/Blocked</p>
@@ -632,15 +632,15 @@ export default function AuditLogViewer() {
         <div className="bg-white rounded-card shadow-card overflow-hidden w-fit mx-auto">
           <div className="overflow-x-auto">
             <table className="table-auto">
-              <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
-                <tr>
-                  <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">Timestamp</th>
-                  <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">User</th>
-                  <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">Action</th>
-                  <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">Category</th>
-                  <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">IP Address</th>
-                  <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">Status</th>
-                  <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">Actions</th>
+              <thead>
+                <tr className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white">
+                  <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider">Timestamp</th>
+                  <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider">User</th>
+                  <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider">Action</th>
+                  <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider">Category</th>
+                  <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider">IP Address</th>
+                  <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -691,15 +691,19 @@ export default function AuditLogViewer() {
           </div>
 
           {/* Pagination */}
-          <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
               totalItems={paginatedLogs.length}
               onPageChange={setCurrentPage}
               itemLabel="logs"
+              itemsPerPage={logsPerPage}
+              onItemsPerPageChange={(value) => {
+                setLogsPerPage(value)
+                setCurrentPage(1)
+              }}
+              showItemsPerPage={true}
             />
-          </div>
         </div>
       </div>
 

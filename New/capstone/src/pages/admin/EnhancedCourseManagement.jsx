@@ -13,7 +13,7 @@ export default function EnhancedCourseManagement() {
   const { user: currentUser } = useAuth()
   
   // State
-  const [activeTab, setActiveTab] = useState('courses')
+  const [activeTab, setActiveTab] = useState('enrollment')
   const [searchTerm, setSearchTerm] = useState('')
   const [programFilter, setProgramFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -29,7 +29,7 @@ export default function EnhancedCourseManagement() {
   
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize] = useState(15) // 15 courses per page for faster loading
+  const [pageSize, setPageSize] = useState(15) // 15 courses per page for faster loading
   const [totalCourses, setTotalCourses] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   
@@ -62,7 +62,7 @@ export default function EnhancedCourseManagement() {
   
   // Section Pagination State
   const [sectionCurrentPage, setSectionCurrentPage] = useState(1)
-  const [sectionPageSize] = useState(15) // 15 sections per page
+  const [sectionPageSize, setSectionPageSize] = useState(15) // 15 sections per page
   
   // Enrollment Filters
   const [sectionSearchTerm, setSectionSearchTerm] = useState('')
@@ -1512,16 +1512,6 @@ student2@example.com,IT-PROG1-2024,email,
         {/* Tabs */}
         <div className="bg-white rounded-card shadow-card mb-12 p-2 flex space-x-2">
           <button
-            onClick={() => setActiveTab('courses')}
-            className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
-              activeTab === 'courses'
-                ? 'bg-red-600 text-white shadow-lg'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            📚 Course List
-          </button>
-          <button
             onClick={() => setActiveTab('enrollment')}
             className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
               activeTab === 'enrollment'
@@ -1530,6 +1520,16 @@ student2@example.com,IT-PROG1-2024,email,
             }`}
           >
             👥 Enrollment
+          </button>
+          <button
+            onClick={() => setActiveTab('courses')}
+            className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all ${
+              activeTab === 'courses'
+                ? 'bg-red-600 text-white shadow-lg'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            📚 Course List
           </button>
         </div>
 
@@ -1583,7 +1583,7 @@ student2@example.com,IT-PROG1-2024,email,
                 </div>
               </div>
 
-              <div className="bg-white rounded-xl shadow-md p-6">
+              <div className="bg-white rounded-card shadow-card p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">Avg Rating</p>
@@ -1603,7 +1603,7 @@ student2@example.com,IT-PROG1-2024,email,
             </div>
 
             {/* Filters */}
-            <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+            <div className="bg-white rounded-card shadow-card p-6 mb-6">
               <div className="grid md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">🔍 Search</label>
@@ -1612,7 +1612,7 @@ student2@example.com,IT-PROG1-2024,email,
                     placeholder="Search courses, codes, instructors..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                   />
                 </div>
                 <div>
@@ -1620,7 +1620,7 @@ student2@example.com,IT-PROG1-2024,email,
                   <select
                     value={programFilter}
                     onChange={(e) => setProgramFilter(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                   >
                     <option value="all">All Programs</option>
                     {programs.map(prog => (
@@ -1633,7 +1633,7 @@ student2@example.com,IT-PROG1-2024,email,
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                   >
                     <option value="all">All Status</option>
                     <option value="Active">Active</option>
@@ -1665,8 +1665,8 @@ student2@example.com,IT-PROG1-2024,email,
             <div className="bg-white rounded-card shadow-card overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-fit mx-auto table-auto">
-                  <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
-                    <tr>
+                  <thead>
+                    <tr className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white">
                       <th className="px-4 py-3 text-center">
                         <input
                           type="checkbox"
@@ -1678,16 +1678,16 @@ student2@example.com,IT-PROG1-2024,email,
                               setSelectedCourses(filteredCourses.map(c => c.id))
                             }
                           }}
-                          className="w-4 h-4 text-red-600 rounded focus:ring-2 focus:ring-indigo-500"
+                          className="w-4 h-4 text-[#7a0000] rounded focus:ring-2 focus:ring-[#7a0000]"
                         />
                       </th>
-                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Code</th>
-                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Course Name</th>
-                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Program</th>
-                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Students</th>
-                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Rating</th>
-                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Status</th>
-                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold uppercase tracking-wider">Code</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold uppercase tracking-wider">Course Name</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold uppercase tracking-wider">Program</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold uppercase tracking-wider">Students</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold uppercase tracking-wider">Rating</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold uppercase tracking-wider">Status</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -1698,7 +1698,7 @@ student2@example.com,IT-PROG1-2024,email,
                             type="checkbox"
                             checked={selectedCourses.includes(course.id)}
                             onChange={(e) => toggleCourseSelection(course.id, e)}
-                            className="w-4 h-4 text-red-600 rounded focus:ring-2 focus:ring-indigo-500"
+                            className="w-4 h-4 text-red-600 rounded focus:ring-2 focus:ring-[#7a0000]"
                           />
                         </td>
                         <td className="px-4 py-3 text-center text-sm font-medium text-gray-900">{course.classCode || course.id}</td>
@@ -1756,22 +1756,26 @@ student2@example.com,IT-PROG1-2024,email,
               </div>
               
               {/* Pagination Controls */}
-              <div className="bg-white rounded-b-xl border-t border-gray-200 px-6 py-4">
                 <Pagination
                   currentPage={currentPage}
                   totalPages={totalPages}
                   totalItems={totalCourses}
                   onPageChange={setCurrentPage}
                   itemLabel="courses"
+                  itemsPerPage={pageSize}
+                  onItemsPerPageChange={(value) => {
+                    setPageSize(value)
+                    setCurrentPage(1)
+                  }}
+                  showItemsPerPage={true}
                 />
-              </div>
             </div>
           </>
         )}
 
         {/* Enrollment Tab - Section Management */}
         {activeTab === 'enrollment' && (
-          <div className="bg-white rounded-xl shadow-md p-6">
+          <div className="bg-white rounded-card shadow-card p-6">
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h3 className="text-xl font-bold text-gray-900">👥 Section Management</h3>
@@ -1812,13 +1816,13 @@ student2@example.com,IT-PROG1-2024,email,
                 placeholder="🔍 Search sections..."
                 value={sectionSearchTerm}
                 onChange={(e) => setSectionSearchTerm(e.target.value)}
-                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-red-500"
+                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-red-500"
               />
               
               <select
                 value={sectionPeriodFilter}
                 onChange={(e) => setSectionPeriodFilter(e.target.value)}
-                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-yellow-500"
+                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-yellow-500"
                 title="Filter sections by evaluation period"
               >
                 <option value="all">All Periods</option>
@@ -1835,7 +1839,7 @@ student2@example.com,IT-PROG1-2024,email,
                   setSectionProgramFilter(e.target.value)
                   setSectionProgramSectionFilter('all') // Reset program section when program changes
                 }}
-                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-red-500"
+                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-red-500"
               >
                 <option value="all">All Programs</option>
                 {apiData?.programs && apiData.programs.map(prog => (
@@ -1846,7 +1850,7 @@ student2@example.com,IT-PROG1-2024,email,
               <select
                 value={sectionProgramSectionFilter}
                 onChange={(e) => setSectionProgramSectionFilter(e.target.value)}
-                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-red-500"
+                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-red-500"
                 disabled={sectionProgramFilter === 'all'}
                 title={sectionProgramFilter === 'all' ? 'Please select a program first' : 'Filter by program section'}
               >
@@ -1877,7 +1881,7 @@ student2@example.com,IT-PROG1-2024,email,
               <select
                 value={sectionYearFilter}
                 onChange={(e) => setSectionYearFilter(e.target.value)}
-                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-red-500"
+                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-red-500"
               >
                 <option value="all">All Year Levels</option>
                 <option value="1">1st Year</option>
@@ -1889,7 +1893,7 @@ student2@example.com,IT-PROG1-2024,email,
               <select
                 value={sectionSemesterFilter}
                 onChange={(e) => setSectionSemesterFilter(e.target.value)}
-                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-red-500"
+                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-red-500"
               >
                 <option value="all">All Semesters</option>
                 <option value="1">First Semester</option>
@@ -1962,7 +1966,7 @@ student2@example.com,IT-PROG1-2024,email,
                     type="checkbox"
                     checked={paginatedSections.length > 0 && selectedSections.length === paginatedSections.length}
                     onChange={handleSelectAllSections}
-                    className="w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-indigo-500"
+                    className="w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-[#7a0000]"
                   />
                   <label className="text-sm font-semibold text-gray-700 cursor-pointer" onClick={handleSelectAllSections}>
                     Select All ({paginatedSections.length} on this page)
@@ -1986,7 +1990,7 @@ student2@example.com,IT-PROG1-2024,email,
                         checked={selectedSections.includes(section.id)}
                         onChange={() => handleSelectSection(section.id)}
                         onClick={(e) => e.stopPropagation()}
-                        className="w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                        className="w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-[#7a0000] cursor-pointer"
                       />
                     </div>
 
@@ -2038,56 +2042,20 @@ student2@example.com,IT-PROG1-2024,email,
               </div>
 
               {/* Pagination Controls */}
-              {sectionTotalPages > 1 && (
-                <div className="mt-6 flex justify-center items-center gap-2">
-                  <button
-                    onClick={() => setSectionCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={sectionCurrentPage === 1}
-                    className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-all"
-                  >
-                    ← Previous
-                  </button>
-                  
-                  <div className="flex gap-2">
-                    {[...Array(sectionTotalPages)].map((_, idx) => {
-                      const pageNum = idx + 1
-                      // Show first page, last page, current page, and pages around current
-                      if (
-                        pageNum === 1 ||
-                        pageNum === sectionTotalPages ||
-                        (pageNum >= sectionCurrentPage - 1 && pageNum <= sectionCurrentPage + 1)
-                      ) {
-                        return (
-                          <button
-                            key={pageNum}
-                            onClick={() => setSectionCurrentPage(pageNum)}
-                            className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                              sectionCurrentPage === pageNum
-                                ? 'bg-red-600 text-white'
-                                : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-                            }`}
-                          >
-                            {pageNum}
-                          </button>
-                        )
-                      } else if (
-                        pageNum === sectionCurrentPage - 2 ||
-                        pageNum === sectionCurrentPage + 2
-                      ) {
-                        return <span key={pageNum} className="px-2 py-2">...</span>
-                      }
-                      return null
-                    })}
-                  </div>
-
-                  <button
-                    onClick={() => setSectionCurrentPage(prev => Math.min(sectionTotalPages, prev + 1))}
-                    disabled={sectionCurrentPage === sectionTotalPages}
-                    className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-all"
-                  >
-                    Next →
-                  </button>
-                </div>
+              {filteredSections.length > 0 && (
+                <Pagination
+                  currentPage={sectionCurrentPage}
+                  totalPages={sectionTotalPages}
+                  totalItems={filteredSections.length}
+                  onPageChange={setSectionCurrentPage}
+                  itemLabel="sections"
+                  itemsPerPage={sectionPageSize}
+                  onItemsPerPageChange={(value) => {
+                    setSectionPageSize(value)
+                    setSectionCurrentPage(1)
+                  }}
+                  showItemsPerPage={true}
+                />
               )}
             </>
             )}
@@ -2119,7 +2087,7 @@ student2@example.com,IT-PROG1-2024,email,
                     required
                     value={formData.name}
                     onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                     placeholder="Introduction to Programming"
                   />
                 </div>
@@ -2130,7 +2098,7 @@ student2@example.com,IT-PROG1-2024,email,
                     required
                     value={formData.classCode}
                     onChange={(e) => setFormData({...formData, classCode: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                     placeholder="CS101"
                   />
                 </div>
@@ -2141,7 +2109,7 @@ student2@example.com,IT-PROG1-2024,email,
                 <select
                   value={formData.instructor}
                   onChange={(e) => setFormData({...formData, instructor: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                 >
                   <option value="">Select Instructor</option>
                   {instructors.map(inst => (
@@ -2158,7 +2126,7 @@ student2@example.com,IT-PROG1-2024,email,
                   <select
                     value={formData.program}
                     onChange={(e) => setFormData({...formData, program: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                   >
                     {programs.map(prog => (
                       <option key={prog} value={prog}>{prog}</option>
@@ -2170,7 +2138,7 @@ student2@example.com,IT-PROG1-2024,email,
                   <select
                     value={formData.yearLevel}
                     onChange={(e) => setFormData({...formData, yearLevel: parseInt(e.target.value)})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                   >
                     <option value={1}>1st Year</option>
                     <option value={2}>2nd Year</option>
@@ -2186,7 +2154,7 @@ student2@example.com,IT-PROG1-2024,email,
                   <select
                     value={formData.semester}
                     onChange={(e) => setFormData({...formData, semester: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                   >
                     <option value="First Semester">First Semester</option>
                     <option value="Second Semester">Second Semester</option>
@@ -2200,7 +2168,7 @@ student2@example.com,IT-PROG1-2024,email,
                     required
                     value={formData.academicYear}
                     onChange={(e) => setFormData({...formData, academicYear: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                     placeholder="2024-2025"
                   />
                 </div>
@@ -2259,7 +2227,7 @@ student2@example.com,IT-PROG1-2024,email,
                     required
                     value={formData.name}
                     onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                     placeholder="Introduction to Programming"
                   />
                 </div>
@@ -2270,7 +2238,7 @@ student2@example.com,IT-PROG1-2024,email,
                     required
                     value={formData.classCode}
                     onChange={(e) => setFormData({...formData, classCode: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                     placeholder="CS101"
                   />
                 </div>
@@ -2281,7 +2249,7 @@ student2@example.com,IT-PROG1-2024,email,
                 <select
                   value={formData.instructor}
                   onChange={(e) => setFormData({...formData, instructor: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                 >
                   <option value="">Select Instructor</option>
                   {instructors.map(inst => (
@@ -2298,7 +2266,7 @@ student2@example.com,IT-PROG1-2024,email,
                   <select
                     value={formData.program}
                     onChange={(e) => setFormData({...formData, program: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                   >
                     {programs.map(prog => (
                       <option key={prog} value={prog}>{prog}</option>
@@ -2310,7 +2278,7 @@ student2@example.com,IT-PROG1-2024,email,
                   <select
                     value={formData.yearLevel}
                     onChange={(e) => setFormData({...formData, yearLevel: parseInt(e.target.value)})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                   >
                     <option value={1}>1st Year</option>
                     <option value={2}>2nd Year</option>
@@ -2326,7 +2294,7 @@ student2@example.com,IT-PROG1-2024,email,
                   <select
                     value={formData.semester}
                     onChange={(e) => setFormData({...formData, semester: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                   >
                     <option value="First Semester">First Semester</option>
                     <option value="Second Semester">Second Semester</option>
@@ -2340,7 +2308,7 @@ student2@example.com,IT-PROG1-2024,email,
                     required
                     value={formData.academicYear}
                     onChange={(e) => setFormData({...formData, academicYear: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                     placeholder="2024-2025"
                   />
                 </div>
@@ -2353,7 +2321,7 @@ student2@example.com,IT-PROG1-2024,email,
                     type="number"
                     value={formData.enrolledStudents}
                     onChange={(e) => setFormData({...formData, enrolledStudents: parseInt(e.target.value)})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                     placeholder="30"
                     min="0"
                   />
@@ -2363,7 +2331,7 @@ student2@example.com,IT-PROG1-2024,email,
                   <select
                     value={formData.status}
                     onChange={(e) => setFormData({...formData, status: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                   >
                     <option value="Active">Active</option>
                     <option value="Archived">Archived</option>
@@ -2455,12 +2423,12 @@ student2@example.com,IT-PROG1-2024,email,
 
                   <div className="border-2 border-gray-200 rounded-lg overflow-hidden">
                     <table className="w-full">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Course Name</th>
-                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Code</th>
-                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Instructor</th>
-                          <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Program</th>
+                      <thead>
+                        <tr className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white">
+                          <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider">Course Name</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider">Code</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider">Instructor</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider">Program</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
@@ -2532,7 +2500,7 @@ student2@example.com,IT-PROG1-2024,email,
                 <select
                   value={formData.instructor}
                   onChange={(e) => setFormData({...formData, instructor: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                 >
                   <option value="">Choose instructor...</option>
                   {instructors.map(inst => (
@@ -2647,7 +2615,7 @@ student2@example.com,IT-PROG1-2024,email,
                       placeholder="Search students..."
                       value={studentSearchTerm}
                       onChange={(e) => setStudentSearchTerm(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] text-sm"
                     />
                   </div>
                   <div className="space-y-2 max-h-48 overflow-y-auto mb-4">
@@ -2673,7 +2641,7 @@ student2@example.com,IT-PROG1-2024,email,
                                 setSelectedStudentIds(selectedStudentIds.filter(id => id !== student.id))
                               }
                             }}
-                            className="mr-3 w-5 h-5 text-red-600 rounded focus:ring-2 focus:ring-blue-500"
+                            className="mr-3 w-5 h-5 text-red-600 rounded focus:ring-2 focus:ring-[#7a0000]"
                           />
                           <div className="flex-1">
                             <p className="font-semibold text-gray-900">
@@ -2757,7 +2725,7 @@ student2@example.com,IT-PROG1-2024,email,
                     <select
                       value={selectedProgramSectionId}
                       onChange={(e) => setSelectedProgramSectionId(e.target.value)}
-                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-yellow-500"
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-yellow-500"
                     >
                       <option value="">Choose a program section...</option>
                       {programSections.map(section => (
@@ -3050,7 +3018,7 @@ student2@example.com,IT-PROG1-2024,email,
                   placeholder="e.g., CS101-A, IT201-1"
                   value={sectionFormData.class_code}
                   onChange={(e) => setSectionFormData({ ...sectionFormData, class_code: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-yellow-500"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-yellow-500"
                 />
               </div>
 
@@ -3064,7 +3032,7 @@ student2@example.com,IT-PROG1-2024,email,
                     placeholder="2024-2025"
                     value={sectionFormData.academic_year}
                     onChange={(e) => setSectionFormData({ ...sectionFormData, academic_year: e.target.value })}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-yellow-500"
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-yellow-500"
                   />
                 </div>
 
@@ -3076,7 +3044,7 @@ student2@example.com,IT-PROG1-2024,email,
                     min="1"
                     value={sectionFormData.max_students}
                     onChange={(e) => setSectionFormData({ ...sectionFormData, max_students: parseInt(e.target.value) })}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-yellow-500"
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-yellow-500"
                   />
                 </div>
               </div>
@@ -3239,13 +3207,13 @@ student2@example.com,IT-PROG1-2024,email,
                   <h3 className="font-semibold text-gray-900 mb-3">📋 Preview (First 5 rows)</h3>
                   <div className="overflow-x-auto border-2 border-gray-200 rounded-lg">
                     <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Student</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Section</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Type</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Notes</th>
+                      <thead>
+                        <tr className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white">
+                          <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider">Status</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider">Student</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider">Section</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider">Type</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider">Notes</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
@@ -3384,7 +3352,7 @@ student2@example.com,IT-PROG1-2024,email,
                     required
                     value={quickBulkFormData.program_id}
                     onChange={(e) => handleQuickBulkFormChange('program_id', e.target.value)}
-                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-red-500"
+                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-red-500"
                   >
                     <option value="">Select program...</option>
                     {apiData?.programs?.map(program => (
@@ -3399,7 +3367,7 @@ student2@example.com,IT-PROG1-2024,email,
                     required
                     value={quickBulkFormData.year_level}
                     onChange={(e) => handleQuickBulkFormChange('year_level', e.target.value)}
-                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-red-500"
+                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-red-500"
                   >
                     <option value="">Select year...</option>
                     <option value="1">1st Year</option>
@@ -3415,7 +3383,7 @@ student2@example.com,IT-PROG1-2024,email,
                     required
                     value={quickBulkFormData.semester}
                     onChange={(e) => handleQuickBulkFormChange('semester', e.target.value)}
-                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-red-500"
+                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-red-500"
                   >
                     <option value="">Select semester...</option>
                     <option value="1">1st Semester</option>
@@ -3430,7 +3398,7 @@ student2@example.com,IT-PROG1-2024,email,
                     required
                     value={quickBulkFormData.program_section_id}
                     onChange={(e) => handleQuickBulkFormChange('program_section_id', e.target.value)}
-                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-red-500"
+                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-red-500"
                     disabled={!quickBulkFormData.program_id}
                   >
                     <option value="">{!quickBulkFormData.program_id ? 'Select program first...' : 'Select program section...'}</option>
@@ -3458,7 +3426,7 @@ student2@example.com,IT-PROG1-2024,email,
               {/* Matching Courses Preview */}
               {loadingMatching ? (
                 <div className="bg-gray-50 border-2 border-gray-300 rounded-xl p-8 text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#7a0000] mx-auto mb-4"></div>
                   <p className="text-gray-600">Loading matching courses...</p>
                 </div>
               ) : matchingCourses.length > 0 ? (

@@ -59,7 +59,7 @@ export const Modal = ({ isOpen, onClose, children, size = 'md' }) => {
   );
 };
 
-export const ModalHeader = ({ children, onClose, icon: Icon, iconColor = 'text-blue-600' }) => {
+export const ModalHeader = ({ children, onClose, icon: Icon, iconColor = 'text-[#7a0000]' }) => {
   return (
     <div className="relative bg-gradient-to-r from-gray-50 to-white border-b border-gray-200 px-6 py-4">
       <div className="flex items-center space-x-3">
@@ -126,8 +126,8 @@ export const ConfirmModal = ({
     },
     info: {
       icon: Info,
-      iconColor: 'text-blue-600',
-      buttonClass: 'bg-blue-600 hover:bg-blue-700 text-white'
+      iconColor: 'text-[#7a0000]',
+      buttonClass: 'bg-gradient-to-r from-[#7a0000] to-[#9a1000] hover:from-[#9a1000] hover:to-[#7a0000] text-white'
     },
     success: {
       icon: CheckCircle,
@@ -191,8 +191,8 @@ export const AlertModal = ({
     },
     info: {
       icon: Info,
-      iconColor: 'text-blue-600',
-      buttonClass: 'bg-blue-600 hover:bg-blue-700 text-white'
+      iconColor: 'text-[#7a0000]',
+      buttonClass: 'bg-gradient-to-r from-[#7a0000] to-[#9a1000] hover:from-[#9a1000] hover:to-[#7a0000] text-white'
     },
     success: {
       icon: CheckCircle,
@@ -242,10 +242,10 @@ export const DeleteUserModal = ({
           <p className="text-gray-700">
             Are you sure you want to delete <span className="font-semibold">{userName}</span>?
           </p>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="bg-[#7a0000]/5 border border-[#7a0000]/20 rounded-lg p-4">
             <div className="flex items-start space-x-3">
-              <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-              <div className="text-sm text-blue-800">
+              <Info className="w-5 h-5 text-[#7a0000] mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-[#7a0000]">
                 <p className="font-medium mb-1">Note:</p>
                 <p>
                   If this user has no evaluations or enrollments, they will be <span className="font-semibold">permanently deleted</span>. 
@@ -318,10 +318,10 @@ export const DeleteResultModal = ({
           </div>
 
           {!isHardDelete && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="bg-[#7a0000]/5 border border-[#7a0000]/20 rounded-lg p-4">
               <div className="flex items-start space-x-3">
-                <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div className="text-sm text-blue-800">
+                <Info className="w-5 h-5 text-[#7a0000] mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-[#7a0000]">
                   <p>The user account has been deactivated but their data (evaluations, enrollments) has been preserved for data integrity.</p>
                 </div>
               </div>
@@ -333,7 +333,7 @@ export const DeleteResultModal = ({
         <button
           type="button"
           onClick={onClose}
-          className="px-5 py-2.5 text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-md transition-all"
+          className="px-5 py-2.5 text-sm font-semibold bg-gradient-to-r from-[#7a0000] to-[#9a1000] hover:from-[#9a1000] hover:to-[#7a0000] text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#7a0000] shadow-md transition-all"
         >
           OK
         </button>

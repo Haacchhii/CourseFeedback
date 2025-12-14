@@ -223,7 +223,7 @@ SMTP_FROM_EMAIL=your-email@gmail.com`}
                 <select
                   value={notificationType}
                   onChange={(e) => setNotificationType(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                   required
                 >
                   <option value="test">🧪 Test Email</option>
@@ -241,7 +241,7 @@ SMTP_FROM_EMAIL=your-email@gmail.com`}
                     type="email"
                     value={testEmail}
                     onChange={(e) => setTestEmail(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                     placeholder="your-email@example.com"
                     required={notificationType === 'test'}
                   />
@@ -260,7 +260,7 @@ SMTP_FROM_EMAIL=your-email@gmail.com`}
                   <select
                     value={selectedPeriod}
                     onChange={(e) => setSelectedPeriod(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                     required={notificationType !== 'test'}
                   >
                     <option value="">Select Period...</option>
@@ -282,7 +282,7 @@ SMTP_FROM_EMAIL=your-email@gmail.com`}
                   <textarea
                     value={customEmails}
                     onChange={(e) => setCustomEmails(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                     rows="3"
                     placeholder="student1@example.com, student2@example.com"
                   />

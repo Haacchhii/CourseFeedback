@@ -28,6 +28,7 @@ export default function Evaluations() {
   
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
   const [pagination, setPagination] = useState(null)
 
   // Filter options states
@@ -845,15 +846,19 @@ export default function Evaluations() {
           
           {/* Pagination Controls */}
           {pagination && pagination.total > 0 && (
-            <div className="mt-6 px-6 pb-6">
               <Pagination
                 currentPage={currentPage}
                 totalPages={pagination.pages}
                 totalItems={pagination.total}
                 onPageChange={setCurrentPage}
                 itemLabel="evaluations"
+                itemsPerPage={itemsPerPage}
+                onItemsPerPageChange={(value) => {
+                  setItemsPerPage(value)
+                  setCurrentPage(1)
+                }}
+                showItemsPerPage={true}
               />
-            </div>
           )}
         </div>
         </>

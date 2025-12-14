@@ -2662,13 +2662,30 @@ async def create_section(
                 # If program_section_id is provided, enroll students from that specific section
                 if section_data.program_section_id:
                     logger.info(f"[AUTO_ENROLL] Using program_section_id: {section_data.program_section_id}")
+
+                    # First, check how many users are in section_students
+                    users_in_section = db.execute(
+                        text("""
+                            SELECT COUNT(*),
+                                   COUNT(CASE WHEN u.is_active = true AND u.role = 'student' THEN 1 END) as active_students,
+                                   COUNT(CASE WHEN s.id IS NOT NULL THEN 1 END) as with_student_record
+                            FROM section_students ss
+                            JOIN users u ON ss.student_id = u.id
+                            LEFT JOIN students s ON s.user_id = u.id
+                            WHERE ss.section_id = :section_id
+                        """),
+                        {"section_id": section_data.program_section_id}
+                    ).fetchone()
+
+                    logger.info(f"[AUTO_ENROLL] Section {section_data.program_section_id} stats: Total users={users_in_section[0]}, Active students={users_in_section[1]}, With student record={users_in_section[2]}")
+
                     # Query students linked to this program section via section_students
                     # section_students.student_id references users.id
                     # We need students.id for the enrollments table
                     from sqlalchemy import text
                     result = db.execute(
                         text("""
-                            SELECT s.id as student_id
+                            SELECT s.id as student_id, u.email, u.first_name, u.last_name
                             FROM section_students ss
                             JOIN users u ON ss.student_id = u.id
                             JOIN students s ON s.user_id = u.id
@@ -2679,10 +2696,34 @@ async def create_section(
                         {"section_id": section_data.program_section_id}
                     )
                     student_rows = result.fetchall()
-                    
+
                     logger.info(f"[AUTO_ENROLL] Found {len(student_rows)} students in program section {section_data.program_section_id}")
                     if student_rows:
                         logger.info(f"[AUTO_ENROLL] Student IDs: {[row[0] for row in student_rows]}")
+                        logger.info(f"[AUTO_ENROLL] Student details: {[(row[0], row[1], row[2], row[3]) for row in student_rows]}")
+                    else:
+                        # If no students found, check if it's because they lack student records
+                        users_without_student_record = db.execute(
+                            text("""
+                                SELECT u.id, u.email, u.first_name, u.last_name, u.role
+                                FROM section_students ss
+                                JOIN users u ON ss.student_id = u.id
+                                LEFT JOIN students s ON s.user_id = u.id
+                                WHERE ss.section_id = :section_id
+                                AND u.is_active = true
+                                AND u.role = 'student'
+                                AND s.id IS NULL
+                            """),
+                            {"section_id": section_data.program_section_id}
+                        ).fetchall()
+
+                        if users_without_student_record:
+                            logger.warning(f"[AUTO_ENROLL] ⚠️ Found {len(users_without_student_record)} users WITHOUT student records:")
+                            for user in users_without_student_record:
+                                logger.warning(f"[AUTO_ENROLL]    User ID: {user[0]}, Email: {user[1]}, Name: {user[2]} {user[3]}, Role: {user[4]}")
+                            logger.warning(f"[AUTO_ENROLL] ⚠️ These users need records in the 'students' table to be enrolled!")
+                        else:
+                            logger.warning(f"[AUTO_ENROLL] ⚠️ No active student users found in program section {section_data.program_section_id}")
                     
                     for row in student_rows:
                         student_id = row[0]  # Use index access for reliability

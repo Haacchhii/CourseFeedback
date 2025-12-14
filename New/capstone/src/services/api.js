@@ -108,7 +108,7 @@ export const authAPI = {
         if (response.token) {
           localStorage.setItem('token', response.token)
         }
-        localStorage.setItem('user', JSON.stringify(response.user))
+        localStorage.setItem('currentUser', JSON.stringify(response.user))
         localStorage.setItem('role', response.user.role)
       }
       
@@ -124,7 +124,7 @@ export const authAPI = {
    */
   logout: () => {
     localStorage.removeItem('token')
-    localStorage.removeItem('user')
+    localStorage.removeItem('currentUser')
     localStorage.removeItem('role')
     window.location.href = '/login'
   },
@@ -135,7 +135,7 @@ export const authAPI = {
    */
   getCurrentUser: () => {
     try {
-      const userStr = localStorage.getItem('user')
+      const userStr = localStorage.getItem('currentUser')
       return userStr ? JSON.parse(userStr) : null
     } catch (error) {
       console.error('Error getting current user:', error)
@@ -455,6 +455,8 @@ export const adminAPI = {
     // Use pagination instead of loading all courses at once
     if (params.page) queryParams.append('page', params.page)
     if (params.page_size) queryParams.append('page_size', params.page_size)
+    // Show all periods flag to get courses regardless of evaluation period
+    if (params.show_all_periods) queryParams.append('show_all_periods', params.show_all_periods)
     
     return apiClient.get(`/admin/courses?${queryParams.toString()}`)
   },

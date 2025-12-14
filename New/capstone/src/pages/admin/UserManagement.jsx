@@ -60,7 +60,7 @@ export default function UserManagement() {
   
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize] = useState(15) // 15 users per page for faster loading
+  const [pageSize, setPageSize] = useState(15) // 15 users per page for faster loading
   const [totalUsers, setTotalUsers] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
 
@@ -886,7 +886,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
 
       <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-10 lg:py-12 max-w-screen-2xl">
         {/* Tab Navigation */}
-        <div className="bg-white rounded-xl shadow-md mb-6">
+        <div className="bg-white rounded-card shadow-card mb-6">
           <div className="flex border-b">
             <button
               onClick={() => setActiveTab('users')}
@@ -976,7 +976,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+        <div className="bg-white rounded-card shadow-card p-6 mb-6">
           <div className="grid md:grid-cols-5 gap-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">🔍 Search</label>
@@ -985,7 +985,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                 placeholder="Search by name or email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
               />
             </div>
             <div>
@@ -993,7 +993,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
               <select
                 value={roleFilter}
                 onChange={(e) => setRoleFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
               >
                 <option value="all">All Roles</option>
                 <option value="student">Student</option>
@@ -1009,7 +1009,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                 value={programFilter}
                 onChange={(e) => setProgramFilter(e.target.value)}
                 disabled={roleFilter !== 'student'}
-                className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${roleFilter !== 'student' ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''}`}
+                className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent ${roleFilter !== 'student' ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''}`}
               >
                 <option value="all">{roleFilter === 'student' ? 'All Programs' : 'Select Student Role First'}</option>
                 {roleFilter === 'student' && programs.map(prog => (
@@ -1022,7 +1022,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
               >
                 <option value="all">All Status</option>
                 <option value="Active">Active</option>
@@ -1035,7 +1035,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                 value={yearLevelFilter}
                 onChange={(e) => setYearLevelFilter(e.target.value)}
                 disabled={roleFilter !== 'student'}
-                className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${roleFilter !== 'student' ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''}`}
+                className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent ${roleFilter !== 'student' ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''}`}
               >
                 <option value="all">{roleFilter === 'student' ? 'All Levels' : 'Select Student Role First'}</option>
                 {roleFilter === 'student' && (
@@ -1062,7 +1062,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
               <button onClick={() => handleBulkAction('Deactivate')} className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-all">
                 Deactivate
               </button>
-              <button onClick={() => handleBulkAction('Reset Password')} className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all">
+              <button onClick={() => handleBulkAction('Reset Password')} className="px-4 py-2 bg-gradient-to-r from-[#7a0000] to-[#9a1000] hover:from-[#9a1000] hover:to-[#7a0000] text-white rounded-lg transition-all">
                 Reset Password
               </button>
               <button onClick={() => handleBulkAction('Delete')} className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all">
@@ -1076,23 +1076,23 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
         <div className="bg-white rounded-card shadow-card overflow-hidden w-fit mx-auto">
           <div className="overflow-x-auto">
             <table className="table-auto">
-              <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
-                <tr>
+              <thead>
+                <tr className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white">
                   <th className="px-6 py-4 text-center">
                     <input
                       type="checkbox"
                       checked={selectedUsers.length === paginatedUsers.length && paginatedUsers.length > 0}
                       onChange={toggleAllUsers}
-                      className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                      className="w-4 h-4 text-[#7a0000] rounded focus:ring-2 focus:ring-[#7a0000]"
                     />
                   </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Name</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Email</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">School ID</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Role</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Program</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
-                  <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">Actions</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Name</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Email</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">School ID</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Role</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Program</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -1185,15 +1185,19 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
           </div>
 
           {/* Pagination */}
-          <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
               totalItems={totalUsers}
               onPageChange={setCurrentPage}
               itemLabel="users"
+              itemsPerPage={pageSize}
+              onItemsPerPageChange={(value) => {
+                setPageSize(value)
+                setCurrentPage(1)
+              }}
+              showItemsPerPage={true}
             />
-          </div>
         </div>
 
       {/* Add User Modal */}
@@ -1219,7 +1223,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                   placeholder="Enter full name"
                 />
               </div>
@@ -1231,7 +1235,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                   placeholder="user@lpubatangas.edu.ph"
                 />
               </div>
@@ -1248,7 +1252,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                       setEnrollmentLookupDone(false)
                       setEnrollmentInfo(null)
                     }}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                     placeholder="e.g., 2022-00001"
                   />
                   {formData.role === 'student' && (
@@ -1345,7 +1349,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                     required
                     value={formData.password || ''}
                     onChange={(e) => setFormData({...formData, password: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                     placeholder="Enter password (min 8 characters)"
                     minLength={8}
                   />
@@ -1357,7 +1361,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                 <select
                   value={formData.role}
                   onChange={(e) => setFormData({...formData, role: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                 >
                   <option value="student">Student</option>
                   <option value="instructor">Instructor</option>
@@ -1377,7 +1381,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                       value={formData.program}
                       onChange={(e) => setFormData({...formData, program: e.target.value})}
                       disabled={enrollmentInfo !== null}
-                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent ${
                         enrollmentInfo ? 'bg-gray-100 cursor-not-allowed border-gray-200' : 'border-gray-300'
                       }`}
                     >
@@ -1396,7 +1400,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                     <select
                       value={formData.yearLevel}
                       onChange={(e) => setFormData({...formData, yearLevel: parseInt(e.target.value)})}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                     >
                       <option value={1}>1st Year</option>
                       <option value={2}>2nd Year</option>
@@ -1412,7 +1416,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                 <select
                   value={formData.status}
                   onChange={(e) => setFormData({...formData, status: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                 >
                   <option value="Active">Active</option>
                   <option value="Inactive">Inactive</option>
@@ -1430,7 +1434,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-[#7a0000] to-[#9a1000] hover:from-[#9a1000] hover:to-[#7a0000] text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                 >
                   {submitting ? (
                     <>
@@ -1473,7 +1477,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                 />
               </div>
 
@@ -1493,7 +1497,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                 <select
                   value={formData.role}
                   onChange={(e) => setFormData({...formData, role: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                 >
                   <option value="student">Student</option>
                   <option value="instructor">Instructor</option>
@@ -1510,7 +1514,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                     <select
                       value={formData.program}
                       onChange={(e) => setFormData({...formData, program: e.target.value})}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                     >
                       {programs.map(prog => (
                         <option key={prog} value={prog}>{prog}</option>
@@ -1522,7 +1526,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                     <select
                       value={formData.yearLevel}
                       onChange={(e) => setFormData({...formData, yearLevel: parseInt(e.target.value)})}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                     >
                       <option value={1}>1st Year</option>
                       <option value={2}>2nd Year</option>
@@ -1585,7 +1589,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  className="flex-1 px-6 py-3 bg-[#7a0000] hover:bg-[#9a1000] text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                 >
                   {submitting ? (
                     <>
@@ -1757,7 +1761,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                 <div className="bg-white border-2 border-gray-200 rounded-xl p-6">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-lg flex items-center justify-center">
                         <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
@@ -1776,16 +1780,16 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                   <div className="border-2 border-gray-200 rounded-lg overflow-hidden shadow-sm">
                     <div className="overflow-x-auto">
                       <table className="w-full">
-                        <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Row</th>
-                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Email</th>
-                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">First Name</th>
-                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Last Name</th>
-                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Role</th>
-                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">School ID</th>
-                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Program</th>
-                            <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
+                        <thead>
+                          <tr className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white">
+                            <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider">Row</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider">Email</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider">First Name</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider">Last Name</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider">Role</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider">School ID</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider">Program</th>
+                            <th className="px-4 py-3 text-center text-sm font-semibold uppercase tracking-wider">Status</th>
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
@@ -1830,15 +1834,15 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
 
               {/* Import Progress */}
               {importProgress.total > 0 && (
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                  <p className="text-sm font-semibold text-blue-900 mb-2">{importProgress.status}</p>
-                  <div className="w-full bg-blue-200 rounded-full h-2">
+                <div className="bg-red-50 border border-[#7a0000]/20 rounded-xl p-4">
+                  <p className="text-sm font-semibold text-[#7a0000] mb-2">{importProgress.status}</p>
+                  <div className="w-full bg-[#7a0000]/20 rounded-full h-2">
                     <div
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] h-2 rounded-full transition-all duration-300"
                       style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
                     ></div>
                   </div>
-                  <p className="text-xs text-blue-700 mt-1">{importProgress.current} / {importProgress.total}</p>
+                  <p className="text-xs text-[#7a0000] mt-1">{importProgress.current} / {importProgress.total}</p>
                 </div>
               )}
             </div>
@@ -1944,7 +1948,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                   type="text"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white"
+                  className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent text-gray-900 dark:text-white"
                   placeholder="changeme123"
                   autoFocus
                 />
@@ -1964,7 +1968,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
               </button>
               <button
                 onClick={handleConfirmResetPassword}
-                className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2 bg-gradient-to-r from-[#7a0000] to-[#9a1000] hover:from-[#9a1000] hover:to-[#7a0000] text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={submitting || !newPassword || newPassword.length < 8}
               >
                 {submitting ? 'Resetting...' : 'OK'}
@@ -1990,7 +1994,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                   type="text"
                   value={bulkPassword}
                   onChange={(e) => setBulkPassword(e.target.value)}
-                  className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-white"
+                  className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent text-gray-900 dark:text-white"
                   placeholder="changeme123"
                   autoFocus
                 />
@@ -2014,7 +2018,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
               </button>
               <button
                 onClick={handleConfirmBulkPasswordReset}
-                className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2 bg-gradient-to-r from-[#7a0000] to-[#9a1000] hover:from-[#9a1000] hover:to-[#7a0000] text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={submitting || !bulkPassword || bulkPassword.length < 8}
               >
                 {submitting ? 'Resetting...' : 'Reset All'}

@@ -92,12 +92,12 @@ export default function CategoryMetricsDisplay({ evaluations, title, description
       {/* Category Details Table */}
       <div className="mt-6 overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-4 py-3 text-left font-semibold text-gray-700">Category</th>
-              <th className="px-4 py-3 text-center font-semibold text-gray-700">Avg Rating</th>
-              <th className="px-4 py-3 text-center font-semibold text-gray-700">Performance</th>
-              <th className="px-4 py-3 text-center font-semibold text-gray-700">Responses</th>
+          <thead>
+            <tr className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white">
+              <th className="px-4 py-3 text-left font-semibold">Category</th>
+              <th className="px-4 py-3 text-center font-semibold">Avg Rating</th>
+              <th className="px-4 py-3 text-center font-semibold">Performance</th>
+              <th className="px-4 py-3 text-center font-semibold">Responses</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">

@@ -33,7 +33,7 @@ export default function Courses() {
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 15
+  const [itemsPerPage, setItemsPerPage] = useState(15)
   
   // Detailed analysis category pagination
   const [currentCategoryPage, setCurrentCategoryPage] = useState(0)
@@ -1126,13 +1126,13 @@ export default function Courses() {
           
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Course</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Students</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Rating</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Response Rate</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
+              <thead>
+                <tr className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white">
+                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Course</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Students</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Rating</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Response Rate</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">
@@ -1240,6 +1240,12 @@ export default function Courses() {
               totalItems={filteredCourses.length}
               onPageChange={setCurrentPage}
               itemLabel="courses"
+              itemsPerPage={itemsPerPage}
+              onItemsPerPageChange={(value) => {
+                setItemsPerPage(value)
+                setCurrentPage(1)
+              }}
+              showItemsPerPage={true}
             />
           )}
           

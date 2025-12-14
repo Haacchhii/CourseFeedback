@@ -13,7 +13,7 @@ export default function CourseCompletionTable({ selectedPeriod = null }) {
   const [sortBy, setSortBy] = useState('completion_rate') // completion_rate, course_name, instructor
   const [filterThreshold, setFilterThreshold] = useState('all') // all, below70, below50
   const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 10
+  const [itemsPerPage, setItemsPerPage] = useState(10)
 
   useEffect(() => {
     fetchCompletionData()
@@ -195,14 +195,14 @@ export default function CourseCompletionTable({ selectedPeriod = null }) {
       {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b-2 border-gray-200">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Course</th>
-              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">Enrolled</th>
-              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">Submitted</th>
-              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">Pending</th>
-              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">Completion</th>
-              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
+          <thead>
+            <tr className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white">
+              <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider">Course</th>
+              <th className="px-4 py-3 text-center text-sm font-semibold uppercase tracking-wider">Enrolled</th>
+              <th className="px-4 py-3 text-center text-sm font-semibold uppercase tracking-wider">Submitted</th>
+              <th className="px-4 py-3 text-center text-sm font-semibold uppercase tracking-wider">Pending</th>
+              <th className="px-4 py-3 text-center text-sm font-semibold uppercase tracking-wider">Completion</th>
+              <th className="px-4 py-3 text-center text-sm font-semibold uppercase tracking-wider">Status</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -293,13 +293,19 @@ export default function CourseCompletionTable({ selectedPeriod = null }) {
       </div>
 
       {/* Pagination Controls */}
-      {totalPages > 1 && (
+      {filteredCourses.length > 0 && (
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
           totalItems={filteredCourses.length}
           onPageChange={setCurrentPage}
           itemLabel="courses"
+          itemsPerPage={itemsPerPage}
+          onItemsPerPageChange={(value) => {
+            setItemsPerPage(value)
+            setCurrentPage(1)
+          }}
+          showItemsPerPage={true}
         />
       )}
     </div>
