@@ -104,42 +104,51 @@ export function hasPermission(user, permissionName) {
 }
 
 // Check if user can manage users (create, edit, delete accounts)
+// Admins have all permissions by default
 export function canManageUsers(user) {
+  if (isAdmin(user)) return true
   return isSystemAdmin(user) && hasPermission(user, 'userManagement')
 }
 
 // Check if user can manage courses (create, edit, delete courses)
 export function canManageCourses(user) {
+  if (isAdmin(user)) return true
   return isSystemAdmin(user) && hasPermission(user, 'courseManagement')
 }
 
 // Check if user can manage evaluations (create questionnaires, set periods)
 export function canManageEvaluations(user) {
+  if (isAdmin(user)) return true
   return isSystemAdmin(user) && hasPermission(user, 'evaluationManagement')
 }
 
 // Check if user can configure system settings
 export function canConfigureSystem(user) {
+  if (isAdmin(user)) return true
   return isSystemAdmin(user) && hasPermission(user, 'systemConfiguration')
 }
 
 // Check if user can export data
 export function canExportData(user) {
+  if (isAdmin(user)) return true
   return isSystemAdmin(user) && hasPermission(user, 'dataExport')
 }
 
 // Check if user can view audit logs
 export function canViewAuditLogs(user) {
+  if (isAdmin(user)) return true
   return isSystemAdmin(user) && hasPermission(user, 'auditLogs')
 }
 
 // Check if user can delete evaluations
 export function canDeleteEvaluations(user) {
+  if (isAdmin(user)) return true
   return isSystemAdmin(user) && hasPermission(user, 'deleteEvaluations')
 }
 
 // Check if user can reset passwords
 export function canResetPasswords(user) {
+  if (isAdmin(user)) return true
   return isSystemAdmin(user) && hasPermission(user, 'resetPasswords')
 }
 

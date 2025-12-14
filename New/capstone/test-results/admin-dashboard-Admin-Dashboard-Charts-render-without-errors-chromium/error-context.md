@@ -1,0 +1,42 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e6]:
+  - generic [ref=e7]:
+    - generic [ref=e10]: LPU
+    - heading "Course Insight Guardian" [level=1] [ref=e11]
+    - paragraph [ref=e12]: Academic Excellence Through Feedback
+  - generic [ref=e13]:
+    - generic [ref=e14]:
+      - heading "Welcome Back" [level=2] [ref=e15]
+      - paragraph [ref=e16]: Sign in to access your dashboard
+    - generic [ref=e18]:
+      - generic [ref=e19]:
+        - generic [ref=e20]: LPU Email Address
+        - generic [ref=e21]:
+          - textbox "your.email@lpubatangas.edu.ph" [ref=e22]: admin@lpubatangas.edu.ph
+          - img [ref=e24]
+      - generic [ref=e26]:
+        - generic [ref=e27]: Password
+        - generic [ref=e28]:
+          - textbox "Enter your password" [ref=e29]: changeme123
+          - button [ref=e30] [cursor=pointer]:
+            - img [ref=e31]
+      - generic [ref=e34]:
+        - img [ref=e35]
+        - generic [ref=e37]: No response from server. Please check your connection.
+      - button "Sign In to Dashboard" [ref=e38] [cursor=pointer]:
+        - generic [ref=e39]:
+          - generic [ref=e40]: Sign In to Dashboard
+          - img [ref=e41]
+      - generic [ref=e43]:
+        - link "Forgot Password?" [ref=e44] [cursor=pointer]:
+          - /url: /forgot
+        - generic [ref=e47]: Secure Login
+    - generic [ref=e49]:
+      - paragraph [ref=e50]: Lyceum of the Philippines University - Batangas
+      - paragraph [ref=e51]: Empowering Academic Excellence Through Technology
+  - generic [ref=e52]:
+    - generic [ref=e55]: Academic Excellence
+    - generic [ref=e58]: Innovation Hub
+```

@@ -1,0 +1,262 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e6]:
+      - link "Course Insight Guardian" [ref=e8] [cursor=pointer]:
+        - /url: /admin/dashboard
+        - generic [ref=e9]: Course Insight Guardian
+      - generic [ref=e10]:
+        - link "🏠 Dashboard" [ref=e11] [cursor=pointer]:
+          - /url: /admin/dashboard
+          - generic [ref=e12]: 🏠
+          - generic [ref=e13]: Dashboard
+        - link "👥 User Management" [ref=e14] [cursor=pointer]:
+          - /url: /admin/users
+          - generic [ref=e15]: 👥
+          - generic [ref=e16]: User Management
+        - link "📋 Enrollment List" [ref=e17] [cursor=pointer]:
+          - /url: /admin/enrollment-list
+          - generic [ref=e18]: 📋
+          - generic [ref=e19]: Enrollment List
+        - link "🎓 Student Advancement" [ref=e20] [cursor=pointer]:
+          - /url: /admin/student-management
+          - generic [ref=e21]: 🎓
+          - generic [ref=e22]: Student Advancement
+        - link "📅 Evaluation Periods" [ref=e23] [cursor=pointer]:
+          - /url: /admin/periods
+          - generic [ref=e24]: 📅
+          - generic [ref=e25]: Evaluation Periods
+        - link "📚 Course Management" [ref=e26] [cursor=pointer]:
+          - /url: /admin/courses
+          - generic [ref=e27]: 📚
+          - generic [ref=e28]: Course Management
+        - link "📤 Data Export" [ref=e29] [cursor=pointer]:
+          - /url: /admin/export
+          - generic [ref=e30]: 📤
+          - generic [ref=e31]: Data Export
+        - link "📋 Audit Logs" [ref=e32] [cursor=pointer]:
+          - /url: /admin/audit-logs
+          - generic [ref=e33]: 📋
+          - generic [ref=e34]: Audit Logs
+      - generic [ref=e35]:
+        - generic [ref=e36]:
+          - generic [ref=e37]: System Administrator
+          - generic [ref=e38]: Administrator
+        - button "Logout" [ref=e39] [cursor=pointer]
+  - main [ref=e40]:
+    - generic [ref=e42]:
+      - generic [ref=e46]:
+        - img "University Logo" [ref=e47]
+        - generic [ref=e48]:
+          - heading "Enhanced Course Management" [level=1] [ref=e49]
+          - paragraph [ref=e50]: Comprehensive course administration and analytics
+      - generic [ref=e51]:
+        - generic [ref=e52]:
+          - button "👥 Enrollment" [ref=e53] [cursor=pointer]
+          - button "📚 Course List" [ref=e54] [cursor=pointer]
+        - generic [ref=e55]:
+          - generic [ref=e56]:
+            - generic [ref=e57]:
+              - heading "👥 Section Management" [level=3] [ref=e58]
+              - paragraph [ref=e59]: Manage student enrollments by class section
+            - generic [ref=e60]:
+              - button "Quick Bulk Enroll" [ref=e61] [cursor=pointer]:
+                - img [ref=e62]
+                - text: Quick Bulk Enroll
+              - button "Create Section" [ref=e64] [cursor=pointer]:
+                - img [ref=e65]
+                - text: Create Section
+              - button "🔄 Refresh" [ref=e67] [cursor=pointer]
+          - generic [ref=e68]:
+            - textbox "🔍 Search sections..." [ref=e69]
+            - combobox "Filter sections by evaluation period" [ref=e70]:
+              - option "All Periods" [selected]
+              - option "1st Semester 2025-2026 (Open)"
+              - option "1st Semester 2025-2026 (Closed)"
+            - combobox [ref=e71]:
+              - option "All Programs" [selected]
+              - option "BSCS-DS"
+              - option "BS-CYBER"
+              - option "BSIT"
+              - option "BSPSY"
+              - option "BAPSY"
+              - option "BMA"
+              - option "ABCOMM"
+            - combobox "Please select a program first" [disabled] [ref=e72]:
+              - option "Select a program first..." [selected]
+            - combobox [ref=e73]:
+              - option "All Year Levels" [selected]
+              - option "1st Year"
+              - option "2nd Year"
+              - option "3rd Year"
+              - option "4th Year"
+            - combobox [ref=e74]:
+              - option "All Semesters" [selected]
+              - option "First Semester"
+              - option "Second Semester"
+              - option "Summer"
+            - generic [ref=e76]:
+              - generic [ref=e77]: 9 sections
+              - generic [ref=e78]: Page 1 of 1 • 9 total
+          - generic [ref=e79]:
+            - checkbox [ref=e80]
+            - generic [ref=e81] [cursor=pointer]: Select All (9 on this page)
+          - generic [ref=e82]:
+            - generic [ref=e83]:
+              - checkbox [ref=e85] [cursor=pointer]
+              - generic [ref=e86]:
+                - button "Edit Section" [ref=e87] [cursor=pointer]:
+                  - img [ref=e88]
+                - button "Delete Section" [ref=e90] [cursor=pointer]:
+                  - img [ref=e91]
+              - generic [ref=e93] [cursor=pointer]:
+                - generic [ref=e94]:
+                  - generic [ref=e95]:
+                    - heading "Comp 6" [level=4] [ref=e96]
+                    - paragraph [ref=e97]: Application Devt. & Emerging Technologies
+                    - paragraph [ref=e98]: "Section: Comp 6-BSCS-DS-3A"
+                  - generic [ref=e99]: "1"
+                - paragraph [ref=e101]: Semester 1 • 2025-2026
+            - generic [ref=e102]:
+              - checkbox [ref=e104] [cursor=pointer]
+              - generic [ref=e105]:
+                - button "Edit Section" [ref=e106] [cursor=pointer]:
+                  - img [ref=e107]
+                - button "Delete Section" [ref=e109] [cursor=pointer]:
+                  - img [ref=e110]
+              - generic [ref=e112] [cursor=pointer]:
+                - generic [ref=e113]:
+                  - generic [ref=e114]:
+                    - heading "CS 17" [level=4] [ref=e115]
+                    - paragraph [ref=e116]: Automata Theory and Formal Languages
+                    - paragraph [ref=e117]: "Section: CS 17-BSCS-DS-3A"
+                  - generic [ref=e118]: "1"
+                - paragraph [ref=e120]: Semester 1 • 2025-2026
+            - generic [ref=e121]:
+              - checkbox [ref=e123] [cursor=pointer]
+              - generic [ref=e124]:
+                - button "Edit Section" [ref=e125] [cursor=pointer]:
+                  - img [ref=e126]
+                - button "Delete Section" [ref=e128] [cursor=pointer]:
+                  - img [ref=e129]
+              - generic [ref=e131] [cursor=pointer]:
+                - generic [ref=e132]:
+                  - generic [ref=e133]:
+                    - heading "CS 19" [level=4] [ref=e134]
+                    - paragraph [ref=e135]: Elective 4
+                    - paragraph [ref=e136]: "Section: CS 19-BSCS-DS-3A"
+                  - generic [ref=e137]: "1"
+                - paragraph [ref=e139]: Semester 1 • 2025-2026
+            - generic [ref=e140]:
+              - checkbox [ref=e142] [cursor=pointer]
+              - generic [ref=e143]:
+                - button "Edit Section" [ref=e144] [cursor=pointer]:
+                  - img [ref=e145]
+                - button "Delete Section" [ref=e147] [cursor=pointer]:
+                  - img [ref=e148]
+              - generic [ref=e150] [cursor=pointer]:
+                - generic [ref=e151]:
+                  - generic [ref=e152]:
+                    - heading "CS 21" [level=4] [ref=e153]
+                    - paragraph [ref=e154]: Networking 4
+                    - paragraph [ref=e155]: "Section: CS 21-BSCS-DS-3A"
+                  - generic [ref=e156]: "1"
+                - paragraph [ref=e158]: Semester 1 • 2025-2026
+            - generic [ref=e159]:
+              - checkbox [ref=e161] [cursor=pointer]
+              - generic [ref=e162]:
+                - button "Edit Section" [ref=e163] [cursor=pointer]:
+                  - img [ref=e164]
+                - button "Delete Section" [ref=e166] [cursor=pointer]:
+                  - img [ref=e167]
+              - generic [ref=e169] [cursor=pointer]:
+                - generic [ref=e170]:
+                  - generic [ref=e171]:
+                    - heading "CS 22" [level=4] [ref=e172]
+                    - paragraph [ref=e173]: CS Thesis Writing 2
+                    - paragraph [ref=e174]: "Section: CS 22-BSCS-DS-3A"
+                  - generic [ref=e175]: "1"
+                - paragraph [ref=e177]: Semester 1 • 2025-2026
+            - generic [ref=e178]:
+              - checkbox [ref=e180] [cursor=pointer]
+              - generic [ref=e181]:
+                - button "Edit Section" [ref=e182] [cursor=pointer]:
+                  - img [ref=e183]
+                - button "Delete Section" [ref=e185] [cursor=pointer]:
+                  - img [ref=e186]
+              - generic [ref=e188] [cursor=pointer]:
+                - generic [ref=e189]:
+                  - generic [ref=e190]:
+                    - heading "GEC-ART" [level=4] [ref=e191]
+                    - paragraph [ref=e192]: Art Appreciation
+                    - paragraph [ref=e193]: "Section: GEC-ART-BSCS-DS-3A"
+                  - generic [ref=e194]: "1"
+                - paragraph [ref=e196]: Semester 1 • 2025-2026
+            - generic [ref=e197]:
+              - checkbox [ref=e199] [cursor=pointer]
+              - generic [ref=e200]:
+                - button "Edit Section" [ref=e201] [cursor=pointer]:
+                  - img [ref=e202]
+                - button "Delete Section" [ref=e204] [cursor=pointer]:
+                  - img [ref=e205]
+              - generic [ref=e207] [cursor=pointer]:
+                - generic [ref=e208]:
+                  - generic [ref=e209]:
+                    - heading "GEC-PCOM" [level=4] [ref=e210]
+                    - paragraph [ref=e211]: Purposive Communication
+                    - paragraph [ref=e212]: "Section: GEC-PCOM-BSCS-DS-3A"
+                  - generic [ref=e213]: "1"
+                - paragraph [ref=e215]: Semester 1 • 2025-2026
+            - generic [ref=e216]:
+              - checkbox [ref=e218] [cursor=pointer]
+              - generic [ref=e219]:
+                - button "Edit Section" [ref=e220] [cursor=pointer]:
+                  - img [ref=e221]
+                - button "Delete Section" [ref=e223] [cursor=pointer]:
+                  - img [ref=e224]
+              - generic [ref=e226] [cursor=pointer]:
+                - generic [ref=e227]:
+                  - generic [ref=e228]:
+                    - heading "GEC-RPH" [level=4] [ref=e229]
+                    - paragraph [ref=e230]: Readings in Philippine History
+                    - paragraph [ref=e231]: "Section: GEC-RPH-BSCS-DS-3A"
+                  - generic [ref=e232]: "1"
+                - paragraph [ref=e234]: Semester 1 • 2025-2026
+            - generic [ref=e235]:
+              - checkbox [ref=e237] [cursor=pointer]
+              - generic [ref=e238]:
+                - button "Edit Section" [ref=e239] [cursor=pointer]:
+                  - img [ref=e240]
+                - button "Delete Section" [ref=e242] [cursor=pointer]:
+                  - img [ref=e243]
+              - generic [ref=e245] [cursor=pointer]:
+                - generic [ref=e246]:
+                  - generic [ref=e247]:
+                    - heading "Phys 2" [level=4] [ref=e248]
+                    - paragraph [ref=e249]: Calculus-based Physics 2
+                    - paragraph [ref=e250]: "Section: Phys 2-BSCS-DS-3A"
+                  - generic [ref=e251]: "1"
+                - paragraph [ref=e253]: Semester 1 • 2025-2026
+          - generic [ref=e255]:
+            - generic [ref=e256]:
+              - generic [ref=e257]: "Show:"
+              - combobox [ref=e258]:
+                - option "10" [selected]
+                - option "25"
+                - option "50"
+                - option "100"
+              - generic [ref=e259]: per page
+            - generic [ref=e260]: Showing 1 to 9 of 9 sections
+            - generic [ref=e261]:
+              - button "First" [disabled] [ref=e262]
+              - button "Previous page" [disabled] [ref=e263]:
+                - img [ref=e264]
+              - button "Go to page 1" [ref=e267] [cursor=pointer]: "1"
+              - button "Next page" [disabled] [ref=e268]:
+                - img [ref=e269]
+              - button "Last" [disabled] [ref=e271]
+  - contentinfo [ref=e272]:
+    - generic [ref=e274]: © 2025 Lyceum of the Philippines University - Batangas. All rights reserved.
+```

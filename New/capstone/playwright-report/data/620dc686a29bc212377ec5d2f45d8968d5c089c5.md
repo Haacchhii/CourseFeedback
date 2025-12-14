@@ -1,0 +1,211 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - navigation [ref=e4]:
+      - generic [ref=e6]:
+        - link "Course Insight Guardian" [ref=e8] [cursor=pointer]:
+          - /url: /admin/dashboard
+          - generic [ref=e9]: Course Insight Guardian
+        - generic [ref=e10]:
+          - link "🏠 Dashboard" [ref=e11] [cursor=pointer]:
+            - /url: /admin/dashboard
+            - generic [ref=e12]: 🏠
+            - generic [ref=e13]: Dashboard
+          - link "👥 User Management" [ref=e14] [cursor=pointer]:
+            - /url: /admin/users
+            - generic [ref=e15]: 👥
+            - generic [ref=e16]: User Management
+          - link "📋 Enrollment List" [ref=e17] [cursor=pointer]:
+            - /url: /admin/enrollment-list
+            - generic [ref=e18]: 📋
+            - generic [ref=e19]: Enrollment List
+          - link "🎓 Student Advancement" [ref=e20] [cursor=pointer]:
+            - /url: /admin/student-management
+            - generic [ref=e21]: 🎓
+            - generic [ref=e22]: Student Advancement
+          - link "📅 Evaluation Periods" [ref=e23] [cursor=pointer]:
+            - /url: /admin/periods
+            - generic [ref=e24]: 📅
+            - generic [ref=e25]: Evaluation Periods
+          - link "📚 Course Management" [ref=e26] [cursor=pointer]:
+            - /url: /admin/courses
+            - generic [ref=e27]: 📚
+            - generic [ref=e28]: Course Management
+          - link "📤 Data Export" [ref=e29] [cursor=pointer]:
+            - /url: /admin/export
+            - generic [ref=e30]: 📤
+            - generic [ref=e31]: Data Export
+          - link "📋 Audit Logs" [ref=e32] [cursor=pointer]:
+            - /url: /admin/audit-logs
+            - generic [ref=e33]: 📋
+            - generic [ref=e34]: Audit Logs
+        - generic [ref=e35]:
+          - generic [ref=e36]:
+            - generic [ref=e37]: System Administrator
+            - generic [ref=e38]: Administrator
+          - button "Logout" [ref=e39] [cursor=pointer]
+    - main [ref=e40]:
+      - generic [ref=e42]:
+        - generic [ref=e45]:
+          - generic [ref=e46]:
+            - img "University Logo" [ref=e47]
+            - generic [ref=e48]:
+              - heading "Course Insight Guardian" [level=1] [ref=e49]
+              - paragraph [ref=e50]: System Administration Panel
+          - generic [ref=e51]:
+            - paragraph [ref=e52]: Welcome back,
+            - paragraph [ref=e53]: System Administrator
+        - generic [ref=e54]:
+          - generic [ref=e55]:
+            - generic [ref=e57] [cursor=pointer]:
+              - generic [ref=e58]:
+                - heading "Total Users" [level=3] [ref=e59]
+                - paragraph [ref=e60]: "57"
+                - paragraph [ref=e61]: System-wide
+              - img [ref=e63]
+            - generic [ref=e66] [cursor=pointer]:
+              - generic [ref=e67]:
+                - heading "Total Courses" [level=3] [ref=e68]
+                - paragraph [ref=e69]: "367"
+                - paragraph [ref=e70]: 7 Programs
+              - img [ref=e72]
+            - generic [ref=e75] [cursor=pointer]:
+              - generic [ref=e76]:
+                - heading "Total Evaluations" [level=3] [ref=e77]
+                - paragraph [ref=e78]: "0"
+                - paragraph [ref=e79]: 0% Participation
+              - img [ref=e81]
+          - generic [ref=e83]:
+            - generic [ref=e84] [cursor=pointer]:
+              - generic [ref=e85]:
+                - img [ref=e87]
+                - generic [ref=e89]:
+                  - heading "User Management" [level=3] [ref=e90]
+                  - paragraph [ref=e91]: Manage all user accounts
+              - paragraph [ref=e92]: Create, edit, and delete user accounts. Assign roles and manage permissions.
+              - button "Manage Users" [ref=e93]:
+                - text: Manage Users
+                - img [ref=e94]
+            - generic [ref=e96] [cursor=pointer]:
+              - generic [ref=e97]:
+                - img [ref=e99]
+                - generic [ref=e101]:
+                  - heading "Course Management" [level=3] [ref=e102]
+                  - paragraph [ref=e103]: Manage all courses
+              - paragraph [ref=e104]: Create, edit, and delete courses. Assign instructors and manage schedules.
+              - button "Manage Courses" [ref=e105]:
+                - text: Manage Courses
+                - img [ref=e106]
+            - generic [ref=e108] [cursor=pointer]:
+              - generic [ref=e109]:
+                - img [ref=e111]
+                - generic [ref=e113]:
+                  - heading "Evaluation Periods" [level=3] [ref=e114]
+                  - paragraph [ref=e115]: Control evaluation schedules
+              - paragraph [ref=e116]: Open/close evaluation periods, monitor participation.
+              - button "Manage Periods →" [ref=e117]
+            - generic [ref=e118] [cursor=pointer]:
+              - generic [ref=e119]:
+                - img [ref=e121]
+                - generic [ref=e123]:
+                  - heading "Student Management" [level=3] [ref=e124]
+                  - paragraph [ref=e125]: Year advancement & transitions
+              - paragraph [ref=e126]: Advance students to next year level and transition enrollments.
+              - button "Manage Students →" [ref=e127]
+            - generic [ref=e128] [cursor=pointer]:
+              - generic [ref=e129]:
+                - img [ref=e131]
+                - generic [ref=e133]:
+                  - heading "Email Notifications" [level=3] [ref=e134]
+                  - paragraph [ref=e135]: Send automated emails
+              - paragraph [ref=e136]: Send period notifications and system alerts to students.
+              - button "Manage Emails →" [ref=e137]
+            - generic [ref=e138] [cursor=pointer]:
+              - generic [ref=e139]:
+                - img [ref=e141]
+                - generic [ref=e143]:
+                  - heading "Data Export" [level=3] [ref=e144]
+                  - paragraph [ref=e145]: Export system data
+              - paragraph [ref=e146]: Export all system data in various formats (CSV, PDF, Excel).
+              - button "Export Data →" [ref=e147]
+            - generic [ref=e148] [cursor=pointer]:
+              - generic [ref=e149]:
+                - img [ref=e151]
+                - generic [ref=e153]:
+                  - heading "Audit Logs" [level=3] [ref=e154]
+                  - paragraph [ref=e155]: View system activity
+              - paragraph [ref=e156]: Monitor system activity, user actions, and security events.
+              - button "View Logs →" [ref=e157]
+          - generic [ref=e158]:
+            - generic [ref=e159]:
+              - generic [ref=e160]:
+                - heading "Program Distribution" [level=3] [ref=e161]
+                - paragraph [ref=e162]: Courses, students, and evaluations by program
+              - region [ref=e164]:
+                - img [ref=e165]:
+                  - generic [ref=e170]:
+                    - generic [ref=e172]: ABCOMM
+                    - generic [ref=e174]: BAPSY
+                    - generic [ref=e176]: BMA
+                    - generic [ref=e178]: BSCS-DS
+                    - generic [ref=e180]: BSIT
+                    - generic [ref=e182]: BSPSY
+                  - generic [ref=e184]:
+                    - generic [ref=e186]: "0"
+                    - generic [ref=e188]: "15"
+                    - generic [ref=e190]: "30"
+                    - generic [ref=e192]: "45"
+                    - generic [ref=e194]: "60"
+                  - generic [ref=e197]:
+                    - img [ref=e198]
+                    - img [ref=e200]
+                    - img [ref=e202]
+                    - img [ref=e204]
+                    - img [ref=e206]
+                    - img [ref=e208]
+                    - img [ref=e210]
+                  - generic [ref=e214]:
+                    - img [ref=e215]
+                    - img [ref=e217]
+                    - img [ref=e219]
+                    - img [ref=e221]
+                    - img [ref=e223]
+                    - img [ref=e225]
+                    - img [ref=e227]
+                  - generic:
+                    - generic:
+                      - generic:
+                        - img
+                        - img
+                        - img
+                        - img
+                        - img
+                        - img
+                        - img
+                - list [ref=e230]:
+                  - listitem [ref=e231]:
+                    - img [ref=e232]
+                    - text: Courses
+                  - listitem [ref=e234]:
+                    - img [ref=e235]
+                    - text: Students
+                  - listitem [ref=e237]:
+                    - img [ref=e238]
+                    - text: Evaluations
+            - generic [ref=e240]:
+              - generic [ref=e241]:
+                - heading "User Roles Distribution" [level=3] [ref=e242]
+                - paragraph [ref=e243]: System users by role type
+              - region [ref=e245]:
+                - img [ref=e246]:
+                  - generic [ref=e248]:
+                    - img [ref=e250]
+                    - img [ref=e252]
+                    - img [ref=e254]
+                    - img [ref=e256]
+    - contentinfo [ref=e257]:
+      - generic [ref=e259]: © 2025 Lyceum of the Philippines University - Batangas. All rights reserved.
+  - generic [ref=e260]: "0"
+```

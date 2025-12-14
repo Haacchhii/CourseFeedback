@@ -1,0 +1,168 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e6]:
+      - link "Course Insight Guardian" [ref=e8] [cursor=pointer]:
+        - /url: /admin/dashboard
+        - generic [ref=e9]: Course Insight Guardian
+      - generic [ref=e10]:
+        - link "🏠 Dashboard" [ref=e11] [cursor=pointer]:
+          - /url: /admin/dashboard
+          - generic [ref=e12]: 🏠
+          - generic [ref=e13]: Dashboard
+        - link "👥 User Management" [ref=e14] [cursor=pointer]:
+          - /url: /admin/users
+          - generic [ref=e15]: 👥
+          - generic [ref=e16]: User Management
+        - link "📋 Enrollment List" [ref=e17] [cursor=pointer]:
+          - /url: /admin/enrollment-list
+          - generic [ref=e18]: 📋
+          - generic [ref=e19]: Enrollment List
+        - link "🎓 Student Advancement" [ref=e20] [cursor=pointer]:
+          - /url: /admin/student-management
+          - generic [ref=e21]: 🎓
+          - generic [ref=e22]: Student Advancement
+        - link "📅 Evaluation Periods" [ref=e23] [cursor=pointer]:
+          - /url: /admin/periods
+          - generic [ref=e24]: 📅
+          - generic [ref=e25]: Evaluation Periods
+        - link "📚 Course Management" [ref=e26] [cursor=pointer]:
+          - /url: /admin/courses
+          - generic [ref=e27]: 📚
+          - generic [ref=e28]: Course Management
+        - link "📤 Data Export" [ref=e29] [cursor=pointer]:
+          - /url: /admin/export
+          - generic [ref=e30]: 📤
+          - generic [ref=e31]: Data Export
+        - link "📋 Audit Logs" [ref=e32] [cursor=pointer]:
+          - /url: /admin/audit-logs
+          - generic [ref=e33]: 📋
+          - generic [ref=e34]: Audit Logs
+      - generic [ref=e35]:
+        - generic [ref=e36]:
+          - generic [ref=e37]: System Administrator
+          - generic [ref=e38]: Administrator
+        - button "Logout" [ref=e39] [cursor=pointer]
+  - main [ref=e40]:
+    - generic [ref=e42]:
+      - generic [ref=e46]:
+        - img "University Logo" [ref=e47]
+        - generic [ref=e48]:
+          - heading "Evaluation Period Management" [level=1] [ref=e49]
+          - paragraph [ref=e50]: Control evaluation schedules and monitor participation
+      - generic [ref=e51]:
+        - generic [ref=e52]:
+          - generic [ref=e54]:
+            - generic [ref=e55]:
+              - generic [ref=e56]:
+                - heading "1st Semester 2025-2026" [level=2] [ref=e57]
+                - generic [ref=e58]: 🟢 OPEN
+              - paragraph [ref=e59]: November 23, 2025 - December 20, 2025
+            - generic [ref=e60]:
+              - button "Extend" [active] [ref=e61] [cursor=pointer]
+              - button "Close Period" [ref=e62] [cursor=pointer]
+          - generic [ref=e63]:
+            - generic [ref=e64]:
+              - generic [ref=e65]:
+                - paragraph [ref=e66]: Total Evaluations
+                - paragraph [ref=e67]: "0"
+              - generic [ref=e68]:
+                - paragraph [ref=e69]: Completed
+                - paragraph [ref=e70]: "0"
+              - generic [ref=e71]:
+                - paragraph [ref=e72]: Participation Rate
+                - paragraph [ref=e73]: 0%
+              - generic [ref=e74]:
+                - paragraph [ref=e75]: Days Remaining
+                - paragraph [ref=e76]: "6"
+            - generic [ref=e77]:
+              - generic [ref=e78]:
+                - generic [ref=e79]: Completion Progress
+                - generic [ref=e80]: 0/0
+              - generic [ref=e83]: 0%
+            - generic [ref=e85]:
+              - img [ref=e86]
+              - generic [ref=e88]:
+                - paragraph [ref=e89]: ❌ Low participation rate!
+                - paragraph [ref=e90]: Participation is below 50%. Immediate action recommended.
+            - generic [ref=e91]:
+              - generic [ref=e92]:
+                - generic [ref=e93]:
+                  - heading "Enrolled Program Sections" [level=3] [ref=e94]:
+                    - img [ref=e95]
+                    - text: Enrolled Program Sections
+                  - paragraph [ref=e97]: Program sections enrolled for evaluation during this period
+                - generic [ref=e98]:
+                  - button "Enroll All" [disabled] [ref=e99]:
+                    - img [ref=e100]
+                    - generic [ref=e102]: Enroll All
+                  - button "Enroll Section" [ref=e103] [cursor=pointer]:
+                    - img [ref=e104]
+                    - generic [ref=e106]: Enroll Section
+              - generic [ref=e109]:
+                - generic [ref=e110]:
+                  - generic [ref=e111]:
+                    - heading "BSCS-DS-3A" [level=4] [ref=e112]
+                    - generic [ref=e113]: Year 3
+                    - generic [ref=e114]: Sem 1
+                  - paragraph [ref=e115]: Bachelor of Science in Computer Science - Data Science
+                  - generic [ref=e116]:
+                    - generic [ref=e117]: BSCS-DS
+                    - generic [ref=e118]: 👥 1 students
+                    - generic [ref=e119]: ✅ 0 evals
+                  - paragraph [ref=e120]: Enrolled Dec 10, 2025
+                - button "Remove" [ref=e121] [cursor=pointer]:
+                  - img [ref=e122]
+                  - generic [ref=e124]: Remove
+        - generic [ref=e125]:
+          - generic [ref=e126]:
+            - heading "📚 Past Evaluation Periods" [level=2] [ref=e127]
+            - paragraph [ref=e128]: Historical evaluation period records
+          - generic [ref=e132]:
+            - generic [ref=e133]:
+              - generic [ref=e134]:
+                - heading "1st Semester 2025-2026" [level=3] [ref=e135]
+                - generic [ref=e136]: CLOSED
+              - paragraph [ref=e137]: Nov 22, 2025 - Nov 23, 2025
+              - generic [ref=e138]:
+                - generic [ref=e139]:
+                  - paragraph [ref=e140]: Participation
+                  - paragraph [ref=e141]: 0%
+                - generic [ref=e142]:
+                  - paragraph [ref=e143]: Completed
+                  - paragraph [ref=e144]: "0"
+                - generic [ref=e145]:
+                  - paragraph [ref=e146]: Total
+                  - paragraph [ref=e147]: "0"
+            - generic [ref=e148]:
+              - button "Extend & Reopen" [ref=e149] [cursor=pointer]:
+                - img [ref=e150]
+                - generic [ref=e152]: Extend & Reopen
+              - button "Delete" [ref=e153] [cursor=pointer]:
+                - img [ref=e154]
+                - generic [ref=e156]: Delete
+      - generic [ref=e158]:
+        - generic [ref=e160]:
+          - generic [ref=e161]:
+            - heading "⏰ Extend Period" [level=2] [ref=e162]
+            - paragraph [ref=e163]: 1st Semester 2025-2026
+          - button [ref=e164] [cursor=pointer]:
+            - img [ref=e165]
+        - generic [ref=e167]:
+          - generic [ref=e168]:
+            - generic [ref=e169]: Current End Date
+            - textbox [disabled] [ref=e170]
+          - generic [ref=e171]:
+            - generic [ref=e172]: New End Date *
+            - textbox [ref=e173]: 2025-12-26
+          - paragraph [ref=e175]:
+            - strong [ref=e176]: 📧 Email notifications
+            - text: will be sent to all users informing them of the extension.
+          - generic [ref=e177]:
+            - button "Cancel" [ref=e178] [cursor=pointer]
+            - button "Extend Period" [ref=e179] [cursor=pointer]
+  - contentinfo [ref=e180]:
+    - generic [ref=e182]: © 2025 Lyceum of the Philippines University - Batangas. All rights reserved.
+```

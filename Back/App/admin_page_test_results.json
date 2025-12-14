@@ -1,0 +1,323 @@
+{
+  "timestamp": "2025-12-14T18:51:25.740892",
+  "pages": {
+    "DatabaseSchema": [
+      {
+        "test": "Table: users",
+        "status": "PASS",
+        "details": "Exists with 57 rows"
+      },
+      {
+        "test": "Table: students",
+        "status": "PASS",
+        "details": "Exists with 51 rows"
+      },
+      {
+        "test": "Table: programs",
+        "status": "PASS",
+        "details": "Exists with 7 rows"
+      },
+      {
+        "test": "Table: courses",
+        "status": "PASS",
+        "details": "Exists with 367 rows"
+      },
+      {
+        "test": "Table: class_sections",
+        "status": "PASS",
+        "details": "Exists with 9 rows"
+      },
+      {
+        "test": "Table: enrollments",
+        "status": "PASS",
+        "details": "Exists with 9 rows"
+      },
+      {
+        "test": "Table: evaluations",
+        "status": "PASS",
+        "details": "Exists with 0 rows"
+      },
+      {
+        "test": "Table: evaluation_periods",
+        "status": "PASS",
+        "details": "Exists with 2 rows"
+      },
+      {
+        "test": "Table: audit_logs",
+        "status": "PASS",
+        "details": "Exists with 1004 rows"
+      },
+      {
+        "test": "Table: program_sections",
+        "status": "PASS",
+        "details": "Exists with 35 rows"
+      },
+      {
+        "test": "Table: section_students",
+        "status": "PASS",
+        "details": "Exists with 51 rows"
+      }
+    ],
+    "AdminDashboard": [
+      {
+        "test": "Dashboard Stats Query",
+        "status": "PASS",
+        "details": "Users: 57, Students: 51, Admins: 1, Courses: 367, Evaluations: 0"
+      },
+      {
+        "test": "Program Stats Query",
+        "status": "PASS",
+        "details": "Found 7 programs with student counts"
+      },
+      {
+        "test": "Sentiment Stats Query",
+        "status": "PASS",
+        "details": "Sentiment distribution: {}"
+      },
+      {
+        "test": "Recent Evaluations Query",
+        "status": "PASS",
+        "details": "Retrieved 0 recent evaluations (using submission_date column)"
+      },
+      {
+        "test": "Active Period Check",
+        "status": "PASS",
+        "details": "Active period: 1st Semester 2025-2026 (ID: 12, Status: active)"
+      },
+      {
+        "test": "Evaluations Table Structure",
+        "status": "PASS",
+        "details": "Columns: [('id', 'integer'), ('student_id', 'integer'), ('class_section_id', 'integer'), ('rating_teaching', 'integer'), ('rating_content', 'integer'), ('rating_engagement', 'integer'), ('rating_overall', 'integer'), ('text_feedback', 'text'), ('suggestions', 'text'), ('sentiment', 'character varying'), ('sentiment_score', 'double precision'), ('sentiment_confidence', 'double precision'), ('is_anomaly', 'boolean'), ('anomaly_score', 'double precision'), ('anomaly_reason', 'text'), ('submission_date', 'timestamp without time zone'), ('submission_ip', 'character varying'), ('processing_status', 'character varying'), ('processed_at', 'timestamp without time zone'), ('ratings', 'jsonb'), ('metadata', 'jsonb'), ('comments', 'text'), ('evaluation_period_id', 'integer'), ('status', 'character varying'), ('created_at', 'timestamp without time zone')]"
+      }
+    ],
+    "UserManagement": [
+      {
+        "test": "Get All Users",
+        "status": "PASS",
+        "details": "Retrieved 57 users"
+      },
+      {
+        "test": "Filter by Role (student)",
+        "status": "PASS",
+        "details": "Found 51 users with role 'student'"
+      },
+      {
+        "test": "Filter by Role (admin)",
+        "status": "PASS",
+        "details": "Found 1 users with role 'admin'"
+      },
+      {
+        "test": "Filter by Role (secretary)",
+        "status": "PASS",
+        "details": "Found 3 users with role 'secretary'"
+      },
+      {
+        "test": "Filter by Role (department_head)",
+        "status": "PASS",
+        "details": "Found 2 users with role 'department_head'"
+      },
+      {
+        "test": "Filter by Status",
+        "status": "PASS",
+        "details": "Active: 56, Inactive: 1"
+      },
+      {
+        "test": "Filter by Program",
+        "status": "PASS",
+        "details": "Programs with students: [('BSPSY', 4), ('BMA', 7), ('BS-CYBER', 7), ('ABCOMM', 8), ('BSIT', 9)]"
+      },
+      {
+        "test": "Filter by Year Level",
+        "status": "PASS",
+        "details": "Year level distribution: {1: 12, 2: 11, 3: 16, 4: 12}"
+      },
+      {
+        "test": "Search Functionality",
+        "status": "PASS",
+        "details": "Search query works, found 57 matching users"
+      },
+      {
+        "test": "User Details with Student Info",
+        "status": "PASS",
+        "details": "Retrieved 5 students with complete info"
+      },
+      {
+        "test": "Enrollment List for Validation",
+        "status": "PASS",
+        "details": "Enrollment list exists with 23 entries"
+      }
+    ],
+    "EvaluationPeriodManagement": [
+      {
+        "test": "Get All Periods",
+        "status": "PASS",
+        "details": "Found 2 evaluation periods"
+      },
+      {
+        "test": "Period Status Distribution",
+        "status": "PASS",
+        "details": "Status distribution: {'active': 1, 'closed': 1}"
+      },
+      {
+        "test": "Period Evaluation Counts",
+        "status": "PASS",
+        "details": "Periods with evaluations: None"
+      },
+      {
+        "test": "Period Enrollments Table",
+        "status": "PASS",
+        "details": "Table exists with 0 entries"
+      },
+      {
+        "test": "Program Section Enrollments Table",
+        "status": "PASS",
+        "details": "Table exists with 1 entries"
+      },
+      {
+        "test": "Period Date Validation",
+        "status": "PASS",
+        "details": "All periods have valid date ranges"
+      }
+    ],
+    "EnhancedCourseManagement": [
+      {
+        "test": "Get All Courses",
+        "status": "PASS",
+        "details": "Found 367 courses"
+      },
+      {
+        "test": "Courses by Program",
+        "status": "PASS",
+        "details": "Course distribution: [('BSCS-DS', 58), ('BMA', 56), ('BS-CYBER', 55), ('BSIT', 54), ('ABCOMM', 50)]"
+      },
+      {
+        "test": "Courses by Year Level",
+        "status": "PASS",
+        "details": "Year levels: [(1, 132), (2, 124), (3, 78), (4, 33)]"
+      },
+      {
+        "test": "Courses by Semester",
+        "status": "PASS",
+        "details": "Semesters: [(1, 194), (3, 20), (2, 153)]"
+      },
+      {
+        "test": "Get Class Sections",
+        "status": "PASS",
+        "details": "Found 9 class sections"
+      },
+      {
+        "test": "Course Status Filter",
+        "status": "PASS",
+        "details": "Active: 367, Archived: 0"
+      }
+    ],
+    "StudentManagement": [
+      {
+        "test": "Get All Students",
+        "status": "PASS",
+        "details": "Found 51 students"
+      },
+      {
+        "test": "Year Level Distribution",
+        "status": "PASS",
+        "details": "Distribution: [(1, 12), (2, 11), (3, 16), (4, 12)]"
+      },
+      {
+        "test": "Program Distribution",
+        "status": "PASS",
+        "details": "Top programs: [('BAPSY', 10), ('BSIT', 9), ('ABCOMM', 8), ('BMA', 7), ('BS-CYBER', 7)]"
+      },
+      {
+        "test": "Student Enrollment Status",
+        "status": "PASS",
+        "details": "Total: 51, Enrolled in courses: 1"
+      }
+    ],
+    "ProgramSections": [
+      {
+        "test": "Get All Program Sections",
+        "status": "PASS",
+        "details": "Found 35 program sections"
+      },
+      {
+        "test": "Section Student Counts",
+        "status": "PASS",
+        "details": "Top sections: [('BAPSY 3-A', 5), ('BS-CYBER 3-A', 5), ('ABCOMM 2-A', 4), ('BAPSY 4-A', 3), ('BSCS-DS-4A', 3)]"
+      },
+      {
+        "test": "Section Students Table",
+        "status": "PASS",
+        "details": "Total section-student assignments: 51"
+      }
+    ],
+    "AuditLogViewer": [
+      {
+        "test": "Get Audit Logs",
+        "status": "PASS",
+        "details": "Found 50 audit log entries"
+      },
+      {
+        "test": "Log Categories",
+        "status": "PASS",
+        "details": "Categories: [('User Management', 401), ('Section Management', 246), ('Authentication', 177), ('Data Export', 62), ('Program Section Management', 57), ('Evaluation Management', 45), ('Course Management', 8), ('System Settings', 5), ('Evaluation', 3)]"
+      },
+      {
+        "test": "Top Actions",
+        "status": "PASS",
+        "details": "Actions: [('USER_CREATED', 262), ('SECTION_DELETED', 237), ('LOGIN', 145), ('USER_DELETED', 79), ('DELETE', 30)]"
+      },
+      {
+        "test": "Severity Distribution",
+        "status": "PASS",
+        "details": "Severities: [('Warning', 25), ('Info', 979)]"
+      }
+    ],
+    "DataExportCenter": [
+      {
+        "test": "Export History",
+        "status": "PASS",
+        "details": "Found 10 export records"
+      },
+      {
+        "test": "Exportable Evaluations",
+        "status": "PASS",
+        "details": "Submitted evaluations available: 0"
+      },
+      {
+        "test": "Exportable Users by Role",
+        "status": "PASS",
+        "details": "Users: [('admin', 1), ('department_head', 2), ('secretary', 3), ('student', 51)]"
+      }
+    ],
+    "NonRespondents": [
+      {
+        "test": "Non-Respondents Query",
+        "status": "PASS",
+        "details": "Found 1 students with pending evaluations"
+      },
+      {
+        "test": "Completion Rate by Section",
+        "status": "PASS",
+        "details": "Found 9 sections with completion data"
+      }
+    ],
+    "EnrollmentListManagement": [
+      {
+        "test": "Enrollment List Table",
+        "status": "PASS",
+        "details": "Table exists with 23 entries"
+      },
+      {
+        "test": "Enrollment List Columns",
+        "status": "PASS",
+        "details": "Columns: ['id', 'student_number', 'first_name', 'last_name', 'middle_name', 'email', 'program_id', 'year_level', 'college_code', 'college_name', 'status', 'date_enrolled', 'created_at', 'updated_at', 'created_by', 'notes']"
+      }
+    ]
+  },
+  "summary": {
+    "passed": 58,
+    "failed": 0,
+    "warnings": 0
+  },
+  "issues_found": []
+}
