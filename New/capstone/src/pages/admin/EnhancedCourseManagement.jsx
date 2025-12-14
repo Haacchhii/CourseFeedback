@@ -1263,11 +1263,14 @@ student2@example.com,IT-PROG1-2024,email,
             program_section_id: selectedProgramSection.id  // Pass program section ID for targeted enrollment
           }
           console.log(`[Quick Bulk] Creating section for ${course.subject_code}:`, sectionData)
+          console.log(`[Quick Bulk] program_section_id being sent:`, selectedProgramSection.id)
           const response = await adminAPI.createSection(sectionData, true) // Enable auto-enrollment
           successCount++
-          console.log(`[Quick Bulk] Response for ${course.subject_code}:`, response.data)
-          if (response.data?.enrolled_count > 0) {
-            console.log(`✅ Auto-enrolled ${response.data.enrolled_count} students into ${course.subject_code}`)
+          // Response is unwrapped by interceptor, so response IS the backend response object
+          console.log(`[Quick Bulk] Full response for ${course.subject_code}:`, response)
+          const enrolledCount = response.data?.enrolled_count || response.enrolled_count || 0
+          if (enrolledCount > 0) {
+            console.log(`✅ Auto-enrolled ${enrolledCount} students into ${course.subject_code}`)
           } else {
             console.warn(`⚠️ No students enrolled into ${course.subject_code}`)
           }

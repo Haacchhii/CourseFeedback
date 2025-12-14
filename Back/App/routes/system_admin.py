@@ -2690,7 +2690,6 @@ async def create_section(
                     # Query students linked to this program section via section_students
                     # section_students.student_id references users.id
                     # We need students.id for the enrollments table
-                    from sqlalchemy import text
                     result = db.execute(
                         text("""
                             SELECT s.id as student_id, u.email, u.first_name, u.last_name
