@@ -2598,7 +2598,7 @@ class SectionCreate(BaseModel):
     semester: int
     academic_year: str
     max_students: int = 40
-    program_section_id: int = None  # Optional: for auto-enrolling specific program section students
+    program_section_id: Optional[int] = None  # Optional: for auto-enrolling specific program section students
 
 @router.post("/sections")
 async def create_section(
@@ -2608,7 +2608,10 @@ async def create_section(
 ):
     """Create a new class section with optional auto-enrollment"""
     try:
+        # Debug: Log all incoming data
+        logger.info(f"[CREATE_SECTION] RAW DATA: course_id={section_data.course_id}, class_code={section_data.class_code}, semester={section_data.semester}, academic_year={section_data.academic_year}, max_students={section_data.max_students}, program_section_id={section_data.program_section_id}")
         logger.info(f"[CREATE_SECTION] Creating section: {section_data.class_code}, auto_enroll={auto_enroll}, program_section_id={section_data.program_section_id}")
+        print(f"[CREATE_SECTION] program_section_id type: {type(section_data.program_section_id)}, value: {section_data.program_section_id}")
         
         # Verify course exists
         course = db.query(Course).filter(Course.id == section_data.course_id).first()
@@ -2632,7 +2635,7 @@ async def create_section(
         new_section = ClassSection(
             course_id=section_data.course_id,
             class_code=section_data.class_code,
-            semester=section_data.semester,
+            semester=str(section_data.semester),  # Convert int to str for database
             academic_year=section_data.academic_year,
             max_students=section_data.max_students
         )
@@ -2640,11 +2643,15 @@ async def create_section(
         db.commit()
         db.refresh(new_section)
         
+        print(f"[SECTION_CREATED] New section ID: {new_section.id}, auto_enroll flag: {auto_enroll}")
+        
         enrolled_count = 0
         
         # Auto-enroll students if requested
         if auto_enroll:
+            print(f"[AUTO_ENROLL_START] ===== STARTING AUTO-ENROLL =====")
             logger.info(f"[AUTO_ENROLL] Starting auto-enrollment for section {new_section.id}")
+            print(f"[AUTO_ENROLL] program_section_id check: value={section_data.program_section_id}, type={type(section_data.program_section_id)}, truthy={bool(section_data.program_section_id)}")
             try:
                 # Get the active evaluation period for auto-enrollment
                 # Status can be 'Open' or 'active' depending on the system
@@ -2662,6 +2669,7 @@ async def create_section(
                 # If program_section_id is provided, enroll students from that specific section
                 if section_data.program_section_id:
                     logger.info(f"[AUTO_ENROLL] Using program_section_id: {section_data.program_section_id}")
+                    print(f"[AUTO_ENROLL] ENTERING program_section_id branch with ID: {section_data.program_section_id}")
 
                     # First, check how many users are in section_students
                     users_in_section = db.execute(
