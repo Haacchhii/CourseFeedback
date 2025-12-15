@@ -1,0 +1,26 @@
+#	Student #	Name 	Enrolled course	Year	Lpu email
+1	23131430	Adarlo, Richelle Grace Q.	BSCS-DS	3rd	richellegraceadarlo@lpubatangas.edu.ph
+2	23130371	Alvarez, Renz Matthew O.	BSCS-DS	3rd	renzmatthewalvarez@lpubatangas.edu,ph
+
+3	23131958	Chua, Carl Lawrence M.	BSCS-DS	3rd	carllawrencechua@lpubatangas.edu.ph
+4	21125056	Dayaday, Francesca Nicole C.	BSCS-DS	3rd	francescanicoledayaday@lpubatangas.edu.ph
+5	23139963	De Belen, Via Mae S.	BSCS-DS	3rd	viamaedebelen@lpubatangas.edu.ph
+6	22229558	Espela, Zymon Yuri R.	BSCS-DS	3rd	zymonyuriespela@lpubatangas.edu.ph
+7	23130379	Gabrera, Malvin Christian B.	BSCS-DS	3rd	malvinchristiangabrera@lpubatangas.edu.ph
+8	23129903	Garcia, Rupert Cyril M.	BSCS-DS	3rd	rupertcyrilgarcia@lpubatangas.edu.ph
+9	23130530	Golloso, Ashley Heart U.	BSCS-DS	3rd	ashleyheartgolloso@lpubatangas.edu.ph
+10	21123850	Halaman, Zac Uriel Joseph C.	BSCS-DS	3rd	zacurieljosephhalaman@lpubatangas.edu.ph
+11	17001927	Ilustre, Joriz Ferdinand S.	BSCS-DS	3rd	jorizferdinandilustre@lpubatangas.edu.ph
+12	23130778	Iturralde, Jose Irineo N.	BSCS-DS	3rd	iturraldejose@lpubatangas.edu.ph
+13	21123626	Lim, Ricci Vinn V.	BSCS-DS	3rd	riccivinnlim@lpubatangas.edu.ph
+14	23131253	Mabilangan, Vincent Edrian C.	BSCS-DS	3rd	vincentedrianmabilangan@lpubatangas.edu.ph
+15	23131597	Maloloy-on, Joshua T.	BSCS-DS	3rd	joshuamaloloyon@lpubatangas.edu.ph
+16	23131122	Martinez, Kim Zaki Nathaniel M.	BSCS-DS	3rd	kimzakinathanielmartinez@lpubatangas.edu.ph
+17	21123833	Mendoza, Henrick Yurie S.	BSCS-DS	3rd	henrickyuriemendoza@lpubatangas.edu.ph
+18	22127115	Montalbo, Ragi Y.	BSCS-DS	3rd	ragimontalbo@lpubatangas.edu.ph
+19	21123290	Romasanta, Rameses M.	BSCS-DS	3rd	ramesesromasanta@lpubatangas.edu.ph
+20	23131179	Sacdalan, Jaeho	BSCS-DS	3rd	jaehosacdalan@lpubatangas.edu.ph
+21	17001886	Tiemsim, shanyka biatrice S.	BSCS-DS	3rd	shanykabiatricetiemsim@lpubatangas.edu.ph
+22	17001902	Tjioe, Justin M.	BSCS-DS	3rd	justintjioe@lpubatangas.edu.ph
+23	23131196	Yema, King Whestlie R.	BSCS-DS	3rd	kingwhestlieyema@lpubatangas.edu.ph
+

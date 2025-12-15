@@ -811,7 +811,7 @@ export default function EnhancedCourseManagement() {
   const loadSections = async () => {
     try {
       // Get all non-archived period IDs for filtering when "All Periods" is selected
-      const nonArchivedPeriodIds = evaluationPeriods
+      const nonArchivedPeriodIds = (evaluationPeriods || [])
         .filter(p => !isArchivedPeriod(p.status))
         .map(p => p.id)
       
@@ -1433,7 +1433,7 @@ student2@example.com,IT-PROG1-2024,email,
       return
     }
 
-    const sectionNames = sections
+    const sectionNames = (sections || [])
       .filter(s => selectedSections.includes(s.id))
       .map(s => s.class_code)
       .join(', ')
