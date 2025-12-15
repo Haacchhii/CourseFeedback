@@ -379,7 +379,7 @@ export default function StudentManagement() {
         {/* Year Advancement Tab */}
         {activeTab === 'advance' && (
           <div className="space-y-6">
-            <div className="bg-white rounded-xl shadow-lg p-8">
+            <div className="bg-white rounded-xl shadow-lg p-8 overflow-visible">
               <h2 className="text-2xl font-bold text-gray-800 mb-6">🎓 Advance Students to Next Year Level</h2>
               
               {/* Info Box */}
@@ -391,8 +391,8 @@ export default function StudentManagement() {
               </div>
 
               {/* Form */}
-              <div className="space-y-6">
-                <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-6 overflow-visible">
+                <div className="grid md:grid-cols-2 gap-6 overflow-visible">
                   <CustomDropdown
                     label="Filter by Program (Optional)"
                     value={selectedProgram}
@@ -529,7 +529,7 @@ export default function StudentManagement() {
         {/* Enrollment Transition Tab */}
         {activeTab === 'transition' && (
           <div className="space-y-6">
-            <div className="bg-white rounded-xl shadow-lg p-8">
+            <div className="bg-white rounded-xl shadow-lg p-8 overflow-visible">
               <h2 className="text-2xl font-bold text-gray-800 mb-6">🔄 Transition Enrollments to New Period</h2>
               
               {/* Info Box */}
@@ -541,8 +541,8 @@ export default function StudentManagement() {
               </div>
 
               {/* Form */}
-              <div className="space-y-6">
-                <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-6 overflow-visible">
+                <div className="grid md:grid-cols-2 gap-6 overflow-visible">
                   <CustomDropdown
                     label="From Period *"
                     value={fromPeriodId}

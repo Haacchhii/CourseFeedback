@@ -212,7 +212,7 @@ SMTP_FROM_EMAIL=your-email@gmail.com`}
 
         {/* Send Notifications Tab */}
         {activeTab === 'send' && (
-          <div className="bg-white rounded-card shadow-card p-6 lg:p-8">
+          <div className="bg-white rounded-card shadow-card p-6 lg:p-8 overflow-visible">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Send Email Notifications</h2>
             
             <form onSubmit={handleSendNotification} className="space-y-6">

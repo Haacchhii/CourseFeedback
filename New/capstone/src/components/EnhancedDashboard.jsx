@@ -220,11 +220,11 @@ export default function EnhancedDashboard() {
         </div>
 
         {/* Enhanced Filters */}
-        <div className="lpu-chart-container mb-8">
+        <div className="lpu-chart-container mb-8 overflow-visible">
           <div className="chart-title">Academic Analytics Filters</div>
           <div className="lpu-divider"></div>
           
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-3 gap-6 overflow-visible">
             {isAdmin(currentUser) && (
               <CustomDropdown
                 label="Academic Program"

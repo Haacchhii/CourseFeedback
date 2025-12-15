@@ -997,8 +997,8 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-          <div className="grid md:grid-cols-5 gap-4">
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 overflow-visible">
+          <div className="grid md:grid-cols-5 gap-4 overflow-visible">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">🔍 Search</label>
               <input

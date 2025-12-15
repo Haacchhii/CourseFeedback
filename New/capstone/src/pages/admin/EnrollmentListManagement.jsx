@@ -484,7 +484,7 @@ const EnrollmentListManagement = () => {
             </div>
 
             {/* Filters */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6 overflow-visible">
               <CustomDropdown
                 label="Program"
                 value={filters.program_id}

@@ -304,8 +304,8 @@ const ProgramSections = () => {
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-6 lg:p-8 rounded-card shadow-card mb-12">
-        <div className="grid grid-cols-4 gap-4">
+      <div className="bg-white p-6 lg:p-8 rounded-card shadow-card mb-12 overflow-visible">
+        <div className="grid grid-cols-4 gap-4 overflow-visible">
           <CustomDropdown
             label="Program"
             value={filters.programId ? filters.programId.toString() : ''}

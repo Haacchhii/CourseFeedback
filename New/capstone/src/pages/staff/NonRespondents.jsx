@@ -244,9 +244,9 @@ export default function NonRespondents() {
             </div>
 
             {/* Filters */}
-            <div className="lpu-card p-6 mb-6">
+            <div className="lpu-card p-6 mb-6 overflow-visible">
               <h3 className="text-lg font-semibold text-gray-700 mb-4">Filters</h3>
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid md:grid-cols-2 gap-4 overflow-visible">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Search Student</label>
                   <div className="relative">

@@ -602,7 +602,7 @@ export default function Evaluations() {
         </div>
 
         {/* Enhanced Filters Section */}
-        <div className="lpu-card mb-8 p-8">
+        <div className="lpu-card mb-8 p-8 overflow-visible">
           <div className="flex items-center justify-between border-b border-gray-200 pb-4 mb-6">
             <div className="flex items-center">
               <svg className="w-6 h-6 text-[#7a0000] mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -615,7 +615,7 @@ export default function Evaluations() {
             </span>
           </div>
           
-          <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-6 overflow-visible">
             <div>
               <label className="block text-sm font-semibold text-[#1e293b] mb-3">Search Evaluations</label>
               <input

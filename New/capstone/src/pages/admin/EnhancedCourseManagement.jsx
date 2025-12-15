@@ -1665,8 +1665,8 @@ student2@example.com,IT-PROG1-2024,email,
             </div>
 
             {/* Filters */}
-            <div className="bg-white rounded-card shadow-card p-6 mb-6">
-              <div className="grid md:grid-cols-3 gap-4">
+            <div className="bg-white rounded-card shadow-card p-6 mb-6 overflow-visible">
+              <div className="grid md:grid-cols-3 gap-4 overflow-visible">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">🔍 Search</label>
                   <input
@@ -1832,7 +1832,7 @@ student2@example.com,IT-PROG1-2024,email,
 
         {/* Enrollment Tab - Section Management */}
         {activeTab === 'enrollment' && (
-          <div className="bg-white rounded-card shadow-card p-6">
+          <div className="bg-white rounded-card shadow-card p-6 overflow-visible">
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h3 className="text-xl font-bold text-gray-900">👥 Section Management</h3>
@@ -1867,7 +1867,7 @@ student2@example.com,IT-PROG1-2024,email,
             </div>
 
             {/* Filters */}
-            <div className="mb-6 grid md:grid-cols-7 gap-4">
+            <div className="mb-6 grid md:grid-cols-7 gap-4 overflow-visible">
               <input
                 type="text"
                 placeholder="🔍 Search sections..."

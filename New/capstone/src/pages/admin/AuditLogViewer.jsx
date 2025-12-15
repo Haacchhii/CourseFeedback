@@ -398,11 +398,11 @@ export default function AuditLogViewer() {
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-card shadow-card p-6 lg:p-8 mb-12">
+        <div className="bg-white rounded-card shadow-card p-6 lg:p-8 mb-12 overflow-visible">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">🔎 Advanced Filters</h3>
           
           {/* Row 1: Search and Action */}
-          <div className="grid md:grid-cols-2 gap-4 mb-4">
+          <div className="grid md:grid-cols-2 gap-4 mb-4 overflow-visible">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">🔍 Search</label>
               <input
@@ -468,7 +468,7 @@ export default function AuditLogViewer() {
           </div>
 
           {/* Row 2: Category and Status */}
-          <div className="grid md:grid-cols-2 gap-4 mb-4">
+          <div className="grid md:grid-cols-2 gap-4 mb-4 overflow-visible">
             <CustomDropdown
               label="📂 Category"
               value={categoryFilter}
@@ -503,7 +503,7 @@ export default function AuditLogViewer() {
           </div>
 
           {/* Row 3: User and Date Range */}
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-2 gap-4 overflow-visible">
             <CustomDropdown
               label="👤 User / Role"
               value={userFilter}

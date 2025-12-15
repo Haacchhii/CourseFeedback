@@ -1000,14 +1000,14 @@ export default function DataExportCenter() {
 
               {/* Category-Specific Filters */}
               {selectedExportType === 'All Users' && (
-                <div className="bg-gray-50 rounded-xl p-4 space-y-4">
+                <div className="bg-gray-50 rounded-xl p-4 space-y-4 overflow-visible">
                   <h3 className="font-semibold text-gray-900 flex items-center gap-2">
                     <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
                     </svg>
                     User Filters
                   </h3>
-                  <div className="grid md:grid-cols-3 gap-4">
+                  <div className="grid md:grid-cols-3 gap-4 overflow-visible">
                     <CustomDropdown
                       label="Role"
                       value={exportFilters.userRole}
@@ -1045,14 +1045,14 @@ export default function DataExportCenter() {
               )}
 
               {selectedExportType === 'All Evaluations' && (
-                <div className="bg-gray-50 rounded-xl p-4 space-y-4">
+                <div className="bg-gray-50 rounded-xl p-4 space-y-4 overflow-visible">
                   <h3 className="font-semibold text-gray-900 flex items-center gap-2">
                     <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
                     </svg>
                     Evaluation Filters
                   </h3>
-                  <div className="grid md:grid-cols-2 gap-4">
+                  <div className="grid md:grid-cols-2 gap-4 overflow-visible">
                     <CustomDropdown
                       label="Date Range"
                       value={exportFilters.evalDateRange}
@@ -1093,14 +1093,14 @@ export default function DataExportCenter() {
               )}
 
               {selectedExportType === 'All Courses' && (
-                <div className="bg-gray-50 rounded-xl p-4 space-y-4">
+                <div className="bg-gray-50 rounded-xl p-4 space-y-4 overflow-visible">
                   <h3 className="font-semibold text-gray-900 flex items-center gap-2">
                     <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
                     </svg>
                     Course Filters
                   </h3>
-                  <div className="grid md:grid-cols-3 gap-4">
+                  <div className="grid md:grid-cols-3 gap-4 overflow-visible">
                     <CustomDropdown
                       label="Program"
                       value={exportFilters.courseProgram}
@@ -1138,14 +1138,14 @@ export default function DataExportCenter() {
               )}
 
               {selectedExportType === 'Audit Logs' && (
-                <div className="bg-gray-50 rounded-xl p-4 space-y-4">
+                <div className="bg-gray-50 rounded-xl p-4 space-y-4 overflow-visible">
                   <h3 className="font-semibold text-gray-900 flex items-center gap-2">
                     <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
                     </svg>
                     Audit Log Filters
                   </h3>
-                  <div className="grid md:grid-cols-2 gap-4">
+                  <div className="grid md:grid-cols-2 gap-4 overflow-visible">
                     <CustomDropdown
                       label="Date Range"
                       value={exportFilters.auditDateRange}

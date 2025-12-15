@@ -419,7 +419,7 @@ export default function AnomalyDetection() {
         </div>
 
         {/* Enhanced Filter and Search */}
-        <div className="lpu-card mb-8 p-8">
+        <div className="lpu-card mb-8 p-8 overflow-visible">
           <div className="border-b border-gray-200 pb-4 mb-6">
             <h2 className="text-2xl font-semibold text-[#7a0000] flex items-center">
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -431,9 +431,9 @@ export default function AnomalyDetection() {
           </div>
           
           {/* Enhanced Multi-Row Filters */}
-          <div className="space-y-4">
+          <div className="space-y-4 overflow-visible">
             {/* Row 1: Evaluation Period, Search, and Severity */}
-            <div className="grid md:grid-cols-3 gap-4">
+            <div className="grid md:grid-cols-3 gap-4 overflow-visible">
               <CustomDropdown
                 label="📅 Evaluation Period"
                 value={selectedPeriod ? selectedPeriod.toString() : ''}
@@ -477,7 +477,7 @@ export default function AnomalyDetection() {
             </div>
 
             {/* Row 2: Program, Year Level, Course */}
-            <div className="grid md:grid-cols-3 gap-4">
+            <div className="grid md:grid-cols-3 gap-4 overflow-visible">
               <CustomDropdown
                 label="🎓 Program"
                 value={programFilter}
@@ -521,7 +521,7 @@ export default function AnomalyDetection() {
             </div>
 
             {/* Row 3: Semester and Date Range */}
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid md:grid-cols-2 gap-4 overflow-visible">
               <CustomDropdown
                 label="📅 Semester"
                 value={semesterFilter}

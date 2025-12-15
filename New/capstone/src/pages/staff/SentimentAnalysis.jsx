@@ -503,8 +503,8 @@ export default function SentimentAnalysis() {
           </div>
 
           {showFilters && (
-            <div className="lpu-card p-6 bg-gray-50">
-              <div className="grid md:grid-cols-4 gap-6">
+            <div className="lpu-card p-6 bg-gray-50 overflow-visible">
+              <div className="grid md:grid-cols-4 gap-6 overflow-visible">
                 {/* Evaluation Period Filter */}
                 <CustomDropdown
                   label="Evaluation Period"
