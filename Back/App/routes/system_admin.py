@@ -274,6 +274,13 @@ async def create_user(
         
         current_user_id = current_user['id']
         
+        # Validate email domain - must be @lpubatangas.edu.ph
+        if not user_data.email.lower().endswith('@lpubatangas.edu.ph'):
+            raise HTTPException(
+                status_code=400, 
+                detail="Email must be from @lpubatangas.edu.ph domain"
+            )
+        
         # Check if email already exists
         existing_user = db.query(User).filter(User.email == user_data.email).first()
         if existing_user:
@@ -515,6 +522,16 @@ async def bulk_import_users(
         
         for idx, user_data in enumerate(users):
             try:
+                # Validate email domain - must be @lpubatangas.edu.ph
+                if not user_data.email.lower().endswith('@lpubatangas.edu.ph'):
+                    results["failed"] += 1
+                    results["errors"].append({
+                        "row": idx + 1,
+                        "email": user_data.email,
+                        "error": "Email must be from @lpubatangas.edu.ph domain"
+                    })
+                    continue
+                
                 # Check if email already exists
                 existing_user = db.query(User).filter(User.email == user_data.email).first()
                 if existing_user:

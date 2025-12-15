@@ -24,7 +24,6 @@ class EnrollmentRecord(BaseModel):
     last_name: str
     middle_name: Optional[str] = None
     program_id: int
-    year_level: int
 
 
 @router.get("/enrollment-list/search")
@@ -32,7 +31,6 @@ async def search_enrollment_list(
     query: Optional[str] = Query(None),
     program_id: Optional[int] = Query(None),
     college_code: Optional[str] = Query(None),
-    year_level: Optional[int] = Query(None),
     status: str = Query('active'),
     limit: int = Query(100, le=500),
     current_user: dict = Depends(require_admin),
@@ -52,7 +50,6 @@ async def search_enrollment_list(
             query=query,
             program_id=program_id,
             college_code=college_code,
-            year_level=year_level,
             status=status,
             limit=limit
         )
@@ -188,15 +185,6 @@ async def get_enrollment_stats(
                 ORDER BY p.program_code
             """)).fetchall()
             by_program = {row[0]: row[1] for row in by_program_rows}
-            
-            by_year_rows = db.execute(text("""
-                SELECT year_level, COUNT(*) as count
-                FROM enrollment_list
-                WHERE status = 'active'
-                GROUP BY year_level
-                ORDER BY year_level
-            """)).fetchall()
-            by_year = {str(row[0]): row[1] for row in by_year_rows}
         else:
             # Fallback to students table (has is_active boolean column)
             # Get total active students
@@ -224,16 +212,6 @@ async def get_enrollment_stats(
             """)).fetchall()
             by_program = {row[0]: row[1] for row in by_program_rows}
             
-            # Get by year level
-            by_year_rows = db.execute(text("""
-                SELECT year_level, COUNT(*) as count
-                FROM students
-                WHERE is_active = true
-                GROUP BY year_level
-                ORDER BY year_level
-            """)).fetchall()
-            by_year = {str(row[0]): row[1] for row in by_year_rows}
-            
             # Get by department (from programs table)
             by_college_rows = db.execute(text("""
                 SELECT p.department, COUNT(*) as count
@@ -250,16 +228,12 @@ async def get_enrollment_stats(
             "total_students": total,
             "by_status": by_status,
             "by_college": by_college,
-            "by_program": by_program,
-            "by_year": by_year
+            "by_program": by_program
         }
         
     except Exception as e:
         logger.error(f"Error getting enrollment stats: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/enrollment-list/upload")
 
 
 @router.post("/enrollment-list/upload")
@@ -270,9 +244,11 @@ async def upload_enrollment_list(
 ):
     """
     Bulk upload enrollment list from CSV
+    Used to validate which students are eligible to create accounts in the system
     
     CSV Format:
-    student_number,first_name,last_name,middle_name,program_code,year_level
+    student_number,first_name,last_name,middle_name,program_code
+    (middle_name is optional)
     
     Access: Admin only
     """
@@ -307,7 +283,6 @@ async def upload_enrollment_list(
                 last_name = row['last_name'].strip()
                 middle_name = row.get('middle_name', '').strip() or None
                 program_code = row['program_code'].strip().upper()
-                year_level = int(row['year_level'])
                 
                 # Validate program exists
                 if program_code not in program_map:
@@ -343,7 +318,6 @@ async def upload_enrollment_list(
                             last_name = :last_name,
                             middle_name = :middle_name,
                             program_id = :program_id,
-                            year_level = :year_level,
                             college_code = :college_code,
                             college_name = :college_name,
                             updated_at = CURRENT_TIMESTAMP
@@ -354,7 +328,6 @@ async def upload_enrollment_list(
                         "last_name": last_name,
                         "middle_name": middle_name,
                         "program_id": program_id,
-                        "year_level": year_level,
                         "college_code": college_code,
                         "college_name": college_name
                     })
@@ -363,11 +336,11 @@ async def upload_enrollment_list(
                     db.execute(text("""
                         INSERT INTO enrollment_list (
                             student_number, first_name, last_name, middle_name,
-                            program_id, year_level, college_code, college_name, 
+                            program_id, college_code, college_name, 
                             status, created_by
                         ) VALUES (
                             :student_number, :first_name, :last_name, :middle_name,
-                            :program_id, :year_level, :college_code, :college_name,
+                            :program_id, :college_code, :college_name,
                             'active', :created_by
                         )
                     """), {
@@ -376,7 +349,6 @@ async def upload_enrollment_list(
                         "last_name": last_name,
                         "middle_name": middle_name,
                         "program_id": program_id,
-                        "year_level": year_level,
                         "college_code": college_code,
                         "college_name": college_name,
                         "created_by": current_user["id"]

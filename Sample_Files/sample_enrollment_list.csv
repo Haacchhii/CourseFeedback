@@ -1,11 +1,11 @@
-student_number,first_name,last_name,middle_name,program_code,year_level
-2022-00001,Francesca Nicole,Dayaday,,BSIT,2
-2022-00002,Juan,Dela Cruz,Santos,BSIT,1
-2022-00003,Maria,Santos,Reyes,BSCS-DS,2
-2022-00004,Pedro,Garcia,Lopez,BSCS-DS,1
-2022-00005,Ana,Martinez,Cruz,BSPSY,3
-2022-00006,Carlos,Rodriguez,Diaz,BSPSY,2
-2022-00007,Sofia,Hernandez,Gomez,BMA,4
-2022-00008,Miguel,Lopez,Torres,BMA,3
-2022-00009,Isabella,Gonzalez,Ramirez,ABCOMM,2
-2022-00010,Diego,Perez,Flores,BS-CYBER,1
+﻿student_number,first_name,last_name,middle_name,program_code
+2022-00001,Francesca Nicole,Dayaday,,BSIT
+2022-00002,Juan,Dela Cruz,Santos,BSIT
+2022-00003,Maria,Santos,Reyes,BSCS-DS
+2022-00004,Pedro,Garcia,Lopez,BSCS-DS
+2022-00005,Ana,Martinez,Cruz,BSPSY
+2022-00006,Carlos,Rodriguez,Diaz,BSPSY
+2022-00007,Sofia,Hernandez,Gomez,BMA
+2022-00008,Miguel,Lopez,Torres,BMA
+2022-00009,Isabella,Gonzalez,Ramirez,ABCOMM
+2022-00010,Diego,Perez,Flores,BS-CYBER

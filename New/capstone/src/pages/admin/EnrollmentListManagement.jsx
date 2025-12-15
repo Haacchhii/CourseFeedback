@@ -11,7 +11,6 @@ const EnrollmentListManagement = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({
     program_id: '',
-    year_level: '',
     status: 'active'
   });
   const [stats, setStats] = useState(null);
@@ -79,7 +78,6 @@ const EnrollmentListManagement = () => {
       const params = new URLSearchParams();
       if (searchQuery) params.append('query', searchQuery);
       if (filters.program_id) params.append('program_id', filters.program_id);
-      if (filters.year_level) params.append('year_level', filters.year_level);
       if (filters.status) params.append('status', filters.status);
       
       // Request all records (up to 500)
@@ -121,7 +119,7 @@ const EnrollmentListManagement = () => {
     } catch (err) {
       console.error('Error fetching stats:', err);
       // Reset stats on error
-      setStats({ total_students: 0, by_status: {}, by_program: {}, by_year: {} });
+      setStats({ total_students: 0, by_status: {}, by_program: {} });
     }
   };
 
@@ -140,7 +138,6 @@ const EnrollmentListManagement = () => {
   const handleClearFilters = () => {
     setFilters({
       program_id: '',
-      year_level: '',
       status: 'active'
     });
     setSearchQuery('');
@@ -169,7 +166,9 @@ const EnrollmentListManagement = () => {
 
         // Parse header
         const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-        const requiredHeaders = ['student_number', 'first_name', 'last_name', 'program_code', 'year_level'];
+        // Required: student_number, first_name, last_name, program_code (middle_name is optional)
+        // This list is used to validate which students are eligible to create accounts
+        const requiredHeaders = ['student_number', 'first_name', 'last_name', 'program_code'];
         const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
 
         if (missingHeaders.length > 0) {
@@ -189,15 +188,12 @@ const EnrollmentListManagement = () => {
             row[header] = values[index] || '';
           });
 
-          // Validate row
+          // Validate row - only essential fields required for eligibility
           const rowErrors = [];
           if (!row.student_number) rowErrors.push('Missing student number');
           if (!row.first_name) rowErrors.push('Missing first name');
           if (!row.last_name) rowErrors.push('Missing last name');
           if (!row.program_code) rowErrors.push('Missing program code');
-          if (!row.year_level || ![1, 2, 3, 4, '1', '2', '3', '4'].includes(row.year_level)) {
-            rowErrors.push('Invalid year level (must be 1-4)');
-          }
 
           if (rowErrors.length > 0) {
             errors.push({ row: i, errors: rowErrors, data: row });
@@ -260,10 +256,11 @@ const EnrollmentListManagement = () => {
     const samplePrograms = programs.slice(0, 3).map(p => p.code || p.program_code).filter(Boolean);
     const programCodes = samplePrograms.length > 0 ? samplePrograms : ['PROGRAM1', 'PROGRAM2', 'PROGRAM3'];
     
-    const csvContent = `student_number,first_name,last_name,middle_name,program_code,year_level
-2024-00001,Juan,Dela Cruz,Santos,${programCodes[0]},1
-2024-00002,Maria,Santos,Lopez,${programCodes[1] || programCodes[0]},2
-2024-00003,Pedro,Garcia,Martinez,${programCodes[2] || programCodes[0]},3`;
+    // This list validates which students are eligible to create accounts in the system
+    const csvContent = `student_number,first_name,last_name,middle_name,program_code
+2024-00001,Juan,Dela Cruz,Santos,${programCodes[0]}
+2024-00002,Maria,Santos,Lopez,${programCodes[1] || programCodes[0]}
+2024-00003,Pedro,Garcia,Martinez,${programCodes[2] || programCodes[0]}`;
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -380,8 +377,8 @@ const EnrollmentListManagement = () => {
             <div className="bg-white rounded-card shadow-card p-6 lg:p-8 hover:shadow-lg transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Year Levels</p>
-                  <p className="text-2xl lg:text-3xl font-bold text-[#7a0000] mt-2">{Object.keys(stats.by_year || {}).length}</p>
+                  <p className="text-sm font-medium text-gray-600">Inactive Students</p>
+                  <p className="text-2xl lg:text-3xl font-bold text-[#7a0000] mt-2">{stats.by_status?.inactive || 0}</p>
                 </div>
                 <Filter className="w-10 h-10 text-[#7a0000]" />
               </div>
@@ -445,11 +442,11 @@ const EnrollmentListManagement = () => {
                 CSV Format Requirements:
               </p>
               <ul className="list-disc list-inside space-y-2 text-sm text-[#9a1000]">
-                <li><strong>Required columns:</strong> student_number, first_name, last_name, middle_name, email, program_code, year_level, college_code, college_name</li>
+                <li><strong>Required columns:</strong> student_number, first_name, last_name, program_code</li>
+                <li><strong>Optional column:</strong> middle_name</li>
                 <li><strong>Program codes:</strong> Must exist in the system {programs.length > 0 && `(${programs.slice(0, 5).map(p => p.code || p.program_code).join(', ')}${programs.length > 5 ? ', etc.' : ''})`}</li>
-                <li><strong>Year level:</strong> Must be between 1 and 4</li>
+                <li><strong>Purpose:</strong> This list validates which students are eligible to create accounts in the system</li>
                 <li><strong>Behavior:</strong> Existing student records will be updated, new records will be inserted</li>
-                <li><strong>Email:</strong> Must be valid format (optional but recommended)</li>
               </ul>
             </div>
           </div>
@@ -504,21 +501,6 @@ const EnrollmentListManagement = () => {
                   ) : (
                     <option disabled>Loading programs...</option>
                   )}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Year Level</label>
-                <select
-                  value={filters.year_level}
-                  onChange={(e) => handleFilterChange('year_level', e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-[#7a0000] focus:border-[#7a0000] text-base"
-                >
-                  <option value="">All Years</option>
-                  <option value="1">Year 1</option>
-                  <option value="2">Year 2</option>
-                  <option value="3">Year 3</option>
-                  <option value="4">Year 4</option>
                 </select>
               </div>
 
@@ -589,9 +571,6 @@ const EnrollmentListManagement = () => {
                     <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider">
                       Program
                     </th>
-                    <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider">
-                      Year Level
-                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -608,9 +587,6 @@ const EnrollmentListManagement = () => {
                           <div className="font-medium">{student.program_code}</div>
                           <div className="text-xs text-gray-500">{student.program_name}</div>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        Year {student.year_level}
                       </td>
                     </tr>
                   ))}
@@ -711,7 +687,6 @@ const EnrollmentListManagement = () => {
                             <th className="px-4 py-3 text-left text-sm font-semibold uppercase">Student #</th>
                             <th className="px-4 py-3 text-left text-sm font-semibold uppercase">Name</th>
                             <th className="px-4 py-3 text-left text-sm font-semibold uppercase">Program</th>
-                            <th className="px-4 py-3 text-left text-sm font-semibold uppercase">Year</th>
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
@@ -735,7 +710,6 @@ const EnrollmentListManagement = () => {
                                 {row.last_name}, {row.first_name} {row.middle_name}
                               </td>
                               <td className="px-4 py-3 text-sm text-gray-900">{row.program_code}</td>
-                              <td className="px-4 py-3 text-sm text-gray-900">Year {row.year_level}</td>
                             </tr>
                           ))}
                         </tbody>

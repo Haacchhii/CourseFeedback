@@ -424,11 +424,32 @@ async def change_password(request: ChangePasswordRequest, db = Depends(get_db)):
     try:
         from sqlalchemy import text
         
-        # Validate new password strength
-        if len(request.new_password) < 8:
+        # Validate new password strength - Full criteria
+        pwd = request.new_password
+        if len(pwd) < 8:
             return ChangePasswordResponse(
                 success=False,
                 message="New password must be at least 8 characters long"
+            )
+        if not any(c.isupper() for c in pwd):
+            return ChangePasswordResponse(
+                success=False,
+                message="Password must contain at least one uppercase letter"
+            )
+        if not any(c.islower() for c in pwd):
+            return ChangePasswordResponse(
+                success=False,
+                message="Password must contain at least one lowercase letter"
+            )
+        if not any(c.isdigit() for c in pwd):
+            return ChangePasswordResponse(
+                success=False,
+                message="Password must contain at least one digit"
+            )
+        if not any(c in '!@#$%^&*(),.?":{}|<>' for c in pwd):
+            return ChangePasswordResponse(
+                success=False,
+                message="Password must contain at least one special character (!@#$%^&*(),.?\":{}|<>)"
             )
         
         # Get user data
