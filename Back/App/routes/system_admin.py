@@ -65,6 +65,7 @@ class UserCreate(BaseModel):
     department: Optional[str] = None
     school_id: Optional[str] = None  # School ID number (required for students)
     program_id: Optional[int] = None
+    program: Optional[str] = None  # Program code (e.g., BSCS-DS) - used if program_id not provided
     year_level: Optional[int] = None
     password: str
 
@@ -628,12 +629,16 @@ async def bulk_import_users(
                         if prog:
                             program_id = prog.id
                     
+                    # Log year_level for debugging
+                    logger.info(f"Creating student {user_data.email}: year_level from request = {user_data.year_level}")
+                    
                     student = Student(
                         user_id=new_user.id,
                         student_number=school_id,
                         program_id=program_id,
-                        year_level=user_data.year_level or 1
+                        year_level=user_data.year_level if user_data.year_level else 1
                     )
+                    logger.info(f"Student created with year_level = {student.year_level}")
                     db.add(student)
                 # instructor role removed from system
                 elif user_data.role == "secretary":

@@ -1663,11 +1663,12 @@ async def get_non_respondents(
                     COUNT(DISTINCT e.class_section_id) as total_courses
                 FROM students s
                 JOIN users u ON s.user_id = u.id
-                LEFT JOIN program_sections ps ON s.section_id = ps.id
-                LEFT JOIN programs p ON ps.program_id = p.id
+                LEFT JOIN section_students ss ON s.id = ss.student_id
+                LEFT JOIN program_sections ps ON ss.section_id = ps.id
+                LEFT JOIN programs p ON COALESCE(ps.program_id, s.program_id) = p.id
                 JOIN enrollments e ON s.id = e.student_id
                 WHERE u.is_active = true
-                    AND (:program_id IS NULL OR ps.program_id = :program_id)
+                    AND (:program_id IS NULL OR COALESCE(ps.program_id, s.program_id) = :program_id)
                     AND (:year_level IS NULL OR s.year_level = :year_level)
                 GROUP BY s.id, s.student_number, u.first_name, u.last_name, 
                          s.year_level, p.program_code, ps.section_name, ps.id
@@ -1756,10 +1757,11 @@ async def get_non_respondents(
             SELECT COUNT(DISTINCT s.id) as total
             FROM students s
             JOIN users u ON s.user_id = u.id
-            LEFT JOIN program_sections ps ON s.section_id = ps.id
+            LEFT JOIN section_students ss ON s.id = ss.student_id
+            LEFT JOIN program_sections ps ON ss.section_id = ps.id
             JOIN enrollments e ON s.id = e.student_id
             WHERE u.is_active = true
-                AND (:program_id IS NULL OR ps.program_id = :program_id)
+                AND (:program_id IS NULL OR COALESCE(ps.program_id, s.program_id) = :program_id)
                 AND (:year_level IS NULL OR s.year_level = :year_level)
         """)
         

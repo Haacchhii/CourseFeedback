@@ -362,18 +362,30 @@ export default function UserManagement() {
       setImportProgress({ current: 0, total: validUsers.length, status: 'Importing users...' })
 
       // Prepare users for bulk import
-      const usersToImport = validUsers.map(userData => ({
-        email: userData.email,
-        first_name: userData.first_name,
-        last_name: userData.last_name,
-        role: userData.role.toLowerCase(),
-        password: userData.password || 'changeme123',
-        department: userData.department || null,
-        program: userData.program || null,
-        program_id: null, // Backend will resolve this
-        year_level: userData.year_level ? parseInt(userData.year_level) : 1,
-        school_id: userData.school_id || null
-      }))
+      const usersToImport = validUsers.map(userData => {
+        // Parse year_level properly - handle empty strings
+        let yearLevel = 1
+        if (userData.year_level && userData.year_level.toString().trim() !== '') {
+          const parsed = parseInt(userData.year_level)
+          if (!isNaN(parsed) && parsed >= 1 && parsed <= 4) {
+            yearLevel = parsed
+          }
+        }
+        console.log(`User ${userData.email}: year_level from CSV = '${userData.year_level}', parsed = ${yearLevel}`)
+        
+        return {
+          email: userData.email,
+          first_name: userData.first_name,
+          last_name: userData.last_name,
+          role: userData.role.toLowerCase(),
+          password: userData.password || 'changeme123',
+          department: userData.department || null,
+          program: userData.program || null,
+          program_id: null, // Backend will resolve this
+          year_level: yearLevel,
+          school_id: userData.school_id || null
+        }
+      })
 
       // Use bulk import endpoint (single API call)
       const response = await apiClient.post('/admin/users/bulk-import', usersToImport)
@@ -1793,6 +1805,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                             <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider">Role</th>
                             <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider">School ID</th>
                             <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wider">Program</th>
+                            <th className="px-4 py-3 text-center text-sm font-semibold uppercase tracking-wider">Year</th>
                             <th className="px-4 py-3 text-center text-sm font-semibold uppercase tracking-wider">Status</th>
                           </tr>
                         </thead>
@@ -1810,6 +1823,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                               </td>
                               <td className="px-4 py-3 text-xs text-gray-900 font-mono font-bold">{row.school_id || <span className="text-gray-400">N/A</span>}</td>
                               <td className="px-4 py-3 text-xs text-gray-600">{row.program || <span className="text-gray-400">N/A</span>}</td>
+                              <td className="px-4 py-3 text-center text-xs font-bold text-gray-900">{row.year_level || <span className="text-gray-400">1</span>}</td>
                               <td className="px-4 py-3 text-center">
                                 {row.hasErrors ? (
                                   <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800">
