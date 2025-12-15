@@ -783,6 +783,11 @@ export default function EnhancedCourseManagement() {
     )
   }
 
+  // Helper functions for period status (backend uses both 'Open'/'active' and 'Closed'/'closed')
+  const isActivePeriod = (status) => status === 'Open' || status === 'active'
+  const isClosedPeriod = (status) => status === 'Closed' || status === 'closed'
+  const isArchivedPeriod = (status) => status === 'Archived' || status === 'archived'
+
   // Load evaluation periods for filtering
   const loadEvaluationPeriods = async () => {
     try {
@@ -792,7 +797,7 @@ export default function EnhancedCourseManagement() {
       
       // Auto-select the active period as default filter
       if (sectionPeriodFilter === 'all') {
-        const activePeriod = periods.find(p => p.status === 'active')
+        const activePeriod = periods.find(p => isActivePeriod(p.status))
         if (activePeriod) {
           setSectionPeriodFilter(String(activePeriod.id))
         }
@@ -1862,18 +1867,18 @@ student2@example.com,IT-PROG1-2024,email,
                 <option value="all">All Periods</option>
                 {/* Show non-archived periods first */}
                 {evaluationPeriods
-                  .filter(period => period.status !== 'archived')
+                  .filter(period => !isArchivedPeriod(period.status))
                   .map(period => (
                     <option key={period.id} value={period.id}>
-                      {period.name} ({period.status === 'active' ? '🟢 Active' : period.status === 'draft' ? '📝 Draft' : '🔴 Closed'})
+                      {period.name} ({isActivePeriod(period.status) ? '🟢 Active' : period.status === 'draft' ? '📝 Draft' : '🔴 Closed'})
                     </option>
                   ))}
                 {/* Show archived periods in a separate section if any exist */}
-                {evaluationPeriods.some(period => period.status === 'archived') && (
+                {evaluationPeriods.some(period => isArchivedPeriod(period.status)) && (
                   <option disabled>── Archived Periods ──</option>
                 )}
                 {evaluationPeriods
-                  .filter(period => period.status === 'archived')
+                  .filter(period => isArchivedPeriod(period.status))
                   .map(period => (
                     <option key={period.id} value={period.id}>
                       {period.name} (📦 Archived)
