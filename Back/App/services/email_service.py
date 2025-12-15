@@ -328,7 +328,8 @@ def send_password_reset_email(to_email: str, reset_token: str, user_name: str) -
     Returns:
         bool: True if sent successfully, False otherwise
     """
-    reset_link = f"http://localhost:5173/reset-password?token={reset_token}"
+    frontend_url = os.getenv("FRONTEND_URL", "https://course-feedback-ochre.vercel.app")
+    reset_link = f"{frontend_url}/reset-password?token={reset_token}"
     
     subject = "🔐 Password Reset Request - LPU Course Feedback"
     

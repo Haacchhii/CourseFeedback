@@ -250,9 +250,10 @@ async def forgot_password(request: ForgotPasswordRequest, db = Depends(get_db)):
         db.add(audit_log)
         db.commit()
         
-        # TODO: Send email with reset link
-        # For now, log the token (in production, send via email)
-        reset_link = f"http://localhost:5173/reset-password?token={reset_token}"
+        # Generate reset link using environment variable or production URL
+        import os
+        frontend_url = os.getenv("FRONTEND_URL", "https://course-feedback-ochre.vercel.app")
+        reset_link = f"{frontend_url}/reset-password?token={reset_token}"
         logger.info(f"Password reset requested for {request.email}. Reset link: {reset_link}")
         
         # Try to send email if email service is configured
