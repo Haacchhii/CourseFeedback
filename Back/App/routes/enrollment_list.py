@@ -318,8 +318,16 @@ async def upload_enrollment_list(
                 program_info = program_map[program_code]
                 program_id = program_info['id']
                 # Derive college info from program's department
-                college_code = program_info.get('department', 'N/A') or 'N/A'
-                college_name = program_info.get('department', 'N/A') or 'N/A'
+                department = program_info.get('department', '') or ''
+                # Generate short college code (max 20 chars) - take initials or first word
+                if department:
+                    # Create abbreviation from department name (e.g., "College of Computer Studies" -> "CCS")
+                    words = department.split()
+                    college_code = ''.join(w[0].upper() for w in words if w.lower() not in ['of', 'the', 'and'])[:20]
+                    college_name = department[:100]  # Truncate college name if too long
+                else:
+                    college_code = 'N/A'
+                    college_name = 'N/A'
                 
                 # Check if exists
                 existing = db.execute(text("""
