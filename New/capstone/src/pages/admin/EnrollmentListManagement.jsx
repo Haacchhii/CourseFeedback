@@ -166,7 +166,7 @@ const EnrollmentListManagement = () => {
 
         // Parse header
         const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-        const requiredHeaders = ['student_number', 'first_name', 'last_name', 'email', 'program_code', 'year_level'];
+        const requiredHeaders = ['student_number', 'first_name', 'last_name', 'program_code', 'year_level'];
         const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
 
         if (missingHeaders.length > 0) {
@@ -191,7 +191,6 @@ const EnrollmentListManagement = () => {
           if (!row.student_number) rowErrors.push('Missing student number');
           if (!row.first_name) rowErrors.push('Missing first name');
           if (!row.last_name) rowErrors.push('Missing last name');
-          if (!row.email || !row.email.includes('@')) rowErrors.push('Invalid email');
           if (!row.program_code) rowErrors.push('Missing program code');
           if (!row.year_level || ![1, 2, 3, 4, '1', '2', '3', '4'].includes(row.year_level)) {
             rowErrors.push('Invalid year level (must be 1-4)');
@@ -709,7 +708,6 @@ const EnrollmentListManagement = () => {
                             <th className="px-4 py-3 text-left text-sm font-semibold uppercase">Status</th>
                             <th className="px-4 py-3 text-left text-sm font-semibold uppercase">Student #</th>
                             <th className="px-4 py-3 text-left text-sm font-semibold uppercase">Name</th>
-                            <th className="px-4 py-3 text-left text-sm font-semibold uppercase">Email</th>
                             <th className="px-4 py-3 text-left text-sm font-semibold uppercase">Program</th>
                             <th className="px-4 py-3 text-left text-sm font-semibold uppercase">Year</th>
                           </tr>
@@ -734,7 +732,6 @@ const EnrollmentListManagement = () => {
                               <td className="px-4 py-3 text-sm text-gray-900">
                                 {row.last_name}, {row.first_name} {row.middle_name}
                               </td>
-                              <td className="px-4 py-3 text-sm text-gray-600">{row.email}</td>
                               <td className="px-4 py-3 text-sm text-gray-900">{row.program_code}</td>
                               <td className="px-4 py-3 text-sm text-gray-900">Year {row.year_level}</td>
                             </tr>
