@@ -48,7 +48,6 @@ class EnrollmentValidationService:
                 e.middle_name,
                 e.email,
                 e.program_id,
-                e.year_level,
                 e.college_code,
                 e.college_name,
                 e.status,
@@ -68,15 +67,16 @@ class EnrollmentValidationService:
                 "suggestion": "Student must be pre-registered in the enrollment list before creating an account."
             }
         
-        # Extract enrollment data
+        # Extract enrollment data (indexes updated - year_level removed from enrollment_list)
+        # Query columns: id(0), student_number(1), first_name(2), last_name(3), middle_name(4), 
+        # email(5), program_id(6), college_code(7), college_name(8), status(9), program_code(10), program_name(11)
         enrolled_program_id = enrollment[6]
-        enrolled_program_code = enrollment[11]
-        enrolled_program_name = enrollment[12]
+        enrolled_program_code = enrollment[10]
+        enrolled_program_name = enrollment[11]
         enrolled_first_name = enrollment[2]
         enrolled_last_name = enrollment[3]
         enrolled_email = enrollment[5]
-        enrolled_year_level = enrollment[7]
-        enrolled_college = enrollment[8]
+        enrolled_college = enrollment[7]
         
         # Validate program matches (skip if program_id is None - accept enrolled program)
         if program_id is not None and enrolled_program_id != program_id:
@@ -125,9 +125,8 @@ class EnrollmentValidationService:
                 "program_id": enrolled_program_id,
                 "program_code": enrolled_program_code,
                 "program_name": enrolled_program_name,
-                "year_level": enrolled_year_level,
                 "college_code": enrolled_college,
-                "college_name": enrollment[9]
+                "college_name": enrollment[8]
             },
             "warnings": name_warnings if name_warnings else None,
             "message": "Student validated successfully against enrollment list"
@@ -156,7 +155,6 @@ class EnrollmentValidationService:
                 e.middle_name,
                 e.email,
                 e.program_id,
-                e.year_level,
                 e.college_code,
                 e.college_name,
                 e.status,
@@ -178,12 +176,11 @@ class EnrollmentValidationService:
             "middle_name": enrollment[4],
             "email": enrollment[5],
             "program_id": enrollment[6],
-            "year_level": enrollment[7],
-            "college_code": enrollment[8],
-            "college_name": enrollment[9],
-            "status": enrollment[10],
-            "program_code": enrollment[11],
-            "program_name": enrollment[12]
+            "college_code": enrollment[7],
+            "college_name": enrollment[8],
+            "status": enrollment[9],
+            "program_code": enrollment[10],
+            "program_name": enrollment[11]
         }
     
     
@@ -193,7 +190,6 @@ class EnrollmentValidationService:
         query: Optional[str] = None,
         program_id: Optional[int] = None,
         college_code: Optional[str] = None,
-        year_level: Optional[int] = None,
         status: str = 'active',
         limit: int = 100
     ) -> list:
@@ -205,7 +201,6 @@ class EnrollmentValidationService:
             query: Search by name or student number
             program_id: Filter by program
             college_code: Filter by college
-            year_level: Filter by year level
             status: Filter by status (default: active)
             limit: Maximum results
         
@@ -222,7 +217,6 @@ class EnrollmentValidationService:
                 e.middle_name,
                 e.email,
                 e.program_id,
-                e.year_level,
                 e.college_code,
                 e.college_name,
                 e.status,
@@ -257,10 +251,6 @@ class EnrollmentValidationService:
             sql += " AND e.college_code = :college_code"
             params["college_code"] = college_code
         
-        if year_level:
-            sql += " AND e.year_level = :year_level"
-            params["year_level"] = year_level
-        
         sql += " ORDER BY e.college_code, e.student_number LIMIT :limit"
         params["limit"] = limit
         
@@ -275,13 +265,12 @@ class EnrollmentValidationService:
                 "middle_name": row[4],
                 "email": row[5],
                 "program_id": row[6],
-                "year_level": row[7],
-                "college_code": row[8],
-                "college_name": row[9],
-                "status": row[10],
-                "program_code": row[11],
-                "program_name": row[12],
-                "date_enrolled": str(row[13]) if row[13] else None
+                "college_code": row[7],
+                "college_name": row[8],
+                "status": row[9],
+                "program_code": row[10],
+                "program_name": row[11],
+                "date_enrolled": str(row[12]) if row[12] else None
             }
             for row in results
         ]

@@ -326,11 +326,11 @@ async def create_user(
                 # If validation passed, use enrollment data to populate fields
                 enrollment_info = validation["enrollment"]
                 
-                # Auto-fill from enrollment list (overrides user input)
+                # Auto-fill from enrollment list (overrides user input for name/program)
                 user_data.first_name = enrollment_info["first_name"]
                 user_data.last_name = enrollment_info["last_name"]
                 user_data.program_id = enrollment_info["program_id"]
-                user_data.year_level = enrollment_info["year_level"]
+                # Keep year_level from user input - enrollment list no longer stores year_level
                 
                 # Use enrollment email if provided
                 if enrollment_info["email"] and not user_data.email:
@@ -572,12 +572,12 @@ async def bulk_import_users(
                         })
                         continue
                     
-                    # Use enrollment data
+                    # Use enrollment data (year_level comes from CSV, not enrollment list)
                     enrollment_info = validation["enrollment"]
                     user_data.first_name = enrollment_info["first_name"]
                     user_data.last_name = enrollment_info["last_name"]
                     user_data.program_id = enrollment_info["program_id"]
-                    user_data.year_level = enrollment_info["year_level"]
+                    # Keep year_level from CSV - enrollment list no longer stores year_level
                 
                 # Generate password
                 must_change_password = False
