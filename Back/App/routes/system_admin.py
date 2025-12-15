@@ -1177,13 +1177,15 @@ async def update_period_status(
             "Closed": "closed",
             "closed": "closed",
             "Draft": "draft",
-            "draft": "draft"
+            "draft": "draft",
+            "Archived": "archived",
+            "archived": "archived"
         }
         
         if status not in status_mapping:
             raise HTTPException(
                 status_code=400, 
-                detail=f"Invalid status. Must be one of: Open/Active, Closed, or Draft"
+                detail=f"Invalid status. Must be one of: Open/Active, Closed, Draft, or Archived"
             )
         
         db_status = status_mapping[status]

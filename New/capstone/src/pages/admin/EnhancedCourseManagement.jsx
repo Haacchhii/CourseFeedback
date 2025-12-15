@@ -787,7 +787,16 @@ export default function EnhancedCourseManagement() {
   const loadEvaluationPeriods = async () => {
     try {
       const response = await adminAPI.getPeriods()
-      setEvaluationPeriods(response?.data || [])
+      const periods = response?.data || []
+      setEvaluationPeriods(periods)
+      
+      // Auto-select the active period as default filter
+      if (sectionPeriodFilter === 'all') {
+        const activePeriod = periods.find(p => p.status === 'active')
+        if (activePeriod) {
+          setSectionPeriodFilter(String(activePeriod.id))
+        }
+      }
     } catch (err) {
       console.error('Error loading evaluation periods:', err)
     }
@@ -1851,11 +1860,25 @@ student2@example.com,IT-PROG1-2024,email,
                 title="Filter sections by evaluation period"
               >
                 <option value="all">All Periods</option>
-                {evaluationPeriods.map(period => (
-                  <option key={period.id} value={period.id}>
-                    {period.name} ({period.status})
-                  </option>
-                ))}
+                {/* Show non-archived periods first */}
+                {evaluationPeriods
+                  .filter(period => period.status !== 'archived')
+                  .map(period => (
+                    <option key={period.id} value={period.id}>
+                      {period.name} ({period.status === 'active' ? '🟢 Active' : period.status === 'draft' ? '📝 Draft' : '🔴 Closed'})
+                    </option>
+                  ))}
+                {/* Show archived periods in a separate section if any exist */}
+                {evaluationPeriods.some(period => period.status === 'archived') && (
+                  <option disabled>── Archived Periods ──</option>
+                )}
+                {evaluationPeriods
+                  .filter(period => period.status === 'archived')
+                  .map(period => (
+                    <option key={period.id} value={period.id}>
+                      {period.name} (📦 Archived)
+                    </option>
+                  ))}
               </select>
               
               <select

@@ -81,6 +81,9 @@ const EnrollmentListManagement = () => {
       if (filters.program_id) params.append('program_id', filters.program_id);
       if (filters.year_level) params.append('year_level', filters.year_level);
       if (filters.status) params.append('status', filters.status);
+      
+      // Request all records (up to 500)
+      params.append('limit', '500');
 
       // Add cache buster to force fresh data
       params.append('_t', Date.now());
@@ -226,13 +229,12 @@ const EnrollmentListManagement = () => {
       const response = await adminAPI.uploadEnrollmentList(csvFile);
       setUploadResult(response);
       
-      // Show success modal
-      const successCount = response?.success_count || response?.created || 0;
-      const updatedCount = response?.updated_count || response?.updated || 0;
-      const totalProcessed = successCount + updatedCount;
+      // Show success modal - backend returns 'imported' and 'skipped'
+      const importedCount = response?.imported || response?.data?.imported || 0;
+      const skippedCount = response?.skipped || response?.data?.skipped || 0;
       
       showAlert(
-        `Successfully processed ${totalProcessed} student(s)\n• Created: ${successCount}\n• Updated: ${updatedCount}`,
+        `Successfully processed ${importedCount} student(s)\n• Imported/Updated: ${importedCount}\n• Skipped: ${skippedCount}`,
         'Upload Successful',
         'success'
       );

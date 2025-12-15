@@ -13,10 +13,12 @@ export default function EvaluationPeriodManagement() {
   // Helper function to check if period is open (backend uses "Open", frontend checks both)
   const isOpen = (status) => status === 'Open' || status === 'active'
   const isClosed = (status) => status === 'Closed' || status === 'closed'
+  const isArchived = (status) => status === 'Archived' || status === 'archived'
   
   // State
   const [currentPeriod, setCurrentPeriod] = useState(null)
   const [pastPeriods, setPastPeriods] = useState([])
+  const [archivedPeriods, setArchivedPeriods] = useState([])
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [showErrorModal, setShowErrorModal] = useState(false)
@@ -59,9 +61,11 @@ export default function EvaluationPeriodManagement() {
     if (periodsData?.data) {
       const periods = periodsData.data
       const current = periods.find(p => p.status === 'Open' || isOpen(p.status)) || null
-      const past = periods.filter(p => isClosed(p.status) || isClosed(p.status))
+      const past = periods.filter(p => isClosed(p.status) && !isArchived(p.status))
+      const archived = periods.filter(p => isArchived(p.status))
       setCurrentPeriod(current)
       setPastPeriods(past)
+      setArchivedPeriods(archived)
     }
   }, [periodsData])
 
@@ -136,9 +140,11 @@ export default function EvaluationPeriodManagement() {
           const response = await adminAPI.getPeriods()
           const periods = response?.data || []
           const current = periods.find(p => isOpen(p.status)) || null
-          const past = periods.filter(p => isClosed(p.status))
+          const past = periods.filter(p => isClosed(p.status) && !isArchived(p.status))
+          const archived = periods.filter(p => isArchived(p.status))
           setCurrentPeriod(current)
           setPastPeriods(past)
+          setArchivedPeriods(archived)
           
           showAlert('Evaluation period closed successfully!', 'Success', 'success')
         } catch (err) {
@@ -167,9 +173,11 @@ export default function EvaluationPeriodManagement() {
           const response = await adminAPI.getPeriods()
           const periods = response?.data || []
           const current = periods.find(p => isOpen(p.status)) || null
-          const past = periods.filter(p => isClosed(p.status))
+          const past = periods.filter(p => isClosed(p.status) && !isArchived(p.status))
+          const archived = periods.filter(p => isArchived(p.status))
           setCurrentPeriod(current)
           setPastPeriods(past)
+          setArchivedPeriods(archived)
           
           showAlert('Evaluation period reopened successfully!', 'Success', 'success')
         } catch (err) {
@@ -229,9 +237,11 @@ export default function EvaluationPeriodManagement() {
       const response = await adminAPI.getPeriods()
       const periods = response?.data || []
       const current = periods.find(p => isOpen(p.status)) || null
-      const past = periods.filter(p => isClosed(p.status))
+      const past = periods.filter(p => isClosed(p.status) && !isArchived(p.status))
+      const archived = periods.filter(p => isArchived(p.status))
       setCurrentPeriod(current)
       setPastPeriods(past)
+      setArchivedPeriods(archived)
       
       showAlert(`Period extended successfully to ${formData.endDate}${isClosed(targetPeriod.status) ? ' and reopened' : ''}.`, 'Success', 'success')
       setShowExtendModal(false)
@@ -296,9 +306,11 @@ export default function EvaluationPeriodManagement() {
       const response = await adminAPI.getPeriods()
       const periods = response?.data || []
       const current = periods.find(p => isOpen(p.status)) || null
-      const past = periods.filter(p => isClosed(p.status))
+      const past = periods.filter(p => isClosed(p.status) && !isArchived(p.status))
+      const archived = periods.filter(p => isArchived(p.status))
       setCurrentPeriod(current)
       setPastPeriods(past)
+      setArchivedPeriods(archived)
 
       showAlert(`New evaluation period "${periodName}" created successfully!`, 'Success', 'success')
       setShowCreateModal(false)
@@ -363,9 +375,11 @@ export default function EvaluationPeriodManagement() {
         const periodsResponse = await adminAPI.getPeriods()
         const periods = periodsResponse?.data || []
         const current = periods.find(p => isOpen(p.status)) || null
-        const past = periods.filter(p => isClosed(p.status))
+        const past = periods.filter(p => isClosed(p.status) && !isArchived(p.status))
+        const archived = periods.filter(p => isArchived(p.status))
         setCurrentPeriod(current)
         setPastPeriods(past)
+        setArchivedPeriods(archived)
         
         await loadEnrolledSections()
         } catch (err) {
@@ -460,9 +474,11 @@ export default function EvaluationPeriodManagement() {
           const periodsResponse = await adminAPI.getPeriods()
           const periods = periodsResponse?.data || []
           const current = periods.find(p => isOpen(p.status)) || null
-          const past = periods.filter(p => isClosed(p.status))
+          const past = periods.filter(p => isClosed(p.status) && !isArchived(p.status))
+          const archived = periods.filter(p => isArchived(p.status))
           setCurrentPeriod(current)
           setPastPeriods(past)
+          setArchivedPeriods(archived)
           
           await loadEnrolledSections()
         } catch (err) {
@@ -493,9 +509,11 @@ export default function EvaluationPeriodManagement() {
           const periodsResponse = await adminAPI.getPeriods()
           const periods = periodsResponse?.data || []
           const current = periods.find(p => isOpen(p.status)) || null
-          const past = periods.filter(p => isClosed(p.status))
+          const past = periods.filter(p => isClosed(p.status) && !isArchived(p.status))
+          const archived = periods.filter(p => isArchived(p.status))
           setCurrentPeriod(current)
           setPastPeriods(past)
+          setArchivedPeriods(archived)
           
           await loadEnrolledSections()
         } catch (err) {
@@ -522,9 +540,11 @@ export default function EvaluationPeriodManagement() {
           const response = await adminAPI.getPeriods()
           const periods = response?.data || []
           const current = periods.find(p => isOpen(p.status)) || null
-          const past = periods.filter(p => isClosed(p.status))
+          const past = periods.filter(p => isClosed(p.status) && !isArchived(p.status))
+          const archived = periods.filter(p => isArchived(p.status))
           setCurrentPeriod(current)
           setPastPeriods(past)
+          setArchivedPeriods(archived)
           
           showAlert(`Period "${periodName}" deleted successfully!`, 'Success', 'success')
         } catch (err) {
@@ -535,6 +555,70 @@ export default function EvaluationPeriodManagement() {
       },
       'Delete Period',
       'Delete Period',
+      'Cancel'
+    )
+  }
+
+  // Archive a closed period (keeps all evaluation data but hides from main view)
+  const handleArchivePeriod = async (periodId, periodName) => {
+    showConfirm(
+      `Archive "${periodName}"?\n\nThis will move the period to the archive. All evaluation data will be preserved and remain accessible for statistics.`,
+      async () => {
+        try {
+          setSubmitting(true)
+          await adminAPI.updatePeriodStatus(periodId, 'archived')
+          
+          // Refresh periods
+          const response = await adminAPI.getPeriods()
+          const periods = response?.data || []
+          const current = periods.find(p => isOpen(p.status)) || null
+          const past = periods.filter(p => isClosed(p.status) && !isArchived(p.status))
+          const archived = periods.filter(p => isArchived(p.status))
+          setCurrentPeriod(current)
+          setPastPeriods(past)
+          setArchivedPeriods(archived)
+          
+          showAlert(`Period "${periodName}" has been archived. Evaluation data is preserved for statistics.`, 'Archived', 'success')
+        } catch (err) {
+          showAlert(err.message || 'Failed to archive period', 'Error', 'error')
+        } finally {
+          setSubmitting(false)
+        }
+      },
+      'Archive Period',
+      'Archive',
+      'Cancel'
+    )
+  }
+
+  // Unarchive a period (move back to closed status)
+  const handleUnarchivePeriod = async (periodId, periodName) => {
+    showConfirm(
+      `Restore "${periodName}" from archive?\n\nThis will move the period back to the Past Periods list.`,
+      async () => {
+        try {
+          setSubmitting(true)
+          await adminAPI.updatePeriodStatus(periodId, 'closed')
+          
+          // Refresh periods
+          const response = await adminAPI.getPeriods()
+          const periods = response?.data || []
+          const current = periods.find(p => isOpen(p.status)) || null
+          const past = periods.filter(p => isClosed(p.status) && !isArchived(p.status))
+          const archived = periods.filter(p => isArchived(p.status))
+          setCurrentPeriod(current)
+          setPastPeriods(past)
+          setArchivedPeriods(archived)
+          
+          showAlert(`Period "${periodName}" has been restored to Past Periods.`, 'Restored', 'success')
+        } catch (err) {
+          showAlert(err.message || 'Failed to restore period', 'Error', 'error')
+        } finally {
+          setSubmitting(false)
+        }
+      },
+      'Restore Period',
+      'Restore',
       'Cancel'
     )
   }
@@ -834,7 +918,7 @@ export default function EvaluationPeriodManagement() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex space-x-2">
+                    <div className="flex flex-wrap gap-2">
                       <button
                         onClick={() => openExtendModal(period)}
                         disabled={submitting}
@@ -844,6 +928,17 @@ export default function EvaluationPeriodManagement() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
                         <span>Extend & Reopen</span>
+                      </button>
+                      <button
+                        onClick={() => handleArchivePeriod(period.id, period.name)}
+                        disabled={submitting}
+                        className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-400 text-white rounded-lg transition-all font-semibold text-sm flex items-center space-x-2"
+                        title="Archive this period (preserves all evaluation data)"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
+                        </svg>
+                        <span>Archive</span>
                       </button>
                       <button
                         onClick={() => handleDeletePastPeriod(period.id, period.name)}
@@ -862,6 +957,75 @@ export default function EvaluationPeriodManagement() {
             </div>
           </div>
         </div>
+
+        {/* Archived Periods Section */}
+        {archivedPeriods.length > 0 && (
+          <div className="bg-white rounded-card shadow-card overflow-hidden mt-8">
+            <div className="bg-gradient-to-r from-gray-600 to-gray-700 p-6">
+              <h2 className="text-2xl font-bold text-white">📦 Archived Evaluation Periods</h2>
+              <p className="text-white/80 text-sm mt-1">Archived periods - evaluation data preserved for statistics</p>
+            </div>
+
+            <div className="p-6 lg:p-8">
+              <div className="space-y-4">
+                {archivedPeriods.map((period) => (
+                  <div key={period.id} className="border-2 border-gray-200 rounded-card p-6 lg:p-8 hover:shadow-lg transition-all duration-250 bg-gray-50">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="flex items-center space-x-3 mb-2">
+                          <h3 className="text-lg font-bold text-gray-700">{period.name}</h3>
+                          <span className="px-3 py-1 bg-gray-400 text-white rounded-full text-xs font-bold">
+                            ARCHIVED
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-500 mb-3">
+                          {new Date(period.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - {new Date(period.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </p>
+                        <div className="flex items-center space-x-6">
+                          <div>
+                            <p className="text-xs text-gray-500">Participation</p>
+                            <p className="text-2xl font-bold text-gray-600">{period.participationRate}%</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Completed</p>
+                            <p className="text-2xl font-bold text-gray-500">{period.completedEvaluations}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Total</p>
+                            <p className="text-2xl font-bold text-gray-600">{period.totalEvaluations}</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => handleUnarchivePeriod(period.id, period.name)}
+                          disabled={submitting}
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-all font-semibold text-sm flex items-center space-x-2"
+                          title="Restore to Past Periods"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                          </svg>
+                          <span>Restore</span>
+                        </button>
+                        <button
+                          onClick={() => handleDeletePastPeriod(period.id, period.name)}
+                          disabled={submitting}
+                          className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white rounded-lg transition-all font-semibold text-sm flex items-center space-x-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                          </svg>
+                          <span>Delete Permanently</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Create Period Modal */}
