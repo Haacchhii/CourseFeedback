@@ -23,12 +23,8 @@ class EnrollmentRecord(BaseModel):
     first_name: str
     last_name: str
     middle_name: Optional[str] = None
-    email: Optional[str] = None
     program_id: int
     year_level: int
-    college_code: str
-    college_name: str
-    status: Optional[str] = 'active'
 
 
 @router.get("/enrollment-list/search")
@@ -276,7 +272,7 @@ async def upload_enrollment_list(
     Bulk upload enrollment list from CSV
     
     CSV Format:
-    student_number,first_name,last_name,middle_name,email,program_code,year_level,college_code,college_name
+    student_number,first_name,last_name,middle_name,program_code,year_level
     
     Access: Admin only
     """
@@ -292,13 +288,13 @@ async def upload_enrollment_list(
         csv_text = content.decode('utf-8')
         csv_reader = csv.DictReader(io.StringIO(csv_text))
         
-        # Get program mapping
+        # Get program mapping with college info
         programs_result = db.execute(text("""
-            SELECT id, program_code, program_name
+            SELECT id, program_code, program_name, department
             FROM programs
         """))
         
-        program_map = {row[1]: row[0] for row in programs_result.fetchall()}
+        program_map = {row[1]: {'id': row[0], 'name': row[2], 'department': row[3]} for row in programs_result.fetchall()}
         
         imported = 0
         skipped = 0
@@ -310,11 +306,8 @@ async def upload_enrollment_list(
                 first_name = row['first_name'].strip()
                 last_name = row['last_name'].strip()
                 middle_name = row.get('middle_name', '').strip() or None
-                email = row.get('email', '').strip() or None
                 program_code = row['program_code'].strip().upper()
                 year_level = int(row['year_level'])
-                college_code = row['college_code'].strip().upper()
-                college_name = row['college_name'].strip()
                 
                 # Validate program exists
                 if program_code not in program_map:
@@ -322,7 +315,11 @@ async def upload_enrollment_list(
                     skipped += 1
                     continue
                 
-                program_id = program_map[program_code]
+                program_info = program_map[program_code]
+                program_id = program_info['id']
+                # Derive college info from program's department
+                college_code = program_info.get('department', 'N/A') or 'N/A'
+                college_name = program_info.get('department', 'N/A') or 'N/A'
                 
                 # Check if exists
                 existing = db.execute(text("""
@@ -337,7 +334,6 @@ async def upload_enrollment_list(
                         SET first_name = :first_name,
                             last_name = :last_name,
                             middle_name = :middle_name,
-                            email = :email,
                             program_id = :program_id,
                             year_level = :year_level,
                             college_code = :college_code,
@@ -349,7 +345,6 @@ async def upload_enrollment_list(
                         "first_name": first_name,
                         "last_name": last_name,
                         "middle_name": middle_name,
-                        "email": email,
                         "program_id": program_id,
                         "year_level": year_level,
                         "college_code": college_code,
@@ -359,11 +354,11 @@ async def upload_enrollment_list(
                     # Insert
                     db.execute(text("""
                         INSERT INTO enrollment_list (
-                            student_number, first_name, last_name, middle_name, email,
+                            student_number, first_name, last_name, middle_name,
                             program_id, year_level, college_code, college_name, 
                             status, created_by
                         ) VALUES (
-                            :student_number, :first_name, :last_name, :middle_name, :email,
+                            :student_number, :first_name, :last_name, :middle_name,
                             :program_id, :year_level, :college_code, :college_name,
                             'active', :created_by
                         )
@@ -372,7 +367,6 @@ async def upload_enrollment_list(
                         "first_name": first_name,
                         "last_name": last_name,
                         "middle_name": middle_name,
-                        "email": email,
                         "program_id": program_id,
                         "year_level": year_level,
                         "college_code": college_code,

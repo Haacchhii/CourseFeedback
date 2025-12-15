@@ -1,0 +1,643 @@
+Enrolled Students First Semester / SY: 2025 - 2026
+Course: Bachelor of Science in Psychology
+Institute: College of Education, Arts and Sciences
+Institute Category: COLLEGE
+STUDENT	ENROLLED COURSE	YEAR LEVEL
+ 	ID No.	NAME		
+1	24134021	Alea , Gianluigi Maramot	BSPSY	2nd Year
+2	24235305	Andrada , Maria Nicole Dela Cruz	BSPSY	2nd Year
+3	24134550	Argente , Arabella Rhiane Austria	BSPSY	2nd Year
+4	24134832	Ariola , Lorraine Mendoza	BSPSY	2nd Year
+5	24134797	Bauyon , Cheriz Keirsten De Ubago	BSPSY	2nd Year
+6	24133846	Cajilig , Gavrie Petalino	BSPSY	2nd Year
+7	24133474	Castro , Jamillah Mae Lampitoc	BSPSY	2nd Year
+8	24133871	Contreras , Khee Nicole Cabias	BSPSY	2nd Year
+9	24133664	Corcuera , Shean Aldrich Alcance	BSPSY	2nd Year
+10	24134561	Cueto , Ma. Ronnielyn Sabido	BSPSY	2nd Year
+11	22127245	Delica , Andrea Denise Eligino	BSPSY	2nd Year
+12	24133820	Diaz , Faye Jeremiah Llave	BSPSY	2nd Year
+13	17001850	Dote , Andrew Marasigan	BSPSY	2nd Year
+14	18002016	Ebora , Iris Chloe Melendres	BSPSY	2nd Year
+15	24134055	Ebora , Yohann Zedrix Marasigan	BSPSY	2nd Year
+16	24134475	Hiwatig , Aeclesias Nigel Tejano	BSPSY	2nd Year
+17	16001349	Lim , Johnna Marasigan	BSPSY	2nd Year
+18	24132654	Lopez , Rachelle Ann Pangilinan	BSPSY	2nd Year
+19	24133616	Macuha , Gean Eishiane Krystel Casa	BSPSY	2nd Year
+20	24134811	Magtibay , Kristine Charlize Panopio	BSPSY	2nd Year
+21	24133936	Marasigan , Gio Alfred Africa	BSPSY	2nd Year
+22	24133954	Matignas Iii , Beethoven Guarin	BSPSY	2nd Year
+23	24134611	Melano , Khen Leonard Laparan	BSPSY	2nd Year
+24	23130552	Nieto , Sophia Iniego	BSPSY	2nd Year
+25	24132624	Patal , Princess Roxan Elamparo	BSPSY	2nd Year
+26	24133392	Patricio , Czarina Pauleen Angelica Isla	BSPSY	2nd Year
+27	22127382	Pintucan , Alumit Creirwy Pacaña	BSPSY	2nd Year
+28	24134053	Retuya , Trisha Mae Abratique	BSPSY	2nd Year
+29	24132891	Rocero , Mary Doren Luzon	BSPSY	2nd Year
+30	24134318	Sajona , Johan Philip Valenzuela	BSPSY	2nd Year
+31	24133588	Sarrol , Kirsten Faith Ng	BSPSY	2nd Year
+32	24133977	Suarez , Shantel Milliscent Lumbres	BSPSY	2nd Year
+33	24133311	Tanyag , Arianne Rose Mariñas	BSPSY	2nd Year
+34	23129902	Valconcha , Jamie Dara Surat	BSPSY	2nd Year
+
+
+
+
+
+
+STUDENT	ENROLLED COURSE	YEAR LEVEL
+ 	ID No.	NAME		
+1	23132056	Adame , Ariene Abrugena	BSPSY	3rd Year
+2	17001942	AlbaÑez , Jasmaine Rianne Mallari	BSPSY	3rd Year
+3	23131113	Alilio , Francheska Dennise Sarmiento	BSPSY	3rd Year
+4	23131832	Alojado , Sandy Vless Manimtim	BSPSY	3rd Year
+5	23131336	Baja , Shane Bernadette Credo	BSPSY	3rd Year
+6	21125032	Barbosa , Maria Sophia Carla Hernandez	BSPSY	3rd Year
+7	23130596	Bergonio , Alyssa Corinn Cello	BSPSY	3rd Year
+8	23131267	Carandang , Alena Johann Garcia	BSPSY	3rd Year
+9	23130001	Cervantes , Maria Suzane Aeris Alcaraz	BSPSY	3rd Year
+10	17001912	Duag , Andreaues Mer Carlo Dalisay	BSPSY	3rd Year
+11	23130469	Fabic , Nazh Khendall Rabo	BSPSY	3rd Year
+12	21124358	Lacsamana , Rozelle Ckrintine Liboon	BSPSY	3rd Year
+13	23130824	Leonsame , Ken Michael Pamis	BSPSY	3rd Year
+14	23130463	Lopez , Samantha Jaira Navarro	BSPSY	3rd Year
+15	23131028	Lopez , Vinze Jebron Camson	BSPSY	3rd Year
+16	23129954	Macalalad , Krystel Mejia	BSPSY	3rd Year
+17	17001838	Maniebo , Khristina Mharie Abanto	BSPSY	3rd Year
+18	23132144	Marasigan , Alesander Byem Manalo	BSPSY	3rd Year
+19	23130929	Palao , Alyssa Ashley Lumaban	BSPSY	3rd Year
+20	23130299	Perez , Angelica Mae Mendoza	BSPSY	3rd Year
+21	23130467	Perez , Kayte Maricon Rosales	BSPSY	3rd Year
+22	23131244	Realingo , Andrea Romina Macatangay	BSPSY	3rd Year
+23	23130221	Rubia , Ashley Shabeth Lachica	BSPSY	3rd Year
+24	23130884	Soliman , Kris Ann Medriano	BSPSY	3rd Year
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+STUDENT	ENROLLED COURSE	YEAR LEVEL
+ 	ID No.	NAME		
+1	22127754	Abad , Margareth Louise Pelias	BSPSY	4th Year
+2	22127521	Abraham , Joros Carl Papasin	BSPSY	4th Year
+3	22229551	Adarayan , Princes Jannah Sarmiento	BSPSY	4th Year
+4	22127270	Alcoriza , Gadelyn Piamonte	BSPSY	4th Year
+5	14000406	Asi , Precious Cleith Robles	BSPSY	4th Year
+6	09189578	Cepillo , Evan Mc Loid Maramot	BSPSY	4th Year
+7	21123894	Cuasay , Rachelle Hope Biblanias	BSPSY	4th Year
+8	22127827	Danganan , Maria Andrea Mirano	BSPSY	4th Year
+9	22127385	Gunay , Sheena Cristina Marasigan	BSPSY	4th Year
+10	22127153	Jonson , John Lloyd Felonia	BSPSY	4th Year
+11	22126257	Legaspi , Nyonna Jean Talavera	BSPSY	4th Year
+12	18113483	Lim , Hanna Edessa Mendoza	BSPSY	4th Year
+13	19118401	Macatangay , Micaela Villanueva	BSPSY	4th Year
+14	21123416	Malabanan , Richmond Cabrera	BSPSY	4th Year
+15	22127251	Marquez , John Ramil Boo	BSPSY	4th Year
+16	22126661	Mendoza , Erica Ailah Leviste	BSPSY	4th Year
+17	22127091	Noche , Ma. Ericka Lorin Anib	BSPSY	4th Year
+18	20121678	Onda , Gr-joshua De Torres	BSPSY	4th Year
+19	22126692	Panopio , Armie Diane Reyes	BSPSY	4th Year
+20	22127009	Pantoja , Von Jiego Soverano	BSPSY	4th Year
+21	22126419	Perez , Carla Jane Morfe	BSPSY	4th Year
+22	22127836	Pesigan , Andrea Mae Calayan	BSPSY	4th Year
+23	22128689	Pulhin , Rianne Carlota Hernandez	BSPSY	4th Year
+24	22127649	Quintana , Zoe Ysobelle Torrejos	BSPSY	4th Year
+25	22126681	Reyes , Karla Andrea Custodio	BSPSY	4th Year
+26	22127317	Rosales , Charisse Dapito	BSPSY	4th Year
+27	22126429	Tanyag , Andrei Ross Mariñas	BSPSY	4th Year
+28	20121596	Toledo , Alliah Denylle Alamag	BSPSY	4th Year
+29	16001351	Villanueva , Krizzle Anne	BSPSY	4th Year
+30	22126925	Villaruel , Kassandra Nicole Andal	BSPSY	4th Year
+
+
+
+
+
+
+
+
+
+
+STUDENT	ENROLLED COURSE	YEAR LEVEL
+ 	ID No.	NAME		
+1	25136023	Aguila , Antonio Miguel Iturralde	BSPSY	1st Year
+2	25137437	Arandia , Norman Joshua Rosales	BSPSY	1st Year
+3	23130994	Arellano , Princess Dapula	BSPSY	1st Year
+4	25136589	Balbastro , Princess Leann Chavez	BSPSY	1st Year
+5	25136588	Basit , Ma. Eliza Esguerra	BSPSY	1st Year
+6	20002425	Bautista , Frances Martha Aguila	BSPSY	1st Year
+7	22127575	Bautista , Nicolle Villanueva	BSPSY	1st Year
+8	25136930	Blanco , Mayuwi Fernandez	BSPSY	1st Year
+9	25137078	Buhat , Arvin Zarsadias	BSPSY	1st Year
+10	23131275	Calangi , Dion Alfonso Ramos	BSPSY	1st Year
+11	25136757	Clerigo , Xyrille Suzanne Nohay	BSPSY	1st Year
+12	25137063	De Torres , Marelle Vian Arguelles	BSPSY	1st Year
+13	25136921	Dechavez , Beatrice Glorioso	BSPSY	1st Year
+14	25136526	Dela Peña , Axl Rozz Lopez	BSPSY	1st Year
+15	25137471	Eleazar , John Julius Virtucio	BSPSY	1st Year
+16	25136306	Esguerra , Ashley Eroy	BSPSY	1st Year
+17	25136895	Espinosa , Roberta Faith Asuncion	BSPSY	1st Year
+18	23132053	Figueroa , Brendaly Avelino	BSPSY	1st Year
+19	25136760	Gagatiga , Ken Philip Mendoza	BSPSY	1st Year
+20	25136294	Garcia , Julianne Kaye Subol	BSPSY	1st Year
+21	25137210	Gloria , Sofia Beatrice Changco	BSPSY	1st Year
+22	25136429	Huang , Alexandra Mikayla Miguel	BSPSY	1st Year
+23	25137411	Jaspe , Hannah Fetalvero	BSPSY	1st Year
+24	25137333	Joseco , Nicole Balmes	BSPSY	1st Year
+25	25136794	Macatangay , Bianca Marie Reyes	BSPSY	1st Year
+26	25136320	Maneja , Julee Xyrelle Balboa	BSPSY	1st Year
+27	25137211	Masupil , Kristine Carlh Cinco	BSPSY	1st Year
+28	23130846	Matol , Keziah Osorio	BSPSY	1st Year
+29	23130568	Nepomuceno , Hermione Dionne Panganiban	BSPSY	1st Year
+30	19002294	PaÑada , Angelique Rei Masagpag	BSPSY	1st Year
+31	24134320	Panganiban , Andrea Bianca Manalo	BSPSY	1st Year
+32	25136504	Pasahol , Christine Dale Felix	BSPSY	1st Year
+33	25136681	Portes , Brizza Margarette Espedillon	BSPSY	1st Year
+34	25136745	Ramirez , Maria Thracy Domenique Montalbo	BSPSY	1st Year
+35	23131231	Reyes , Mikhan Danielle Solis	BSPSY	1st Year
+36	23130408	Rosales , Sharmhel	BSPSY	1st Year
+37	25137201	Silang , Mikaela Aubrey Mauhay	BSPSY	1st Year
+38	19002245	TaÑas , Ashley Yvonne TaÑas	BSPSY	1st Year
+39	25136028	Villalobos , Irish Grace Bulanhagui	BSPSY	1st Year
+
+
+Enrolled Students First Semester / SY: 2025 - 2026
+Course: Bachelor of Arts in Psychology
+Institute: College of Education, Arts and Sciences
+Institute Category: COLLEGE
+STUDENT	ENROLLED COURSE	YEAR LEVEL
+ 	ID No.	NAME		
+1	24133810	Atajar , Mark Joseph Caraig	AB-PSY	2nd Year
+2	24135016	Balbalosa , Cj Gabriel Belbar	AB-PSY	2nd Year
+3	22229561	Catimbang , Riane Caylen Mosca	AB-PSY	2nd Year
+4	24134203	Macatangay , Franz Louise Mauhay	AB-PSY	2nd Year
+5	24133650	Mercado , Hilarie Elaine Pastorin	AB-PSY	2nd Year
+6	24134386	Olaguer , Ryan Kenndrick Agojo	AB-PSY	2nd Year
+
+
+
+STUDENT	ENROLLED COURSE	YEAR LEVEL
+ 	ID No.	NAME		
+1	23129950	Antonio , Chrysilla Jealian Malabanan	AB-PSY	3rd Year
+2	23129796	Babao , Iandra Cedree Monastrial	AB-PSY	3rd Year
+3	23131262	Castillo , Jethro Generoso	AB-PSY	3rd Year
+4	23130549	Lazo , Izumi Roji Jimenez	AB-PSY	3rd Year
+5	23132120	Martin , Sarah Angela	AB-PSY	3rd Year
+6	23131747	Natiola , Bianca Ysabelle Rain Macaraig	AB-PSY	3rd Year
+7	23130316	Robles , Leila Mariel Leonor	AB-PSY	3rd Year
+8	23131881	Tenorio , Renea Danielle Reyes	AB-PSY	3rd Year
+
+
+STUDENT	ENROLLED COURSE	YEAR LEVEL
+ 	ID No.	NAME		
+1	20122106	Aguba , Darla Charles Blanco	AB-PSY	4th Year
+2	22127770	Bajar , Peavei Cielo	AB-PSY	4th Year
+3	22127956	Bello , Aliah Mae Mercado	AB-PSY	4th Year
+4	21125094	Delen , Karylle Fhaye Moster	AB-PSY	4th Year
+5	19118118	Ebora , Andre Aleksie Arellano	AB-PSY	4th Year
+6	22126930	Escueta , Anne Jancee Dalisay	AB-PSY	4th Year
+7	22127375	Gonda , Charnej Anelci Baod	AB-PSY	4th Year
+8	22127484	Lastimosa , Samantha Louie Salingay	AB-PSY	4th Year
+9	22126593	Ligaya , Cliff Joseph Catapang	AB-PSY	4th Year
+10	20121705	Manongsong , Hazel Ann	AB-PSY	4th Year
+11	21225908	Millar , Jervie Jc Liquigan	AB-PSY	4th Year
+12	22127910	Ogalesco , Francheska Julia Boo	AB-PSY	4th Year
+13	22127796	Prenia , France Kylyn Muñoz	AB-PSY	4th Year
+
+Enrolled Students First Semester / SY: 2025 - 2026
+Course: Bachelor of Multimedia Arts (BMMA)
+Institute: College of Education, Arts and Sciences
+Institute Category: COLLEGE
+STUDENT	ENROLLED COURSE	YEAR LEVEL
+ 	ID No.	NAME		
+1	25136609	Abon , Shayne Aila Mae Cantara	BMMA	1st Year
+2	25137257	Abrogina , Delter Del Rio	BMMA	1st Year
+3	25136351	Alea , Eirene Rae Pamillaran	BMMA	1st Year
+4	25135811	Aquino , Jhenicka Kaye Casanova	BMMA	1st Year
+5	25136347	Arce , Gabrielle Coleen Dimacuha	BMMA	1st Year
+6	25136112	Buhain , Eugene Allen Rae Antes	BMMA	1st Year
+7	25136446	Castillo , Pauleen Kim Dador	BMMA	1st Year
+8	25136455	Catilo , Alexandra Monica Bautista	BMMA	1st Year
+9	25137228	Cureg , Paul Angelo Agno	BMMA	1st Year
+10	25135743	Evangelista , Dannie Bongay	BMMA	1st Year
+11	25136383	Evangelista , Gabrielle Faye Lontoc	BMMA	1st Year
+12	25136253	Faundo , Kiean De Omampo	BMMA	1st Year
+13	25137412	Gan , Ashley Nicole Basit	BMMA	1st Year
+14	25136844	Hernandez , Krizia Angela Mulingtapang	BMMA	1st Year
+15	25136305	Hernandez , Naomi Rumel Pasia	BMMA	1st Year
+16	25135626	Lontok , Diana Ysabel Cabael	BMMA	1st Year
+17	25136323	Mojares , Stephen John Canilao	BMMA	1st Year
+18	23130380	Musico , Claire Ma. Sophia Comia	BMMA	1st Year
+19	25136580	Paran , Nho-jann Caszhmeire So	BMMA	1st Year
+20	23130346	Pitel , Rhoss Espita	BMMA	1st Year
+21	19119396	Plata , Nicole Denise Guerra	BMMA	1st Year
+22	25136117	Reyes , Samantha Kirsten Perez	BMMA	1st Year
+23	25137209	Rubenecia , Jake Betantos	BMMA	1st Year
+24	25136328	Serrano , Stephen Delgado	BMMA	1st Year
+25	25136369	Umali , Elisha Nedriel Duhan	BMMA	1st Year
+26	25135566	Valencia , Dylan Jade Castillo	BMMA	1st Year
+27	25135939	Villanueva , Ma. Paula Aldriana Mendoza	BMMA	1st Year
+28	23130036	Villanueva , Olivia Ayra Tatlonghari	BMMA	1st Year
+
+
+
+
+
+
+
+
+
+
+
+STUDENT	ENROLLED COURSE	YEAR LEVEL
+ 	ID No.	NAME		
+1	24134894	Abarentos , Danielle Ann Feliz Macatangay	BMMA	2nd Year
+2	24134047	Belela , Jermaine Yves Margallo	BMMA	2nd Year
+3	22126650	Borja , John Benedict De Jesus	BMMA	2nd Year
+4	24133342	Cuevas , Kenshyne Evangelista	BMMA	2nd Year
+5	24132575	De Los Reyes , Anthony NiÑo Maranan	BMMA	2nd Year
+6	24133136	Delos Reyes , Mariane Christalei	BMMA	2nd Year
+7	16001596	Ebreo , Althea Joyce Borbon	BMMA	2nd Year
+8	24134343	Emplica , Jeremias Romiel Salazar	BMMA	2nd Year
+9	22127979	Garais , Dianne Esther Castillo	BMMA	2nd Year
+10	24134718	Guilles , Arielly Cruzat	BMMA	2nd Year
+11	24132581	Ilag , Kathleen Denise Vinson	BMMA	2nd Year
+12	22127354	Medina , Lindsay Nicole Inumerable	BMMA	2nd Year
+13	22127493	Ng , Michiko Girette Uy Bomping	BMMA	2nd Year
+14	18002031	Panganiban , Andrei Orbe	BMMA	2nd Year
+15	23131615	Ramirez , Jhenifer Calingasan	BMMA	2nd Year
+16	24132998	Rodaje , Jhea Larizza Valenzuela	BMMA	2nd Year
+17	23129896	Tria , Hannah Ocampo	BMMA	2nd Year
+
+
+STUDENT	ENROLLED COURSE	YEAR LEVEL
+ 	ID No.	NAME		
+1	23130375	Ancheta , Gil Marion Urieta	BMMA	3rd Year
+2	23131050	Arguelles , Rommel Iii Tañas	BMMA	3rd Year
+3	17001862	Cuasay , Marc Jhonsen Ramos	BMMA	3rd Year
+4	23131152	Dimaculangan , Denpher Marco Kasilag	BMMA	3rd Year
+5	21125120	Dolor , Jaezel Icely Garing	BMMA	3rd Year
+6	23131411	Frago , Dan Alfred Encinares	BMMA	3rd Year
+7	23130019	Galicia , Galileo Manansala	BMMA	3rd Year
+8	22127381	Matibag , Dominic Carl Briones	BMMA	3rd Year
+9	23131066	Mercado , Vince Andrew Marasigan	BMMA	3rd Year
+10	22129028	Montenegro , John Kenneth Ceballo	BMMA	3rd Year
+11	23131416	Otanes , Haniel John Kaibigan	BMMA	3rd Year
+12	23130682	Perez , Jan Keane Bana-ay	BMMA	3rd Year
+13	23130975	Ramirez , Prince Tanz Joses Ramos	BMMA	3rd Year
+14	21124108	Tabacug , Sandra Louise Gulen	BMMA	3rd Year
+15	23130616	Veril , Nickous Gabriel Reglos	BMMA	3rd Year
+
+
+
+
+
+
+
+STUDENT	ENROLLED COURSE	YEAR LEVEL
+ 	ID No.	NAME		
+1	22129064	Arandia , Denise Guce	BMMA	4th Year
+2	22127306	Atienza , Eve Cathlene De Los Reyes	BMMA	4th Year
+3	22127443	De Leon , Mary Gelin Manalo	BMMA	4th Year
+4	16001531	Dimaano , Janna Frietzy Ferino	BMMA	4th Year
+5	22126519	Dumas , Princess Mae Montera	BMMA	4th Year
+6	22127596	Fajarillo , Claire Anne Cristal	BMMA	4th Year
+7	20122079	Faytaren , Yvette Gozun	BMMA	4th Year
+8	21123168	Frago , Franz Julienne Gonzales	BMMA	4th Year
+9	22126856	Guno , Kiro Cullar	BMMA	4th Year
+10	22128202	Javier , Gayle Margarita Caringal	BMMA	4th Year
+11	22127844	Macalalad , Mycca Daenielle De Roxas	BMMA	4th Year
+12	20121518	Mactal , Elizabeth Anne Castillo	BMMA	4th Year
+13	22126621	Manalo , Kristine Angela Figueroa	BMMA	4th Year
+14	21124391	Mansalapus , David Joshua Balita	BMMA	4th Year
+15	18114195	Roxas , Mark Lawrence Macaraig	BMMA	4th Year
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Enrolled Students First Semester / SY: 2025 - 2026
+Course: Bachelor of Science in Computer Science
+Institute: College of Computer Studies
+Institute Category: COLLEGE
+STUDENT	ENROLLED COURSE	YEAR LEVEL
+ 	ID No.	NAME		
+1	25137158	Bicol , Vyiane Luinice Maranan	BSCS	1st Year
+2	25136701	Agillon , Anjela Grace Caibiran	BSCS	1st Year
+3	23130885	Driz , Josef Carl Rodelas	BSCS	1st Year
+4	25136847	Hidalgo , Adrian Madlangbayan	BSCS	1st Year
+5	25137424	Hofer , James Ivan Musico	BSCS	1st Year
+6	25135688	Magpantay , John Bryle Pasia	BSCS	1st Year
+7	25135680	Pedillaga , Stephen Apigo	BSCS	1st Year
+8	25136926	Pilapil , Felix Gerard Saligao	BSCS	1st Year
+9	25135873	Sampaga , Aerol Marasigan	BSCS	1st Year
+
+
+
+STUDENT	ENROLLED COURSE	YEAR LEVEL
+ 	ID No.	NAME		
+1	22127771	Bunyi , Bavie Jr. Anoyo	BSCS	4th Year
+2	16111235	Corrales , Anjell Viven Dulay	BSCS	4th Year
+3	16001557	Culla , Rey Michael Francis Iii Aguilar	BSCS	4th Year
+4	22128214	Hernandez , Alexander Neil Tautuan	BSCS	4th Year
+5	22229625	Jocson , Robin Andal	BSCS	4th Year
+6	18115368	Luneta , Raphael Alfred Panopio	BSCS	4th Year
+7	22128145	Silang , Alger Cruz	BSCS	4th Year
+
+Enrolled Students First Semester / SY: 2025 - 2026
+Course: Bachelor of Science in Cybersecurity
+STUDENT	ENROLLED COURSE	YEAR LEVEL
+ 	ID No.	NAME		
+1	25137159	Bitangcor , Lauro Gina	BSCYSEC	1st Year
+2	19117068	Buenaventura , Keene Alsworth Dalangin	BSCYSEC	1st Year
+3	25136336	Castillo , Darren Jade Rivera	BSCYSEC	1st Year
+4	23129929	Eusebio , Marc Ernest Abram Austria	BSCYSEC	1st Year
+5	25137032	Gumawa , Lorenzo Miguel Pural	BSCYSEC	1st Year
+6	22127815	Paragas , Vryce Aldin Calero	BSCYSEC	1st Year
+7	23131137	Perez , Mykael Gabriell De Castro	BSCYSEC	1st Year
+8	22002530	Saporna , Khian Derick Macatangay	BSCYSEC	1st Year
+
+
+
+
+STUDENT	ENROLLED COURSE	YEAR LEVEL
+ 	ID No.	NAME		
+1	22128450	Acot , Archielled Arl	BSCS-DS	4th Year
+2	22128156	Acupido , Jedidah Kezia Siababa	BSCS-DS	4th Year
+3	21124132	Almario , Kyle Angelo Catipan	BSCS-DS	4th Year
+4	22127725	Belarmino , Charlize Gian Antenor	BSCS-DS	4th Year
+5	22128827	Dinglasan , Miguel Enrico Datinguinoo	BSCS-DS	4th Year
+6	21123991	Fernando , Zymer Quinito Politico	BSCS-DS	4th Year
+7	22126581	Fetizanan , Ravie Rafael Espeleta	BSCS-DS	4th Year
+8	22127912	Flores , Jose Angelo Manalo	BSCS-DS	4th Year
+9	21123729	Garcia , Kimberlie Malabanan	BSCS-DS	4th Year
+10	22127626	Manay , Joshua James Dela Vega	BSCS-DS	4th Year
+11	22128258	Martinez , Zedric Myer De Torres	BSCS-DS	4th Year
+12	16001661	Ramos , Emmanuel Benedict Magtibay	BSCS-DS	4th Year
+13	22127878	Salibio , Jeramlie Casidsid	BSCS-DS	4th Year
+14	21123110	Suguitan , Chlarence Eguia	BSCS-DS	4th Year
+15	22128794	Villena , Enrico Navarro	BSCS-DS	4th Year
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Enrolled Students First Semester / SY: 2025 - 2026
+Course: Bachelor of Science in Information Technology
+Institute: College of Computer Studies
+Institute Category: COLLEGE
+STUDENT	ENROLLED COURSE	YEAR LEVEL
+ 	ID No.	NAME		
+1	25136703	Aguila , Joaquin Alfonso Canosa	BSIT	1st Year
+2	25135792	Alvez , Donne Malaluan	BSIT	1st Year
+3	25137061	Aquino , Bonn Leenard Edica	BSIT	1st Year
+4	25136593	Baja , Nikko Stane Credo	BSIT	1st Year
+5	23130868	Balse , John Laurence Manalo	BSIT	1st Year
+6	25136242	Catle , God Weyn De Guzman	BSIT	1st Year
+7	25136908	Dimaculangan , Nathan Perlado	BSIT	1st Year
+8	25136677	Javiña , Justine Jason Llanes	BSIT	1st Year
+9	25136522	Lindog , Prince Lenuel Laygo	BSIT	1st Year
+10	25136502	Loria , Feliz Dueñas	BSIT	1st Year
+11	25136972	Magtibay , Aaron Christian Panopio	BSIT	1st Year
+12	25136400	Marquez , Cyrus Ivann Bonito	BSIT	1st Year
+13	22128496	MeÑez , Cristo John Paul Alday	BSIT	1st Year
+14	25135786	Mojares , Princess Mei Escobella	BSIT	1st Year
+15	23131659	Nepomuceno , Andrew Surban	BSIT	1st Year
+16	25137422	Nuevo , Ian Zyrus Villanueva	BSIT	1st Year
+17	25136879	Raspado , Earl Jhon Ilagan	BSIT	1st Year
+18	25136792	Santiago , Ken[t Edwin Zata	BSIT	1st Year
+19	25135720	Vedoral , Alyza Mae Mercene	BSIT	1st Year
+20	25137236	Villalobos , Karl Hayzen Delfino	BSIT	1st Year
+21	23131017	Villano , Raven Joshua Andal	BSIT	1st Year
+22	25137415	Vince Weyant , Afaga De Chavez	BSIT	1st Year
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+STUDENT	ENROLLED COURSE	YEAR LEVEL
+ 	ID No.	NAME		
+1	24132570	Abe , Airah Janine Jaraya	BSIT	2nd Year
+2	24134765	Abrenica Iii , Albert Gutierrez	BSIT	2nd Year
+3	18002030	Addag , Siegfred Alday	BSIT	2nd Year
+4	19117823	Alcantara , Charles Jansen Dasigan	BSIT	2nd Year
+5	22127658	Alcantara , John Joshua Mantala	BSIT	2nd Year
+6	24134127	Amo , Pauline Yanna Recio	BSIT	2nd Year
+7	24133579	Andiz , Terrence Josh Delos Reyes	BSIT	2nd Year
+8	21124395	Atie , Lawrence James Puyo	BSIT	2nd Year
+9	24134017	Atienza , Jade Drix Stiphen Plata	BSIT	2nd Year
+10	24134340	Buan , Zhach Jedrick Pagsinuhin	BSIT	2nd Year
+11	24132698	Carandang , Ivan Bugtong	BSIT	2nd Year
+12	24134022	Casas , Luke Andrew Sarmiento	BSIT	2nd Year
+13	24134583	Cello , Alfonso Francisco Calingasan	BSIT	2nd Year
+14	24133561	Cezar , Joshua Shadrach Ocampo	BSIT	2nd Year
+15	24134413	Cueto , Dustin Carl Leynes	BSIT	2nd Year
+16	22126687	Dechosa , Kezia Leigh Lacatan	BSIT	2nd Year
+17	24133139	Dilao , Njairo Gutierrez	BSIT	2nd Year
+18	24134137	Dimaano , Mj Kurt Casas	BSIT	2nd Year
+19	22128047	Enriquez , Princess Magnaye	BSIT	2nd Year
+20	24134188	Espina , Kyle Benedict Malaluan	BSIT	2nd Year
+21	24132928	Felipe , Charlz Wayne Aguilon	BSIT	2nd Year
+22	24133162	Fornoles , Vianne Alexa Mendoza	BSIT	2nd Year
+23	24133420	Garcia , Jan Tristan Hernandez	BSIT	2nd Year
+24	24134712	Gutierrez , Gabriel Dodjie Guyo	BSIT	2nd Year
+25	24133930	Gutierrez , Haley Oril	BSIT	2nd Year
+26	24134064	Hilario , Lance Tristan Espinili	BSIT	2nd Year
+27	22127419	Leynes , Aleser Lance Lampa	BSIT	2nd Year
+28	24132708	Luneta , Juan Miguel De Castro	BSIT	2nd Year
+29	24133935	Macahilig , Rheinz Anjielo Gutierrez	BSIT	2nd Year
+30	24133219	Magtibay , King Harey Atienza	BSIT	2nd Year
+31	22127785	Malabanan , Lorenz Lanz Villaroza	BSIT	2nd Year
+32	22229543	Martinez , Alliana Kassandra Mae Matibag	BSIT	2nd Year
+33	23131026	Martinez , Allysa Kristina Matibag	BSIT	2nd Year
+34	22127937	Matibag , Louise Ivan	BSIT	2nd Year
+35	24134769	Mendoza , Jem Marson Balagtas	BSIT	2nd Year
+36	24133914	Natanauan , Demetri Justin Palomeno	BSIT	2nd Year
+37	24134184	Panopio , Marck Aaron Barro	BSIT	2nd Year
+38	24133996	Peramo , Angela Mariz Manalo	BSIT	2nd Year
+39	24133163	Perez , Aldwin Josh De Ocampo	BSIT	2nd Year
+40	24134084	Perez , Jireh Eliel Cantos	BSIT	2nd Year
+41	24132712	Rabano , John Albert Bagting	BSIT	2nd Year
+42	24133600	Ramos , Raiven Destreza	BSIT	2nd Year
+43	24134601	Sanchez , John Phillip Ebora	BSIT	2nd Year
+44	18002106	Tarcelo , Isaac Ken Sawali	BSIT	2nd Year
+45	18002164	Victoria , Sean Marcus Escarez	BSIT	2nd Year
+46	24133421	Villanueva , Ian Conrad De Los Reyes	BSIT	2nd Year
+47	24134227	Viste , Jennie Matibag	BSIT	2nd Year
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+STUDENT	ENROLLED COURSE	YEAR LEVEL
+ 	ID No.	NAME		
+1	23130060	Aguilar , Samuel Ryan De Castro	BSIT	3rd Year
+2	23130944	Albuera , Charles Wendel Panganiban	BSIT	3rd Year
+3	23131218	Amboy , Kyel Darcy Bonado	BSIT	3rd Year
+4	23130185	Andres , Jen Suzara Sario	BSIT	3rd Year
+5	23130602	Arañez , Francis Alrey Diokno	BSIT	3rd Year
+6	23130749	Austria , Kean Alston Garcia	BSIT	3rd Year
+7	23132009	Bacarro , Mutya Barrion	BSIT	3rd Year
+8	22127895	Bacay , Alyssa Mae Santiaguel	BSIT	3rd Year
+9	12199344	Baliguat , Angelito Rubia	BSIT	3rd Year
+10	23130311	Bang , Hannah Serenity Tapire	BSIT	3rd Year
+11	23131741	Barcial , Vincent Melvin Go	BSIT	3rd Year
+12	23131024	Bereña , Ralph Joseph Mercado	BSIT	3rd Year
+13	22126241	Cabalona , John Benedict Lesigues	BSIT	3rd Year
+14	23130738	Calingasan , Louixiana Mari De Leon	BSIT	3rd Year
+15	23129953	Ciudad , Rachelle Ann Medrano	BSIT	3rd Year
+16	23129961	De Chavez , Dustin Lanz Alain Escobido	BSIT	3rd Year
+17	22128194	De Villa , Vince Matthew De Ocampo	BSIT	3rd Year
+18	23131309	Ermita , Nick Julian De Luna	BSIT	3rd Year
+19	23130508	Flores , Steven Amir Villafranca	BSIT	3rd Year
+20	23131089	Gardoce , Charles Wilbert Balasbas	BSIT	3rd Year
+21	23130013	Hernandez , Jonard Josh Amparo	BSIT	3rd Year
+22	23130781	Lopez , Nestor Jr Gutierrez	BSIT	3rd Year
+23	23130510	Manalo , Kaycee Bueno	BSIT	3rd Year
+24	23130761	Maullion , Ian Camongol	BSIT	3rd Year
+25	23130340	Mengote , Pierre Simon Bathan	BSIT	3rd Year
+26	12199819	Mercado , Leonard Salla	BSIT	3rd Year
+27	23129970	Ona , Dame Jensen Pedron	BSIT	3rd Year
+28	23130542	Pesigan , Nicolei Glen Beig	BSIT	3rd Year
+29	21124776	Rañon , Isaac Kulaz Bagabaldo	BSIT	3rd Year
+30	23131664	Roxas , Kaspiani Roxas	BSIT	3rd Year
+31	22229580	Sarmiento , Rodeniel Esperanza	BSIT	3rd Year
+32	20121754	Tenedero , Alyssa Kimberly Perez	BSIT	3rd Year
+33	23131142	Tonel , John Andrei Villaflor	BSIT	3rd Year
+34	23130387	Villanueva , John Jenry Garcia	BSIT	3rd Year
+35	23129838	Yaco , Kent	BSIT	3rd Year
+
+
+
+
+
+
+
+
+
+STUDENT	ENROLLED COURSE	YEAR LEVEL
+ 	ID No.	NAME		
+1	19220455	Atienza , Dustin Jerard Manalo	BSIT	4th Year
+2	18113277	Baclao , Ma. Khaila Fojas	BSIT	4th Year
+3	22127236	Basit , Leandre Esguerra	BSIT	4th Year
+4	22127265	Bathan , Gretchen Movida	BSIT	4th Year
+5	22127216	Bayaborda , Marc Jethro Samaniego	BSIT	4th Year
+6	22126246	Boniel , Elmar Johann Endaya	BSIT	4th Year
+7	21124200	Castillo , Jonas Ramos	BSIT	4th Year
+8	22128765	Dela Cruz , Vincent Manluza	BSIT	4th Year
+9	22127607	Ebreo , Ellasandra Alvaro	BSIT	4th Year
+10	22127522	Gatdula , Ashley Mae Relevo	BSIT	4th Year
+11	20121640	Hernandez , Arhizza Jem Silang	BSIT	4th Year
+12	20121064	Hernandez , Joel Kenneth Baral	BSIT	4th Year
+13	22127831	Landicho , Dave Ivan Mabilin	BSIT	4th Year
+14	22127219	Manalo , Alfredo Iii De Claro	BSIT	4th Year
+15	21123885	Manalo , Gerry Nathaniel Castillo	BSIT	4th Year
+16	20121562	Marasigan , Joshz Raniel Datinguinoo	BSIT	4th Year
+17	22127208	Palogme , Joross Marasigan	BSIT	4th Year
+18	22128343	Pasaol , Coniele Joloe Robles	BSIT	4th Year
+19	22127532	Serquiña , Leon Khyle Quiambao	BSIT	4th Year
+

@@ -259,10 +259,10 @@ const EnrollmentListManagement = () => {
     const samplePrograms = programs.slice(0, 3).map(p => p.code || p.program_code).filter(Boolean);
     const programCodes = samplePrograms.length > 0 ? samplePrograms : ['PROGRAM1', 'PROGRAM2', 'PROGRAM3'];
     
-    const csvContent = `student_number,first_name,last_name,middle_name,email,program_code,year_level,college_code,college_name
-2024-00001,Juan,Dela Cruz,Santos,jdelacruz@lpulaguna.edu.ph,${programCodes[0]},1,COLLEGE1,College Name 1
-2024-00002,Maria,Santos,Lopez,msantos@lpulaguna.edu.ph,${programCodes[1] || programCodes[0]},2,COLLEGE2,College Name 2
-2024-00003,Pedro,Garcia,Martinez,pgarcia@lpulaguna.edu.ph,${programCodes[2] || programCodes[0]},3,COLLEGE1,College Name 1`;
+    const csvContent = `student_number,first_name,last_name,middle_name,program_code,year_level
+2024-00001,Juan,Dela Cruz,Santos,${programCodes[0]},1
+2024-00002,Maria,Santos,Lopez,${programCodes[1] || programCodes[0]},2
+2024-00003,Pedro,Garcia,Martinez,${programCodes[2] || programCodes[0]},3`;
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -586,19 +586,10 @@ const EnrollmentListManagement = () => {
                       Name
                     </th>
                     <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider">
-                      Email
-                    </th>
-                    <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider">
                       Program
                     </th>
                     <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider">
                       Year Level
-                    </th>
-                    <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider">
-                      College
-                    </th>
-                    <th className="px-6 py-4 text-center text-sm font-semibold uppercase tracking-wider">
-                      Status
                     </th>
                   </tr>
                 </thead>
@@ -611,9 +602,6 @@ const EnrollmentListManagement = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {student.first_name} {student.middle_name ? student.middle_name + ' ' : ''}{student.last_name}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {student.email || 'N/A'}
-                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         <div>
                           <div className="font-medium">{student.program_code}</div>
@@ -622,22 +610,6 @@ const EnrollmentListManagement = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         Year {student.year_level}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <div>
-                          <div className="font-medium">{student.college_code}</div>
-                          <div className="text-xs text-gray-400">{student.college_name}</div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          student.status === 'active' ? 'bg-green-100 text-green-800' :
-                          student.status === 'inactive' ? 'bg-gray-100 text-gray-800' :
-                          student.status === 'transferred' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-blue-100 text-blue-800'
-                        }`}>
-                          {student.status}
-                        </span>
                       </td>
                     </tr>
                   ))}
