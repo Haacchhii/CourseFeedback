@@ -8,6 +8,7 @@ import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/use
 import Pagination from '../../components/Pagination'
 import { useDebounce } from '../../hooks/useDebounce'
 import { transformPrograms, toDisplayCode } from '../../utils/programMapping'
+import CustomDropdown from '../../components/CustomDropdown'
 
 export default function Evaluations() {
   const navigate = useNavigate()
@@ -543,16 +544,16 @@ export default function Evaluations() {
             </div>
             <div className="flex items-center space-x-2">
               <label className="text-sm font-medium text-gray-700">Show:</label>
-              <select
-                value={chartLimit}
-                onChange={(e) => setChartLimit(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-              >
-                <option value="5">Top 5</option>
-                <option value="10">Top 10</option>
-                <option value="20">Top 20</option>
-                <option value="all">All Items</option>
-              </select>
+              <CustomDropdown
+                value={chartLimit.toString()}
+                onChange={(val) => setChartLimit(val)}
+                options={[
+                  { value: '5', label: 'Top 5' },
+                  { value: '10', label: 'Top 10' },
+                  { value: '20', label: 'Top 20' },
+                  { value: 'all', label: 'All Items' }
+                ]}
+              />
             </div>
           </div>
           
@@ -626,63 +627,57 @@ export default function Evaluations() {
               />
             </div>
             
-            <div>
-              <label className="block text-sm font-semibold text-[#1e293b] mb-3">Academic Program</label>
-              <select
-                value={programFilter}
-                onChange={(e) => setProgramFilter(e.target.value)}
-                className="lpu-select"
-              >
-                <option value="all">All Programs</option>
-                {programOptions.map(program => (
-                  <option key={program.id} value={program.code}>{program.code} - {program.name}</option>
-                ))}
-              </select>
-            </div>
+            <CustomDropdown
+              label="Academic Program"
+              value={programFilter}
+              onChange={(val) => setProgramFilter(val)}
+              options={[
+                { value: 'all', label: 'All Programs' },
+                ...programOptions.map(program => ({
+                  value: program.code,
+                  label: `${program.code} - ${program.name}`
+                }))
+              ]}
+              searchable={true}
+            />
 
-            <div>
-              <label className="block text-sm font-semibold text-[#1e293b] mb-3">Year Level</label>
-              <select
-                value={yearLevelFilter}
-                onChange={(e) => setYearLevelFilter(e.target.value)}
-                className="lpu-select"
-              >
-                <option value="all">All Year Levels</option>
-                {yearLevelOptions.map(yearLevel => (
-                  <option key={yearLevel.value} value={yearLevel.value}>{yearLevel.label}</option>
-                ))}
-              </select>
-            </div>
+            <CustomDropdown
+              label="Year Level"
+              value={yearLevelFilter}
+              onChange={(val) => setYearLevelFilter(val)}
+              options={[
+                { value: 'all', label: 'All Year Levels' },
+                ...yearLevelOptions.map(yearLevel => ({
+                  value: yearLevel.value,
+                  label: yearLevel.label
+                }))
+              ]}
+            />
 
-            <div>
-              <label className="block text-sm font-semibold text-[#1e293b] mb-3">Sentiment Type</label>
-              <select
-                value={sentimentFilter}
-                onChange={(e) => setSentimentFilter(e.target.value)}
-                className="lpu-select"
-              >
-                <option value="all">All Sentiments</option>
-                <option value="positive">Positive Feedback</option>
-                <option value="neutral">Neutral Feedback</option>
-                <option value="negative">Negative Feedback</option>
-              </select>
-            </div>
+            <CustomDropdown
+              label="Sentiment Type"
+              value={sentimentFilter}
+              onChange={(val) => setSentimentFilter(val)}
+              options={[
+                { value: 'all', label: 'All Sentiments' },
+                { value: 'positive', label: 'Positive Feedback' },
+                { value: 'neutral', label: 'Neutral Feedback' },
+                { value: 'negative', label: 'Negative Feedback' }
+              ]}
+            />
 
-            <div>
-              <label className="block text-sm font-semibold text-[#1e293b] mb-3">Evaluation Period</label>
-              <select
-                value={selectedPeriod || ''}
-                onChange={(e) => setSelectedPeriod(e.target.value ? parseInt(e.target.value) : null)}
-                className="lpu-select"
-              >
-                <option value="">All Periods</option>
-                {evaluationPeriods.map(period => (
-                  <option key={period.id} value={period.id}>
-                    {period.name} ({period.academic_year}) {period.status === 'Open' || period.status === 'active' ? '- Active' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <CustomDropdown
+              label="Evaluation Period"
+              value={selectedPeriod ? selectedPeriod.toString() : ''}
+              onChange={(val) => setSelectedPeriod(val ? parseInt(val) : null)}
+              options={[
+                { value: '', label: 'All Periods' },
+                ...evaluationPeriods.map(period => ({
+                  value: period.id.toString(),
+                  label: `${period.name} (${period.academic_year}) ${period.status === 'Open' || period.status === 'active' ? '- Active' : ''}`
+                }))
+              ]}
+            />
           </div>
         </div>
 

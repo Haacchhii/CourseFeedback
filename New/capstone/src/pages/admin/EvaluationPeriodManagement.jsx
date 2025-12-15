@@ -1267,19 +1267,19 @@ export default function EvaluationPeriodManagement() {
                       </div>
                     ) : (
                       <>
-                        <select
-                          required
+                        <CustomDropdown
                           value={enrollFormData.programSectionId}
-                          onChange={(e) => setEnrollFormData({...enrollFormData, programSectionId: e.target.value})}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-                        >
-                          <option value="">Select a program section...</option>
-                          {availableProgramSections.map((section) => (
-                            <option key={section.id} value={section.id}>
-                              {section.sectionName || section.section_name} - {section.programCode || section.program_code} (Year {section.yearLevel || section.year_level}, Sem {section.semester}) - {section.studentCount || section.student_count} students
-                            </option>
-                          ))}
-                        </select>
+                          onChange={(val) => setEnrollFormData({...enrollFormData, programSectionId: val})}
+                          required
+                          options={[
+                            { value: '', label: 'Select a program section...' },
+                            ...availableProgramSections.map((section) => ({
+                              value: section.id.toString(),
+                              label: `${section.sectionName || section.section_name} - ${section.programCode || section.program_code} (Year ${section.yearLevel || section.year_level}, Sem ${section.semester}) - ${section.studentCount || section.student_count} students`
+                            }))
+                          ]}
+                          searchable={availableProgramSections.length > 5}
+                        />
                         <p className="text-xs text-gray-500 mt-1">Select the student group (e.g., BSCS-DS-3A) to enable for evaluation</p>
                       </>
                     )}

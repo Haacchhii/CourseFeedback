@@ -6,6 +6,7 @@ import { adminAPI, deptHeadAPI, secretaryAPI } from '../../services/api'
 import Pagination from '../../components/Pagination'
 import { useDebounce } from '../../hooks/useDebounce'
 import { transformPrograms, toDisplayCode } from '../../utils/programMapping'
+import CustomDropdown from '../../components/CustomDropdown'
 
 export default function Courses() {
   const { user: currentUser } = useAuth()
@@ -936,18 +937,18 @@ export default function Courses() {
           <div className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-[#7a0000]">Course Performance Overview</h3>
-              <div className="flex items-center space-x-2">
-                <label className="text-sm font-medium text-gray-700">Show:</label>
-                <select
-                  value={chartLimit}
-                  onChange={(e) => setChartLimit(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-                >
-                  <option value="5">Top 5</option>
-                  <option value="10">Top 10</option>
-                  <option value="20">Top 20</option>
-                  <option value="all">All Courses</option>
-                </select>
+              <div className="flex items-center space-x-2 w-40">
+                <CustomDropdown
+                  label=""
+                  value={chartLimit.toString()}
+                  onChange={(val) => setChartLimit(val)}
+                  options={[
+                    { value: '5', label: 'Top 5' },
+                    { value: '10', label: 'Top 10' },
+                    { value: '20', label: 'Top 20' },
+                    { value: 'all', label: 'All Courses' }
+                  ]}
+                />
               </div>
             </div>
             <ResponsiveContainer width="100%" height={300}>
@@ -991,64 +992,46 @@ export default function Courses() {
               </div>
             </div>
             
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Evaluation Period</label>
-              <select
-                value={selectedPeriod || ''}
-                onChange={(e) => setSelectedPeriod(e.target.value ? parseInt(e.target.value) : null)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent bg-white transition-all duration-200"
-              >
-                <option value="">
-                  {activePeriod ? `${activePeriod.name} (${activePeriod.academic_year}) - Active` : 'Select Period'}
-                </option>
-                {evaluationPeriods.filter(p => p.status !== 'active').map(period => (
-                  <option key={period.id} value={period.id}>
-                    {period.name} ({period.academic_year})
-                  </option>
-                ))}
-              </select>
-            </div>
+            <CustomDropdown
+              label="Evaluation Period"
+              value={selectedPeriod?.toString() || ''}
+              onChange={(val) => setSelectedPeriod(val ? parseInt(val) : null)}
+              options={[
+                { value: '', label: activePeriod ? `${activePeriod.name} (${activePeriod.academic_year}) - Active` : 'Select Period' },
+                ...evaluationPeriods.filter(p => p.status !== 'active').map(period => ({
+                  value: period.id.toString(),
+                  label: `${period.name} (${period.academic_year})`
+                }))
+              ]}
+            />
             
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Filter by Program</label>
-              <select
-                value={selectedProgram}
-                onChange={(e) => {
-                  setSelectedProgram(e.target.value)
-                  // Reset program section when program changes
-                  setSelectedProgramSection('all')
-                }}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent bg-white transition-all duration-200"
-              >
-                <option value="all">All Programs</option>
-                {programs.map(program => {
+            <CustomDropdown
+              label="Filter by Program"
+              value={selectedProgram}
+              onChange={(val) => {
+                setSelectedProgram(val)
+                setSelectedProgramSection('all')
+              }}
+              options={[
+                { value: 'all', label: 'All Programs' },
+                ...programs.map(program => {
                   const displayCode = program.code || program.program_code || ''
                   const displayName = program.name || program.program_name || 'Unknown Program'
                   const optionValue = displayCode || displayName
                   const optionLabel = displayCode ? `${displayCode} - ${displayName}` : displayName
-                  
-                  console.log('[COURSES] Rendering option:', { displayCode, displayName, optionValue, optionLabel })
-                  
-                  return (
-                    <option key={program.id} value={optionValue}>
-                      {optionLabel}
-                    </option>
-                  )
-                })}
-              </select>
-            </div>
+                  return { value: optionValue, label: optionLabel }
+                })
+              ]}
+              searchable={programs.length > 5}
+            />
             
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Filter by Program Section</label>
-              <select
-                value={selectedProgramSection}
-                onChange={(e) => {
-                  setSelectedProgramSection(e.target.value)
-                }}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent bg-white transition-all duration-200"
-              >
-                <option value="all">All Sections</option>
-                {programSections
+            <CustomDropdown
+              label="Filter by Program Section"
+              value={selectedProgramSection}
+              onChange={(val) => setSelectedProgramSection(val)}
+              options={[
+                { value: 'all', label: 'All Sections' },
+                ...programSections
                   .filter(section => {
                     // Filter sections by selected program if program filter is active
                     if (selectedProgram === 'all') return true
@@ -1085,19 +1068,14 @@ export default function Courses() {
                       optionLabel += ` (${details.join(', ')})`
                     }
                     
-                    return (
-                      <option key={section.id} value={section.id}>
-                        {optionLabel}
-                      </option>
-                    )
-                  })}
-              </select>
-              <p className="text-xs text-gray-500 mt-1">
-                {programSections.length === 0 
-                  ? 'No program sections available' 
-                  : `${programSections.length} section${programSections.length !== 1 ? 's' : ''} available`}
-              </p>
-            </div>
+                    return { value: section.id.toString(), label: optionLabel }
+                  })
+              ]}
+              searchable={programSections.length > 5}
+              helpText={programSections.length === 0 
+                ? 'No program sections available' 
+                : `${programSections.length} section${programSections.length !== 1 ? 's' : ''} available`}
+            />
           </div>
         </div>
 
@@ -1696,26 +1674,20 @@ export default function Courses() {
               <div className="grid md:grid-cols-2 gap-6">
                 {/* Course Selection */}
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Select Course <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="course_id"
-                    value={newSection.course_id}
-                    onChange={handleInputChange}
-                    className={`lpu-select ${formErrors.course_id ? 'border-red-500' : ''}`}
-                  >
-                    <option value="">-- Select a Course --</option>
-                    {availableCourses.map(course => (
-                      <option key={course.id} value={course.id}>
-                        {course.subject_code} - {course.subject_name} (Year {course.year_level})
-                      </option>
-                    ))}
-                  </select>
-                  {formErrors.course_id && (
-                    <p className="text-red-500 text-xs mt-1">{formErrors.course_id}</p>
-                  )}
-                  <p className="text-gray-500 text-xs mt-1">Choose from existing course definitions</p>
+                  <CustomDropdown
+                    label="Select Course *"
+                    value={newSection.course_id ? newSection.course_id.toString() : ''}
+                    onChange={(val) => handleInputChange({ target: { name: 'course_id', value: val } })}
+                    options={[
+                      { value: '', label: '-- Select a Course --' },
+                      ...availableCourses.map(course => ({
+                        value: course.id.toString(),
+                        label: `${course.subject_code} - ${course.subject_name} (Year ${course.year_level})`
+                      }))
+                    ]}
+                    searchable={availableCourses.length > 5}
+                    helpText={formErrors.course_id || 'Choose from existing course definitions'}
+                  />
                 </div>
                 
                 {/* Class Code */}
@@ -1739,19 +1711,16 @@ export default function Courses() {
                 
                 {/* Semester */}
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Semester <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="semester"
-                    value={newSection.semester}
-                    onChange={handleInputChange}
-                    className="lpu-select"
-                  >
-                    <option value={1}>First Semester</option>
-                    <option value={2}>Second Semester</option>
-                    <option value={3}>Summer</option>
-                  </select>
+                  <CustomDropdown
+                    label="Semester *"
+                    value={newSection.semester ? newSection.semester.toString() : '1'}
+                    onChange={(val) => handleInputChange({ target: { name: 'semester', value: val } })}
+                    options={[
+                      { value: '1', label: 'First Semester' },
+                      { value: '2', label: 'Second Semester' },
+                      { value: '3', label: 'Summer' }
+                    ]}
+                  />
                 </div>
                 
                 {/* Academic Year */}

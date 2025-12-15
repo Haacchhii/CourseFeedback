@@ -3,6 +3,7 @@ import { Upload, Search, Filter, Users, TrendingUp, AlertCircle, CheckCircle, X,
 import { adminAPI, apiClient } from '../../services/api';
 import { AlertModal } from '../../components/Modal';
 import Pagination from '../../components/Pagination';
+import CustomDropdown from '../../components/CustomDropdown';
 
 const EnrollmentListManagement = () => {
   const [enrollmentList, setEnrollmentList] = useState([]);
@@ -484,40 +485,35 @@ const EnrollmentListManagement = () => {
 
             {/* Filters */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Program</label>
-                <select
-                  value={filters.program_id}
-                  onChange={(e) => handleFilterChange('program_id', e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-[#7a0000] focus:border-[#7a0000] text-base"
-                >
-                  <option value="">All Programs</option>
-                  {programs.length > 0 ? (
-                    programs.map(program => (
-                      <option key={program.id} value={program.id}>
-                        {program.code || program.program_code} - {program.name || program.program_name}
-                      </option>
-                    ))
-                  ) : (
-                    <option disabled>Loading programs...</option>
-                  )}
-                </select>
-              </div>
+              <CustomDropdown
+                label="Program"
+                value={filters.program_id}
+                onChange={(val) => handleFilterChange('program_id', val)}
+                options={[
+                  { value: '', label: 'All Programs' },
+                  ...(programs.length > 0 
+                    ? programs.map(program => ({
+                        value: program.id.toString(),
+                        label: `${program.code || program.program_code} - ${program.name || program.program_name}`
+                      }))
+                    : [{ value: '', label: 'Loading programs...', disabled: true }]
+                  )
+                ]}
+                searchable={true}
+              />
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Status</label>
-                <select
-                  value={filters.status}
-                  onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-card focus:outline-none focus:ring-2 focus:ring-[#7a0000] focus:border-[#7a0000] text-base"
-                >
-                  <option value="">All Statuses</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="transferred">Transferred</option>
-                  <option value="graduated">Graduated</option>
-                </select>
-              </div>
+              <CustomDropdown
+                label="Status"
+                value={filters.status}
+                onChange={(val) => handleFilterChange('status', val)}
+                options={[
+                  { value: '', label: 'All Statuses' },
+                  { value: 'active', label: 'Active' },
+                  { value: 'inactive', label: 'Inactive' },
+                  { value: 'transferred', label: 'Transferred' },
+                  { value: 'graduated', label: 'Graduated' }
+                ]}
+              />
             </div>
 
             <div className="mt-6 flex gap-3">

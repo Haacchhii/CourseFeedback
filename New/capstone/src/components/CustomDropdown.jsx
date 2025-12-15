@@ -78,7 +78,7 @@ const CustomDropdown = ({
         disabled={disabled}
         onClick={() => !disabled && setIsOpen(!isOpen)}
         onKeyDown={handleKeyDown}
-        className={`w-full px-4 py-3 text-left bg-white border-2 rounded-xl transition-all duration-200 flex items-center justify-between
+        className={`w-full px-4 py-3 text-left bg-white border-2 rounded-xl transition-all duration-200 flex items-center justify-between min-h-[50px]
           ${error
             ? 'border-red-300 focus:border-red-500 focus:ring-2 focus:ring-red-100'
             : disabled 
@@ -89,11 +89,11 @@ const CustomDropdown = ({
           }
         `}
       >
-        <span className={`flex items-center gap-2 truncate ${selectedOption ? 'text-gray-900' : 'text-gray-400'}`}>
+        <span className={`flex-1 ${selectedOption ? 'text-gray-900' : 'text-gray-400'}`}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
         <svg 
-          className={`w-5 h-5 text-gray-400 transition-transform duration-200 flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} 
+          className={`w-5 h-5 text-gray-400 transition-transform duration-200 flex-shrink-0 ml-2 ${isOpen ? 'rotate-180' : ''}`} 
           fill="none" 
           stroke="currentColor" 
           viewBox="0 0 24 24"

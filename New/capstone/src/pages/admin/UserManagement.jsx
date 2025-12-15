@@ -1009,66 +1009,58 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-100 focus:border-[#7a0000] transition-all"
               />
             </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">🎯 Role</label>
-              <CustomDropdown
-                options={[
-                  { value: 'all', label: 'All Roles' },
-                  { value: 'student', label: 'Student' },
-                  { value: 'instructor', label: 'Instructor' },
-                  { value: 'department_head', label: 'Department Head' },
-                  { value: 'secretary', label: 'Secretary' },
-                  { value: 'admin', label: 'Administrator' }
-                ]}
-                value={roleFilter}
-                onChange={(value) => setRoleFilter(value)}
-                placeholder="All Roles"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">📚 Program</label>
-              <CustomDropdown
-                options={[
-                  { value: 'all', label: roleFilter === 'student' ? 'All Programs' : 'Select Student Role First' },
-                  ...(roleFilter === 'student' ? programs.map(prog => ({ value: prog, label: prog })) : [])
-                ]}
-                value={programFilter}
-                onChange={(value) => setProgramFilter(value)}
-                disabled={roleFilter !== 'student'}
-                placeholder={roleFilter === 'student' ? 'All Programs' : 'Select Student Role First'}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">⚡ Status</label>
-              <CustomDropdown
-                options={[
-                  { value: 'all', label: 'All Status' },
-                  { value: 'Active', label: 'Active' },
-                  { value: 'Inactive', label: 'Inactive' }
-                ]}
-                value={statusFilter}
-                onChange={(value) => setStatusFilter(value)}
-                placeholder="All Status"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">🎓 Year Level</label>
-              <CustomDropdown
-                options={[
-                  { value: 'all', label: roleFilter === 'student' ? 'All Levels' : 'Select Student Role First' },
-                  ...(roleFilter === 'student' ? [
-                    { value: '1', label: '1st Year' },
-                    { value: '2', label: '2nd Year' },
-                    { value: '3', label: '3rd Year' },
-                    { value: '4', label: '4th Year' }
-                  ] : [])
-                ]}
-                value={yearLevelFilter}
-                onChange={(value) => setYearLevelFilter(value)}
-                disabled={roleFilter !== 'student'}
-                placeholder={roleFilter === 'student' ? 'All Levels' : 'Select Student Role First'}
-              />
-            </div>
+            <CustomDropdown
+              label="🎯 Role"
+              options={[
+                { value: 'all', label: 'All Roles' },
+                { value: 'student', label: 'Student' },
+                { value: 'instructor', label: 'Instructor' },
+                { value: 'department_head', label: 'Department Head' },
+                { value: 'secretary', label: 'Secretary' },
+                { value: 'admin', label: 'Administrator' }
+              ]}
+              value={roleFilter}
+              onChange={(value) => setRoleFilter(value)}
+              placeholder="All Roles"
+            />
+            <CustomDropdown
+              label="📚 Program"
+              options={[
+                { value: 'all', label: roleFilter === 'student' ? 'All Programs' : 'Select Student Role First' },
+                ...(roleFilter === 'student' ? programs.map(prog => ({ value: prog, label: prog })) : [])
+              ]}
+              value={programFilter}
+              onChange={(value) => setProgramFilter(value)}
+              disabled={roleFilter !== 'student'}
+              placeholder={roleFilter === 'student' ? 'All Programs' : 'Select Student Role First'}
+            />
+            <CustomDropdown
+              label="⚡ Status"
+              options={[
+                { value: 'all', label: 'All Status' },
+                { value: 'Active', label: 'Active' },
+                { value: 'Inactive', label: 'Inactive' }
+              ]}
+              value={statusFilter}
+              onChange={(value) => setStatusFilter(value)}
+              placeholder="All Status"
+            />
+            <CustomDropdown
+              label="🎓 Year Level"
+              options={[
+                { value: 'all', label: roleFilter === 'student' ? 'All Levels' : 'Select Student Role First' },
+                ...(roleFilter === 'student' ? [
+                  { value: '1', label: '1st Year' },
+                  { value: '2', label: '2nd Year' },
+                  { value: '3', label: '3rd Year' },
+                  { value: '4', label: '4th Year' }
+                ] : [])
+              ]}
+              value={yearLevelFilter}
+              onChange={(value) => setYearLevelFilter(value)}
+              disabled={roleFilter !== 'student'}
+              placeholder={roleFilter === 'student' ? 'All Levels' : 'Select Student Role First'}
+            />
           </div>
         </div>
 

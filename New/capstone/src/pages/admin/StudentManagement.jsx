@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 import { isAdmin } from '../../utils/roleUtils'
 import { adminAPI } from '../../services/api'
 import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
+import CustomDropdown from '../../components/CustomDropdown'
 
 export default function StudentManagement() {
   const navigate = useNavigate()
@@ -392,37 +393,31 @@ export default function StudentManagement() {
               {/* Form */}
               <div className="space-y-6">
                 <div className="grid md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Filter by Program (Optional)
-                    </label>
-                    <select
-                      value={selectedProgram}
-                      onChange={(e) => setSelectedProgram(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-                    >
-                      <option value="">All Programs</option>
-                      {Object.entries(eligibilityData?.by_program || {}).map(([code, data]) => (
-                        <option key={code} value={data.program_id}>{code} - {data.program_name}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <CustomDropdown
+                    label="Filter by Program (Optional)"
+                    value={selectedProgram}
+                    onChange={(val) => setSelectedProgram(val)}
+                    options={[
+                      { value: '', label: 'All Programs' },
+                      ...Object.entries(eligibilityData?.by_program || {}).map(([code, data]) => ({
+                        value: data.program_id.toString(),
+                        label: `${code} - ${data.program_name}`
+                      }))
+                    ]}
+                    searchable={true}
+                  />
 
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Filter by Current Year Level (Optional)
-                    </label>
-                    <select
-                      value={selectedYearLevel}
-                      onChange={(e) => setSelectedYearLevel(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-                    >
-                      <option value="">All Year Levels</option>
-                      <option value="1">Year 1 only</option>
-                      <option value="2">Year 2 only</option>
-                      <option value="3">Year 3 only</option>
-                    </select>
-                  </div>
+                  <CustomDropdown
+                    label="Filter by Current Year Level (Optional)"
+                    value={selectedYearLevel}
+                    onChange={(val) => setSelectedYearLevel(val)}
+                    options={[
+                      { value: '', label: 'All Year Levels' },
+                      { value: '1', label: 'Year 1 only' },
+                      { value: '2', label: 'Year 2 only' },
+                      { value: '3', label: 'Year 3 only' }
+                    ]}
+                  />
                 </div>
 
                 {/* Dry Run Toggle */}
@@ -548,41 +543,31 @@ export default function StudentManagement() {
               {/* Form */}
               <div className="space-y-6">
                 <div className="grid md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      From Period <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={fromPeriodId}
-                      onChange={(e) => setFromPeriodId(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-                    >
-                      <option value="">Select source period...</option>
-                      {evaluationPeriods.map(period => (
-                        <option key={period.id} value={period.id}>
-                          {period.name} ({period.status})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <CustomDropdown
+                    label="From Period *"
+                    value={fromPeriodId}
+                    onChange={(val) => setFromPeriodId(val)}
+                    options={[
+                      { value: '', label: 'Select source period...' },
+                      ...evaluationPeriods.map(period => ({
+                        value: period.id.toString(),
+                        label: `${period.name} (${period.status})`
+                      }))
+                    ]}
+                  />
 
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      To Period <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={toPeriodId}
-                      onChange={(e) => setToPeriodId(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-                    >
-                      <option value="">Select target period...</option>
-                      {evaluationPeriods.map(period => (
-                        <option key={period.id} value={period.id}>
-                          {period.name} ({period.status})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <CustomDropdown
+                    label="To Period *"
+                    value={toPeriodId}
+                    onChange={(val) => setToPeriodId(val)}
+                    options={[
+                      { value: '', label: 'Select target period...' },
+                      ...evaluationPeriods.map(period => ({
+                        value: period.id.toString(),
+                        label: `${period.name} (${period.status})`
+                      }))
+                    ]}
+                  />
                 </div>
 
                 {/* Auto Advance Toggle */}

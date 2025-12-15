@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { secretaryAPI, deptHeadAPI } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 import { Search, Users, AlertCircle, ChevronDown, ChevronRight, GraduationCap, BookOpen } from 'lucide-react'
+import CustomDropdown from '../../components/CustomDropdown'
 
 export default function NonRespondents() {
   const { user } = useAuth()
@@ -260,21 +261,18 @@ export default function NonRespondents() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Evaluation Period</label>
-                  <select
-                    value={selectedPeriod || ''}
-                    onChange={(e) => setSelectedPeriod(e.target.value)}
-                    className="lpu-select"
-                  >
-                    <option value="">Select Period</option>
-                    {evaluationPeriods.map((period) => (
-                      <option key={period.id} value={period.id}>
-                        {period.name} {period.status === 'active' || period.status === 'Active' ? '(Active)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <CustomDropdown
+                  label="Evaluation Period"
+                  value={selectedPeriod?.toString() || ''}
+                  onChange={(val) => setSelectedPeriod(val)}
+                  options={[
+                    { value: '', label: 'Select Period' },
+                    ...evaluationPeriods.map(period => ({
+                      value: period.id.toString(),
+                      label: `${period.name} ${period.status === 'active' || period.status === 'Active' ? '(Active)' : ''}`
+                    }))
+                  ]}
+                />
               </div>
             </div>
 
@@ -305,13 +303,13 @@ export default function NonRespondents() {
                       <div className="flex items-center gap-4">
                         <GraduationCap className="w-6 h-6" />
                         <div className="text-left">
-                          <h3 className="text-lg font-bold">{programSection.program} - {programSection.section}</h3>
+                          <h3 className="text-lg font-bold">{programSection.program}{programSection.section && programSection.section !== 'No Section' && programSection.section !== 'N/A' ? ` - ${programSection.section}` : ''}</h3>
                           <p className="text-sm text-white/80">Year {programSection.yearLevel} • {Object.keys(programSection.courseSections).length} courses with pending evaluations</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="bg-white/20 px-3 py-1 rounded-full text-sm font-semibold">
-                          {programSection.totalStudents} students
+                          {programSection.totalStudents} {programSection.totalStudents === 1 ? 'student' : 'students'} pending
                         </span>
                         {expandedProgramSections[programKey] ? (
                           <ChevronDown className="w-6 h-6" />

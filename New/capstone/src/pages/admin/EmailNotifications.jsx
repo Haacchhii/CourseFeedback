@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { adminAPI } from '../../services/api'
 import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
 import { AlertModal, ConfirmModal } from '../../components/Modal'
+import CustomDropdown from '../../components/CustomDropdown'
 
 export default function EmailNotifications() {
   const navigate = useNavigate()
@@ -216,20 +217,16 @@ SMTP_FROM_EMAIL=your-email@gmail.com`}
             
             <form onSubmit={handleSendNotification} className="space-y-6">
               {/* Notification Type */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Notification Type *
-                </label>
-                <select
-                  value={notificationType}
-                  onChange={(e) => setNotificationType(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-                  required
-                >
-                  <option value="test">🧪 Test Email</option>
-                  <option value="period_start">🎯 Evaluation Period Started</option>
-                </select>
-              </div>
+              <CustomDropdown
+                label="Notification Type *"
+                value={notificationType}
+                onChange={(val) => setNotificationType(val)}
+                required
+                options={[
+                  { value: 'test', label: '🧪 Test Email' },
+                  { value: 'period_start', label: '🎯 Evaluation Period Started' }
+                ]}
+              />
 
               {/* Test Email Field */}
               {notificationType === 'test' && (
@@ -253,24 +250,19 @@ SMTP_FROM_EMAIL=your-email@gmail.com`}
 
               {/* Evaluation Period Selection */}
               {notificationType !== 'test' && (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Evaluation Period *
-                  </label>
-                  <select
-                    value={selectedPeriod}
-                    onChange={(e) => setSelectedPeriod(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-                    required={notificationType !== 'test'}
-                  >
-                    <option value="">Select Period...</option>
-                    {periods.map(period => (
-                      <option key={period.id} value={period.id}>
-                        {period.name} ({period.status})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <CustomDropdown
+                  label="Evaluation Period *"
+                  value={selectedPeriod}
+                  onChange={(val) => setSelectedPeriod(val)}
+                  required={notificationType !== 'test'}
+                  options={[
+                    { value: '', label: 'Select Period...' },
+                    ...periods.map(period => ({
+                      value: period.id.toString(),
+                      label: `${period.name} (${period.status})`
+                    }))
+                  ]}
+                />
               )}
 
               {/* Custom Recipients (Optional) */}

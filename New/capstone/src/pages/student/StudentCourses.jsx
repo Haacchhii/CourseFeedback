@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
 import { toDisplayCode } from '../../utils/programMapping'
+import CustomDropdown from '../../components/CustomDropdown'
 
 // Helper function to calculate time remaining
 function getTimeRemaining(endDateStr) {
@@ -290,18 +291,17 @@ export default function StudentCourses(){
             {/* Period Filter */}
             {availablePeriods.length > 0 && (
               <div className="sm:w-64">
-                <select
-                  className="lpu-select"
+                <CustomDropdown
                   value={selectedPeriod}
-                  onChange={e => setSelectedPeriod(e.target.value)}
-                >
-                  <option value="">All Periods</option>
-                  {availablePeriods.map(period => (
-                    <option key={period.id} value={period.id}>
-                      {period.name} ({period.evaluation_count} evaluation{period.evaluation_count !== 1 ? 's' : ''})
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setSelectedPeriod(val)}
+                  options={[
+                    { value: '', label: 'All Periods' },
+                    ...availablePeriods.map(period => ({
+                      value: period.id.toString(),
+                      label: `${period.name} (${period.evaluation_count} evaluation${period.evaluation_count !== 1 ? 's' : ''})`
+                    }))
+                  ]}
+                />
               </div>
             )}
           </div>

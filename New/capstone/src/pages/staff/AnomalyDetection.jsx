@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext'
 import { adminAPI, deptHeadAPI, secretaryAPI } from '../../services/api'
 import { useDebounce } from '../../hooks/useDebounce'
 import { transformPrograms, toDisplayCode } from '../../utils/programMapping'
+import CustomDropdown from '../../components/CustomDropdown'
 
 export default function AnomalyDetection() {
   const navigate = useNavigate()
@@ -433,21 +434,18 @@ export default function AnomalyDetection() {
           <div className="space-y-4">
             {/* Row 1: Evaluation Period, Search, and Severity */}
             <div className="grid md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">📅 Evaluation Period</label>
-                <select
-                  value={selectedPeriod || ''}
-                  onChange={(e) => setSelectedPeriod(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent bg-white transition-all duration-200"
-                >
-                  <option value="">Select Period</option>
-                  {evaluationPeriods.map((period) => (
-                    <option key={period.id} value={period.id}>
-                      {period.name} {period.status === 'active' || period.status === 'Active' ? '(Active)' : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <CustomDropdown
+                label="📅 Evaluation Period"
+                value={selectedPeriod ? selectedPeriod.toString() : ''}
+                onChange={(val) => setSelectedPeriod(val)}
+                options={[
+                  { value: '', label: 'Select Period' },
+                  ...evaluationPeriods.map(period => ({
+                    value: period.id.toString(),
+                    label: `${period.name} ${period.status === 'active' || period.status === 'Active' ? '(Active)' : ''}`
+                  }))
+                ]}
+              />
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">🔍 Search Anomalies</label>
@@ -465,102 +463,89 @@ export default function AnomalyDetection() {
                 </div>
               </div>
               
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">⚠️ Severity Level</label>
-                <select
-                  value={severityFilter}
-                  onChange={(e) => setSeverityFilter(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent bg-white transition-all duration-200"
-                >
-                  <option key="severity-all" value="all">All Severities</option>
-                  <option key="severity-high" value="High">🔴 High Severity</option>
-                  <option key="severity-medium" value="Medium">🟡 Medium Severity</option>
-                  <option key="severity-low" value="Low">🟢 Low Severity</option>
-                </select>
-              </div>
+              <CustomDropdown
+                label="⚠️ Severity Level"
+                value={severityFilter}
+                onChange={(val) => setSeverityFilter(val)}
+                options={[
+                  { value: 'all', label: 'All Severities' },
+                  { value: 'High', label: '🔴 High Severity' },
+                  { value: 'Medium', label: '🟡 Medium Severity' },
+                  { value: 'Low', label: '🟢 Low Severity' }
+                ]}
+              />
             </div>
 
             {/* Row 2: Program, Year Level, Course */}
             <div className="grid md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">🎓 Program</label>
-                <select
-                  value={programFilter}
-                  onChange={(e) => setProgramFilter(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent bg-white"
-                >
-                  <option value="all">All Programs</option>
-                  {programs.map(program => (
-                    <option key={program.id} value={program.id}>
-                      {program.name || program.program_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <CustomDropdown
+                label="🎓 Program"
+                value={programFilter}
+                onChange={(val) => setProgramFilter(val)}
+                options={[
+                  { value: 'all', label: 'All Programs' },
+                  ...programs.map(program => ({
+                    value: program.id.toString(),
+                    label: program.name || program.program_name
+                  }))
+                ]}
+                searchable={true}
+              />
               
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">📚 Year Level</label>
-                <select
-                  value={yearLevelFilter}
-                  onChange={(e) => setYearLevelFilter(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent bg-white"
-                >
-                  <option value="all">All Years</option>
-                  {yearLevels.map(yl => (
-                    <option key={yl.id} value={yl.year_level}>
-                      Year {yl.year_level}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <CustomDropdown
+                label="📚 Year Level"
+                value={yearLevelFilter}
+                onChange={(val) => setYearLevelFilter(val)}
+                options={[
+                  { value: 'all', label: 'All Years' },
+                  ...yearLevels.map(yl => ({
+                    value: yl.year_level.toString(),
+                    label: `Year ${yl.year_level}`
+                  }))
+                ]}
+              />
               
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">📖 Course</label>
-                <select
-                  value={courseFilter}
-                  onChange={(e) => setCourseFilter(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent bg-white"
-                >
-                  <option value="all">All Courses</option>
-                  {courses.map(course => (
-                    <option key={course.id} value={course.id}>
-                      {course.code} - {course.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <CustomDropdown
+                label="📖 Course"
+                value={courseFilter}
+                onChange={(val) => setCourseFilter(val)}
+                options={[
+                  { value: 'all', label: 'All Courses' },
+                  ...courses.map(course => ({
+                    value: course.id.toString(),
+                    label: `${course.code} - ${course.name}`
+                  }))
+                ]}
+                searchable={true}
+              />
             </div>
 
             {/* Row 3: Semester and Date Range */}
             <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">📅 Semester</label>
-                <select
-                  value={semesterFilter}
-                  onChange={(e) => setSemesterFilter(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent bg-white"
-                >
-                  <option value="all">All Semesters</option>
-                  <option value="1st Semester">1st Semester</option>
-                  <option value="2nd Semester">2nd Semester</option>
-                  <option value="Summer">Summer</option>
-                </select>
-              </div>
+              <CustomDropdown
+                label="📅 Semester"
+                value={semesterFilter}
+                onChange={(val) => setSemesterFilter(val)}
+                options={[
+                  { value: 'all', label: 'All Semesters' },
+                  { value: '1st Semester', label: '1st Semester' },
+                  { value: '2nd Semester', label: '2nd Semester' },
+                  { value: 'Summer', label: 'Summer' }
+                ]}
+              />
               
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">🕒 Date Range</label>
-                <select
-                  value={dateRangeFilter}
-                  onChange={(e) => setDateRangeFilter(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent bg-white"
-                >
-                  <option value="all">All Time</option>
-                  <option value="today">Today</option>
-                  <option value="week">Last 7 Days</option>
-                  <option value="month">Last 30 Days</option>
-                  <option value="semester">Current Semester</option>
-                </select>
-              </div>
+              <CustomDropdown
+                label="🕒 Date Range"
+                value={dateRangeFilter}
+                onChange={(val) => setDateRangeFilter(val)}
+                options={[
+                  { value: 'all', label: 'All Time' },
+                  { value: 'today', label: 'Today' },
+                  { value: 'week', label: 'Last 7 Days' },
+                  { value: 'month', label: 'Last 30 Days' },
+                  { value: 'semester', label: 'Current Semester' }
+                ]}
+              />
             </div>
 
             {/* Filter Summary and Clear */}

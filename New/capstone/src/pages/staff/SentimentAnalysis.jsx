@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext'
 import { adminAPI, deptHeadAPI, secretaryAPI } from '../../services/api'
 import { useDebounce } from '../../hooks/useDebounce'
 import { transformPrograms, toDisplayCode } from '../../utils/programMapping'
+import CustomDropdown from '../../components/CustomDropdown'
 
 const SENTIMENT_COLORS = ['#10b981', '#f59e0b', '#ef4444'] // Green, Yellow, Red
 
@@ -505,78 +506,60 @@ export default function SentimentAnalysis() {
             <div className="lpu-card p-6 bg-gray-50">
               <div className="grid md:grid-cols-4 gap-6">
                 {/* Evaluation Period Filter */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Evaluation Period
-                  </label>
-                  <select
-                    value={selectedPeriod || ''}
-                    onChange={(e) => setSelectedPeriod(e.target.value)}
-                    className="lpu-select w-full"
-                  >
-                    <option value="">Select Period</option>
-                    {evaluationPeriods.map((period) => (
-                      <option key={period.id} value={period.id}>
-                        {period.name} {period.status === 'Open' || period.status === 'active' || period.status === 'Active' ? '(Active)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <CustomDropdown
+                  label="Evaluation Period"
+                  value={selectedPeriod?.toString() || ''}
+                  onChange={(val) => setSelectedPeriod(val)}
+                  options={[
+                    { value: '', label: 'Select Period' },
+                    ...evaluationPeriods.map(period => ({
+                      value: period.id.toString(),
+                      label: `${period.name} ${period.status === 'Open' || period.status === 'active' || period.status === 'Active' ? '(Active)' : ''}`
+                    }))
+                  ]}
+                />
 
                 {/* Program Filter */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Academic Program
-                  </label>
-                  <select
-                    value={selectedProgram}
-                    onChange={(e) => setSelectedProgram(e.target.value)}
-                    className="lpu-select w-full"
-                  >
-                    <option value="all">All Programs</option>
-                    {programOptions.map(program => (
-                      <option key={program.id} value={program.id}>
-                        {program.code} - {program.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <CustomDropdown
+                  label="Academic Program"
+                  value={selectedProgram}
+                  onChange={(val) => setSelectedProgram(val)}
+                  options={[
+                    { value: 'all', label: 'All Programs' },
+                    ...programOptions.map(program => ({
+                      value: program.id.toString(),
+                      label: `${program.code} - ${program.name}`
+                    }))
+                  ]}
+                  searchable={programOptions.length > 5}
+                />
 
                 {/* Year Level Filter */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Year Level
-                  </label>
-                  <select
-                    value={selectedYearLevel}
-                    onChange={(e) => setSelectedYearLevel(e.target.value)}
-                    className="lpu-select w-full"
-                  >
-                    <option value="all">All Year Levels</option>
-                    {yearLevelOptions.map(yl => (
-                      <option key={yl.value} value={yl.value}>
-                        {yl.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <CustomDropdown
+                  label="Year Level"
+                  value={selectedYearLevel}
+                  onChange={(val) => setSelectedYearLevel(val)}
+                  options={[
+                    { value: 'all', label: 'All Year Levels' },
+                    ...yearLevelOptions.map(yl => ({
+                      value: yl.value,
+                      label: yl.label
+                    }))
+                  ]}
+                />
 
                 {/* Semester Filter */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Semester
-                  </label>
-                  <select
-                    value={selectedSemester}
-                    onChange={(e) => setSelectedSemester(e.target.value)}
-                    className="lpu-select w-full"
-                  >
-                    <option value="all">All Semesters</option>
-                    <option value="1">First Semester</option>
-                    <option value="2">Second Semester</option>
-                    <option value="3">Summer</option>
-                  </select>
-                </div>
+                <CustomDropdown
+                  label="Semester"
+                  value={selectedSemester}
+                  onChange={(val) => setSelectedSemester(val)}
+                  options={[
+                    { value: 'all', label: 'All Semesters' },
+                    { value: '1', label: 'First Semester' },
+                    { value: '2', label: 'Second Semester' },
+                    { value: '3', label: 'Summer' }
+                  ]}
+                />
               </div>
 
               <div className="mt-4 flex justify-end space-x-3">

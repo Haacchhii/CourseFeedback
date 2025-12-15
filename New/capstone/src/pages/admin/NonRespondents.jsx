@@ -3,6 +3,7 @@ import { adminAPI } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 import ActiveFilters from '../../components/ActiveFilters'
 import Pagination from '../../components/Pagination'
+import CustomDropdown from '../../components/CustomDropdown'
 import { Download, Search, Users, AlertCircle } from 'lucide-react'
 
 export default function NonRespondents() {
@@ -218,21 +219,18 @@ export default function NonRespondents() {
         <div className="lpu-card p-6 mb-6">
           <h3 className="text-lg font-semibold text-gray-700 mb-4">Filters</h3>
           <div className="grid md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Evaluation Period</label>
-              <select
-                value={selectedPeriod || ''}
-                onChange={(e) => setSelectedPeriod(e.target.value)}
-                className="lpu-select"
-              >
-                <option value="">Select Period</option>
-                {evaluationPeriods.map((period) => (
-                  <option key={period.id} value={period.id}>
-                    {period.name} {period.status === 'active' || period.status === 'Active' ? '(Active)' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <CustomDropdown
+              label="Evaluation Period"
+              value={selectedPeriod ? selectedPeriod.toString() : ''}
+              onChange={(val) => setSelectedPeriod(val)}
+              options={[
+                { value: '', label: 'Select Period' },
+                ...evaluationPeriods.map(period => ({
+                  value: period.id.toString(),
+                  label: `${period.name} ${period.status === 'active' || period.status === 'Active' ? '(Active)' : ''}`
+                }))
+              ]}
+            />
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
@@ -248,35 +246,32 @@ export default function NonRespondents() {
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Program</label>
-              <select
-                value={selectedProgram}
-                onChange={(e) => setSelectedProgram(e.target.value)}
-                className="lpu-select"
-              >
-                <option value="all">All Programs</option>
-                {programs.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.program_code} - {p.program_name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <CustomDropdown
+              label="Program"
+              value={selectedProgram}
+              onChange={(val) => setSelectedProgram(val)}
+              options={[
+                { value: 'all', label: 'All Programs' },
+                ...programs.map(p => ({
+                  value: p.id.toString(),
+                  label: `${p.program_code} - ${p.program_name}`
+                }))
+              ]}
+              searchable={true}
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Year Level</label>
-              <select
-                value={selectedYearLevel}
-                onChange={(e) => setSelectedYearLevel(e.target.value)}
-                className="lpu-select"
-              >
-                <option value="all">All Year Levels</option>
-                {yearLevels.map((y) => (
-                  <option key={y.value} value={y.value}>{y.label}</option>
-                ))}
-              </select>
-            </div>
+            <CustomDropdown
+              label="Year Level"
+              value={selectedYearLevel}
+              onChange={(val) => setSelectedYearLevel(val)}
+              options={[
+                { value: 'all', label: 'All Year Levels' },
+                ...yearLevels.map(y => ({
+                  value: y.value,
+                  label: y.label
+                }))
+              ]}
+            />
           </div>
         </div>
 
