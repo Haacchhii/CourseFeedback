@@ -1648,8 +1648,17 @@ async def get_non_respondents(
             
             evaluation_period_id = active_period.id
         
+        # Build dynamic filters to avoid PostgreSQL ambiguous parameter type errors
+        program_filter = ""
+        year_level_filter = ""
+        
+        if program_id is not None:
+            program_filter = "AND COALESCE(ps.program_id, s.program_id) = :program_id"
+        if year_level is not None:
+            year_level_filter = "AND s.year_level = :year_level"
+        
         # Build query for non-respondents
-        query = text("""
+        query = text(f"""
             WITH enrolled_students AS (
                 SELECT DISTINCT
                     s.id as student_id,
@@ -1668,8 +1677,8 @@ async def get_non_respondents(
                 LEFT JOIN programs p ON COALESCE(ps.program_id, s.program_id) = p.id
                 JOIN enrollments e ON s.id = e.student_id
                 WHERE u.is_active = true
-                    AND (:program_id IS NULL OR COALESCE(ps.program_id, s.program_id) = :program_id)
-                    AND (:year_level IS NULL OR s.year_level = :year_level)
+                    {program_filter}
+                    {year_level_filter}
                 GROUP BY s.id, s.student_number, u.first_name, u.last_name, 
                          s.year_level, p.program_code, ps.section_name, ps.id
             ),
@@ -1698,11 +1707,14 @@ async def get_non_respondents(
             ORDER BY pending_count DESC, es.student_number ASC
         """)
         
-        result = db.execute(query, {
-            "period_id": evaluation_period_id,
-            "program_id": program_id,
-            "year_level": year_level
-        }).fetchall()
+        # Build parameters - only include if not None
+        query_params = {"period_id": evaluation_period_id}
+        if program_id is not None:
+            query_params["program_id"] = program_id
+        if year_level is not None:
+            query_params["year_level"] = year_level
+        
+        result = db.execute(query, query_params).fetchall()
         
         # Get pending courses for each non-respondent
         non_respondents = []
@@ -1752,8 +1764,8 @@ async def get_non_respondents(
                 "total_courses": row.total_courses
             })
         
-        # Calculate statistics
-        total_query = text("""
+        # Calculate statistics - use same dynamic filters
+        total_query = text(f"""
             SELECT COUNT(DISTINCT s.id) as total
             FROM students s
             JOIN users u ON s.user_id = u.id
@@ -1761,14 +1773,18 @@ async def get_non_respondents(
             LEFT JOIN program_sections ps ON ss.section_id = ps.id
             JOIN enrollments e ON s.id = e.student_id
             WHERE u.is_active = true
-                AND (:program_id IS NULL OR COALESCE(ps.program_id, s.program_id) = :program_id)
-                AND (:year_level IS NULL OR s.year_level = :year_level)
+                {program_filter}
+                {year_level_filter}
         """)
         
-        total_students = db.execute(total_query, {
-            "program_id": program_id,
-            "year_level": year_level
-        }).scalar() or 0
+        # Build parameters for total query
+        total_params = {}
+        if program_id is not None:
+            total_params["program_id"] = program_id
+        if year_level is not None:
+            total_params["year_level"] = year_level
+        
+        total_students = db.execute(total_query, total_params).scalar() or 0
         
         non_responded = len(non_respondents)
         responded = total_students - non_responded

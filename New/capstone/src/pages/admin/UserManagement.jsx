@@ -9,6 +9,7 @@ import Pagination from '../../components/Pagination'
 import { useDebounce } from '../../hooks/useDebounce'
 import { transformPrograms, toDisplayCode } from '../../utils/programMapping'
 import { DeleteUserModal, DeleteResultModal, AlertModal, ConfirmModal } from '../../components/Modal'
+import CustomDropdown from '../../components/CustomDropdown'
 
 export default function UserManagement() {
   const navigate = useNavigate()
@@ -996,7 +997,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-card shadow-card p-6 mb-6">
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
           <div className="grid md:grid-cols-5 gap-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">🔍 Search</label>
@@ -1005,68 +1006,68 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                 placeholder="Search by name or email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-100 focus:border-[#7a0000] transition-all"
               />
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">🎯 Role</label>
-              <select
+              <CustomDropdown
+                options={[
+                  { value: 'all', label: 'All Roles' },
+                  { value: 'student', label: 'Student' },
+                  { value: 'instructor', label: 'Instructor' },
+                  { value: 'department_head', label: 'Department Head' },
+                  { value: 'secretary', label: 'Secretary' },
+                  { value: 'admin', label: 'Administrator' }
+                ]}
                 value={roleFilter}
-                onChange={(e) => setRoleFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-              >
-                <option value="all">All Roles</option>
-                <option value="student">Student</option>
-                <option value="instructor">Instructor</option>
-                <option value="department_head">Department Head</option>
-                <option value="secretary">Secretary</option>
-                <option value="admin">Administrator</option>
-              </select>
+                onChange={(value) => setRoleFilter(value)}
+                placeholder="All Roles"
+              />
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">📚 Program</label>
-              <select
+              <CustomDropdown
+                options={[
+                  { value: 'all', label: roleFilter === 'student' ? 'All Programs' : 'Select Student Role First' },
+                  ...(roleFilter === 'student' ? programs.map(prog => ({ value: prog, label: prog })) : [])
+                ]}
                 value={programFilter}
-                onChange={(e) => setProgramFilter(e.target.value)}
+                onChange={(value) => setProgramFilter(value)}
                 disabled={roleFilter !== 'student'}
-                className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent ${roleFilter !== 'student' ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''}`}
-              >
-                <option value="all">{roleFilter === 'student' ? 'All Programs' : 'Select Student Role First'}</option>
-                {roleFilter === 'student' && programs.map(prog => (
-                  <option key={prog} value={prog}>{prog}</option>
-                ))}
-              </select>
+                placeholder={roleFilter === 'student' ? 'All Programs' : 'Select Student Role First'}
+              />
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">⚡ Status</label>
-              <select
+              <CustomDropdown
+                options={[
+                  { value: 'all', label: 'All Status' },
+                  { value: 'Active', label: 'Active' },
+                  { value: 'Inactive', label: 'Inactive' }
+                ]}
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-              >
-                <option value="all">All Status</option>
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-              </select>
+                onChange={(value) => setStatusFilter(value)}
+                placeholder="All Status"
+              />
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">🎓 Year Level</label>
-              <select
+              <CustomDropdown
+                options={[
+                  { value: 'all', label: roleFilter === 'student' ? 'All Levels' : 'Select Student Role First' },
+                  ...(roleFilter === 'student' ? [
+                    { value: '1', label: '1st Year' },
+                    { value: '2', label: '2nd Year' },
+                    { value: '3', label: '3rd Year' },
+                    { value: '4', label: '4th Year' }
+                  ] : [])
+                ]}
                 value={yearLevelFilter}
-                onChange={(e) => setYearLevelFilter(e.target.value)}
+                onChange={(value) => setYearLevelFilter(value)}
                 disabled={roleFilter !== 'student'}
-                className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent ${roleFilter !== 'student' ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''}`}
-              >
-                <option value="all">{roleFilter === 'student' ? 'All Levels' : 'Select Student Role First'}</option>
-                {roleFilter === 'student' && (
-                  <>
-                    <option value="1">1st Year</option>
-                    <option value="2">2nd Year</option>
-                    <option value="3">3rd Year</option>
-                    <option value="4">4th Year</option>
-                  </>
-                )}
-              </select>
+                placeholder={roleFilter === 'student' ? 'All Levels' : 'Select Student Role First'}
+              />
             </div>
           </div>
         </div>
@@ -1222,13 +1223,18 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
 
       {/* Add User Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl">
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6 border-b-4 border-blue-800 flex-shrink-0">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl my-4">
+            <div className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] p-5 rounded-t-2xl flex-shrink-0">
               <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-white">➕ Add New User</h2>
-                <button onClick={() => setShowAddModal(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                  </svg>
+                  Add New User
+                </h2>
+                <button onClick={() => setShowAddModal(false)} className="w-8 h-8 flex items-center justify-center hover:bg-white/20 rounded-lg transition-colors">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
                   </svg>
                 </button>
@@ -1243,7 +1249,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-100 focus:border-[#7a0000] transition-all"
                   placeholder="Enter full name"
                 />
               </div>
@@ -1255,7 +1261,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-100 focus:border-[#7a0000] transition-all"
                   placeholder="user@lpubatangas.edu.ph"
                 />
               </div>
@@ -1272,7 +1278,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                       setEnrollmentLookupDone(false)
                       setEnrollmentInfo(null)
                     }}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
+                    className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-100 focus:border-[#7a0000] transition-all"
                     placeholder="e.g., 2022-00001"
                   />
                   {formData.role === 'student' && (
@@ -1378,17 +1384,17 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Role *</label>
-                <select
+                <CustomDropdown
+                  options={[
+                    { value: 'student', label: 'Student' },
+                    { value: 'instructor', label: 'Instructor' },
+                    { value: 'department_head', label: 'Department Head' },
+                    { value: 'secretary', label: 'Secretary' },
+                    { value: 'admin', label: 'Administrator' }
+                  ]}
                   value={formData.role}
-                  onChange={(e) => setFormData({...formData, role: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-                >
-                  <option value="student">Student</option>
-                  <option value="instructor">Instructor</option>
-                  <option value="department_head">Department Head</option>
-                  <option value="secretary">Secretary</option>
-                  <option value="admin">Administrator</option>
-                </select>
+                  onChange={(value) => setFormData({...formData, role: value})}
+                />
               </div>
 
               {formData.role === 'student' && (
@@ -1397,50 +1403,40 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Program * {enrollmentInfo && <span className="text-green-600 text-xs ml-2">🔒 Locked to enrollment</span>}
                     </label>
-                    <select
+                    <CustomDropdown
+                      options={programs.map(prog => ({ value: prog, label: prog }))}
                       value={formData.program}
-                      onChange={(e) => setFormData({...formData, program: e.target.value})}
+                      onChange={(value) => setFormData({...formData, program: value})}
                       disabled={enrollmentInfo !== null}
-                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent ${
-                        enrollmentInfo ? 'bg-gray-100 cursor-not-allowed border-gray-200' : 'border-gray-300'
-                      }`}
-                    >
-                      {programs.map(prog => (
-                        <option key={prog} value={prog}>{prog}</option>
-                      ))}
-                    </select>
-                    {enrollmentInfo && (
-                      <p className="text-xs text-gray-600 mt-1">
-                        ✅ Program is automatically set from enrollment list and cannot be changed
-                      </p>
-                    )}
+                      helpText={enrollmentInfo ? '✅ Program is automatically set from enrollment list and cannot be changed' : null}
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Year Level *</label>
-                    <select
+                    <CustomDropdown
+                      options={[
+                        { value: 1, label: '1st Year' },
+                        { value: 2, label: '2nd Year' },
+                        { value: 3, label: '3rd Year' },
+                        { value: 4, label: '4th Year' }
+                      ]}
                       value={formData.yearLevel}
-                      onChange={(e) => setFormData({...formData, yearLevel: parseInt(e.target.value)})}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-                    >
-                      <option value={1}>1st Year</option>
-                      <option value={2}>2nd Year</option>
-                      <option value={3}>3rd Year</option>
-                      <option value={4}>4th Year</option>
-                    </select>
+                      onChange={(value) => setFormData({...formData, yearLevel: parseInt(value)})}
+                    />
                   </div>
                 </>
               )}
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Status</label>
-                <select
+                <CustomDropdown
+                  options={[
+                    { value: 'Active', label: 'Active' },
+                    { value: 'Inactive', label: 'Inactive' }
+                  ]}
                   value={formData.status}
-                  onChange={(e) => setFormData({...formData, status: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-                >
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
-                </select>
+                  onChange={(value) => setFormData({...formData, status: value})}
+                />
               </div>
 
               <div className="flex space-x-4 pt-4">
@@ -1476,17 +1472,23 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
 
       {/* Edit User Modal */}
       {showEditModal && selectedUser && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-2xl w-full my-4 max-h-[85vh] flex flex-col shadow-2xl">
-            <div className="bg-gradient-to-r from-purple-600 to-purple-700 p-6 border-b-4 border-purple-800 flex-shrink-0">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-lg w-full my-4 max-h-[90vh] flex flex-col shadow-2xl">
+            <div className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] p-5 rounded-t-2xl flex-shrink-0">
               <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-white">✏️ Edit User: {`${selectedUser.first_name || ''} ${selectedUser.last_name || ''}`.trim() || selectedUser.email}</h2>
-                <button onClick={() => setShowEditModal(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  Edit User
+                </h2>
+                <button onClick={() => setShowEditModal(false)} className="w-8 h-8 flex items-center justify-center hover:bg-white/20 rounded-lg transition-colors">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
                   </svg>
                 </button>
               </div>
+              <p className="text-white/80 text-sm mt-1">{`${selectedUser.first_name || ''} ${selectedUser.last_name || ''}`.trim() || selectedUser.email}</p>
             </div>
             
             <form onSubmit={handleSubmitEdit} className="flex-1 overflow-y-auto p-6 space-y-4">
@@ -1497,7 +1499,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-100 focus:border-[#7a0000] transition-all"
                 />
               </div>
 
@@ -1507,52 +1509,48 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                   type="email"
                   value={formData.email}
                   disabled
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 cursor-not-allowed text-gray-500"
                 />
                 <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Role *</label>
-                <select
+                <CustomDropdown
+                  options={[
+                    { value: 'student', label: 'Student' },
+                    { value: 'instructor', label: 'Instructor' },
+                    { value: 'department_head', label: 'Department Head' },
+                    { value: 'secretary', label: 'Secretary' },
+                    { value: 'admin', label: 'Administrator' }
+                  ]}
                   value={formData.role}
-                  onChange={(e) => setFormData({...formData, role: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-                >
-                  <option value="student">Student</option>
-                  <option value="instructor">Instructor</option>
-                  <option value="department_head">Department Head</option>
-                  <option value="secretary">Secretary</option>
-                  <option value="admin">Administrator</option>
-                </select>
+                  onChange={(value) => setFormData({...formData, role: value})}
+                />
               </div>
 
               {formData.role === 'student' && (
                 <>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Program *</label>
-                    <select
+                    <CustomDropdown
+                      options={programs.map(prog => ({ value: prog, label: prog }))}
                       value={formData.program}
-                      onChange={(e) => setFormData({...formData, program: e.target.value})}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-                    >
-                      {programs.map(prog => (
-                        <option key={prog} value={prog}>{prog}</option>
-                      ))}
-                    </select>
+                      onChange={(value) => setFormData({...formData, program: value})}
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Year Level *</label>
-                    <select
+                    <CustomDropdown
+                      options={[
+                        { value: 1, label: '1st Year' },
+                        { value: 2, label: '2nd Year' },
+                        { value: 3, label: '3rd Year' },
+                        { value: 4, label: '4th Year' }
+                      ]}
                       value={formData.yearLevel}
-                      onChange={(e) => setFormData({...formData, yearLevel: parseInt(e.target.value)})}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-                    >
-                      <option value={1}>1st Year</option>
-                      <option value={2}>2nd Year</option>
-                      <option value={3}>3rd Year</option>
-                      <option value={4}>4th Year</option>
-                    </select>
+                      onChange={(value) => setFormData({...formData, yearLevel: parseInt(value)})}
+                    />
                   </div>
                 </>
               )}
@@ -1631,29 +1629,29 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
 
       {/* Bulk Import Modal */}
       {showBulkImportModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl">
-            <div className="bg-gradient-to-r from-yellow-600 to-amber-600 px-5 py-3 flex items-center justify-between flex-shrink-0 rounded-t-2xl">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
-                  <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl my-4">
+            <div className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] p-5 rounded-t-2xl flex-shrink-0">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
                   </svg>
-                </div>
-                <h2 className="text-lg font-bold text-white">Bulk Import Users</h2>
+                  Bulk Import Users
+                </h2>
+                <button onClick={() => setShowBulkImportModal(false)} className="w-8 h-8 flex items-center justify-center hover:bg-white/20 rounded-lg transition-colors">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
               </div>
-              <button onClick={() => setShowBulkImportModal(false)} className="text-white hover:text-gray-200 transition-colors">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-              </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
               {/* Download Template */}
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-10 h-10 bg-yellow-600 rounded-lg flex items-center justify-center flex-shrink-0">
+              <div className="bg-red-50 border-2 border-red-100 rounded-xl p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 bg-[#7a0000] rounded-xl flex items-center justify-center flex-shrink-0">
                     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                     </svg>
@@ -1666,7 +1664,7 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                 
                 <button
                   onClick={downloadCSVTemplate}
-                  className="w-full px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2 mb-2"
+                  className="w-full px-4 py-3 bg-gradient-to-r from-[#7a0000] to-[#9a1000] hover:from-[#9a1000] hover:to-[#7a0000] text-white rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 mb-3"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
@@ -1960,44 +1958,45 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
 
       {/* Reset Password Modal */}
       {showResetPasswordModal && resetPasswordUser && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full">
-            <div className="modal-header bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-t-xl">
-              <h3 className="text-xl font-bold">Reset password for {resetPasswordUser.first_name} {resetPasswordUser.last_name}</h3>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full">
+            <div className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white p-5 rounded-t-2xl">
+              <h3 className="text-lg font-bold">Reset Password</h3>
+              <p className="text-white/80 text-sm mt-1">{resetPasswordUser.first_name} {resetPasswordUser.last_name}</p>
             </div>
-            <div className="modal-body p-6 space-y-4">
+            <div className="p-5 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Enter new password (minimum 8 characters):
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  New Password (min. 8 characters)
                 </label>
                 <input
                   type="text"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent text-gray-900 dark:text-white"
-                  placeholder="changeme123"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-100 focus:border-[#7a0000] transition-all"
+                  placeholder="Enter new password"
                   autoFocus
                 />
               </div>
             </div>
-            <div className="modal-footer flex gap-3 p-6 bg-gray-50 dark:bg-gray-900 rounded-b-xl">
+            <div className="flex gap-3 p-5 pt-0">
               <button
                 onClick={() => {
                   setShowResetPasswordModal(false)
                   setNewPassword('')
                   setResetPasswordUser(null)
                 }}
-                className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg font-medium transition-all"
+                className="flex-1 px-4 py-3 border-2 border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl font-semibold transition-all"
                 disabled={submitting}
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmResetPassword}
-                className="flex-1 px-4 py-2 bg-gradient-to-r from-[#7a0000] to-[#9a1000] hover:from-[#9a1000] hover:to-[#7a0000] text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-[#7a0000] to-[#9a1000] hover:from-[#9a1000] hover:to-[#7a0000] text-white rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={submitting || !newPassword || newPassword.length < 8}
               >
-                {submitting ? 'Resetting...' : 'OK'}
+                {submitting ? 'Resetting...' : 'Reset Password'}
               </button>
             </div>
           </div>
@@ -2006,45 +2005,46 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
 
       {/* Bulk Password Reset Modal */}
       {showBulkPasswordModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full">
-            <div className="modal-header bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-t-xl">
-              <h3 className="text-xl font-bold">Reset Password for {selectedUsers.length} Users</h3>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full">
+            <div className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white p-5 rounded-t-2xl">
+              <h3 className="text-lg font-bold">Bulk Password Reset</h3>
+              <p className="text-white/80 text-sm mt-1">{selectedUsers.length} users selected</p>
             </div>
-            <div className="modal-body p-6 space-y-4">
+            <div className="p-5 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Enter new password (minimum 8 characters):
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  New Password (min. 8 characters)
                 </label>
                 <input
                   type="text"
                   value={bulkPassword}
                   onChange={(e) => setBulkPassword(e.target.value)}
-                  className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent text-gray-900 dark:text-white"
-                  placeholder="changeme123"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-100 focus:border-[#7a0000] transition-all"
+                  placeholder="Enter new password"
                   autoFocus
                 />
                 {bulkPassword && bulkPassword.length < 8 && (
-                  <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+                  <p className="mt-2 text-xs text-red-600">
                     Password must be at least 8 characters long
                   </p>
                 )}
               </div>
             </div>
-            <div className="modal-footer flex gap-3 p-6 bg-gray-50 dark:bg-gray-900 rounded-b-xl">
+            <div className="flex gap-3 p-5 pt-0">
               <button
                 onClick={() => {
                   setShowBulkPasswordModal(false)
                   setBulkPassword('')
                 }}
-                className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg font-medium transition-all"
+                className="flex-1 px-4 py-3 border-2 border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl font-semibold transition-all"
                 disabled={submitting}
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmBulkPasswordReset}
-                className="flex-1 px-4 py-2 bg-gradient-to-r from-[#7a0000] to-[#9a1000] hover:from-[#9a1000] hover:to-[#7a0000] text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-[#7a0000] to-[#9a1000] hover:from-[#9a1000] hover:to-[#7a0000] text-white rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 disabled={submitting || !bulkPassword || bulkPassword.length < 8}
               >
                 {submitting ? 'Resetting...' : 'Reset All'}

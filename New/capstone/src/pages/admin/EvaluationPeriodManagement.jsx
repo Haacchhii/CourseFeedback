@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { adminAPI } from '../../services/api'
 import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
 import { AlertModal, ConfirmModal } from '../../components/Modal'
+import CustomDropdown from '../../components/CustomDropdown'
 
 export default function EvaluationPeriodManagement() {
   const navigate = useNavigate()
@@ -1030,13 +1031,18 @@ export default function EvaluationPeriodManagement() {
 
       {/* Create Period Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl">
-            <div className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] p-6 border-b-4 border-[#5a0000] flex-shrink-0">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl my-4">
+            <div className="bg-gradient-to-r from-[#7a0000] to-[#9a1000] p-5 rounded-t-2xl flex-shrink-0">
               <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-white">📅 Create New Evaluation Period</h2>
-                <button onClick={() => setShowCreateModal(false)} className="w-10 h-10 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-lg transition-colors">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Create Evaluation Period
+                </h2>
+                <button onClick={() => setShowCreateModal(false)} className="w-8 h-8 flex items-center justify-center hover:bg-white/20 rounded-lg transition-colors">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
                   </svg>
                 </button>
@@ -1047,16 +1053,16 @@ export default function EvaluationPeriodManagement() {
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Semester *</label>
-                  <select
-                    required
+                  <CustomDropdown
+                    options={[
+                      { value: '1st Semester', label: '1st Semester' },
+                      { value: '2nd Semester', label: '2nd Semester' },
+                      { value: 'Summer', label: 'Summer' }
+                    ]}
                     value={formData.semester}
-                    onChange={(e) => setFormData({...formData, semester: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-                  >
-                    <option value="1st Semester">1st Semester</option>
-                    <option value="2nd Semester">2nd Semester</option>
-                    <option value="Summer">Summer</option>
-                  </select>
+                    onChange={(value) => setFormData({...formData, semester: value})}
+                    required
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Academic Year *</label>
@@ -1066,14 +1072,14 @@ export default function EvaluationPeriodManagement() {
                     pattern="\d{4}-\d{4}"
                     value={formData.academicYear}
                     onChange={(e) => setFormData({...formData, academicYear: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-100 focus:border-[#7a0000] transition-all"
                     placeholder="2025-2026"
                   />
                   <p className="text-xs text-gray-500 mt-1">Format: YYYY-YYYY (e.g., 2025-2026)</p>
                 </div>
               </div>
 
-              <div className="bg-[#7a0000]/5 border border-[#7a0000]/20 rounded-lg p-4">
+              <div className="bg-red-50 border-2 border-red-100 rounded-xl p-4">
                 <p className="text-sm font-semibold text-[#7a0000] mb-1">📝 Period Name Preview:</p>
                 <p className="text-lg font-bold text-[#7a0000]">{formData.semester} {formData.academicYear}</p>
                 <p className="text-xs text-[#7a0000]/70 mt-1">Name will be auto-generated from semester and academic year</p>
@@ -1088,7 +1094,7 @@ export default function EvaluationPeriodManagement() {
                     min={new Date().toISOString().split('T')[0]}
                     value={formData.startDate}
                     onChange={(e) => setFormData({...formData, startDate: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-100 focus:border-[#7a0000] transition-all"
                   />
                   <p className="text-xs text-gray-500 mt-1">⚠️ Cannot select past dates</p>
                 </div>

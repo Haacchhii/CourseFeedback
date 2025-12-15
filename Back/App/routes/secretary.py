@@ -2131,7 +2131,18 @@ async def get_non_respondents(
             })
         
         # Calculate statistics
-        total_query = text("""
+        # Build dynamic query to avoid PostgreSQL ambiguous parameter type errors
+        total_year_filter = ""
+        if year_level is not None:
+            total_year_filter = "AND s.year_level = :year_level"
+        
+        # Handle program filter for total count
+        if len(program_ids) > 1:
+            total_program_filter = f"AND COALESCE(ps.program_id, s.program_id) IN ({','.join(str(p) for p in program_ids)})"
+        else:
+            total_program_filter = "AND COALESCE(ps.program_id, s.program_id) = :program_id"
+        
+        total_query = text(f"""
             SELECT COUNT(DISTINCT s.id) as total
             FROM students s
             JOIN users u ON s.user_id = u.id
@@ -2139,14 +2150,18 @@ async def get_non_respondents(
             LEFT JOIN program_sections ps ON ss.section_id = ps.id
             JOIN enrollments e ON s.id = e.student_id
             WHERE u.is_active = true
-                AND COALESCE(ps.program_id, s.program_id) = :program_id
-                AND (:year_level IS NULL OR s.year_level = :year_level)
+                {total_program_filter}
+                {total_year_filter}
         """)
         
-        total_students = db.execute(total_query, {
-            "program_id": program_id,
-            "year_level": year_level
-        }).scalar() or 0
+        # Build parameters for total query
+        total_params = {}
+        if len(program_ids) == 1:
+            total_params["program_id"] = program_id
+        if year_level is not None:
+            total_params["year_level"] = year_level
+        
+        total_students = db.execute(total_query, total_params).scalar() or 0
         
         non_responded = len(non_respondents)
         responded = total_students - non_responded

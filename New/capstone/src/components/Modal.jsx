@@ -4,17 +4,25 @@ import { X, AlertTriangle, CheckCircle, Info, Trash2, UserX, AlertCircle } from 
 /**
  * Modern Modal Component System
  * Replaces ugly browser alert(), confirm(), and prompt() with beautiful UI
+ * Supports auto-sizing based on content
  */
 
-export const Modal = ({ isOpen, onClose, children, size = 'md' }) => {
+export const Modal = ({ isOpen, onClose, children, size = 'md', autoSize = false }) => {
   if (!isOpen) return null;
 
   const sizeClasses = {
-    sm: 'max-w-md',
-    md: 'max-w-lg',
-    lg: 'max-w-2xl',
-    xl: 'max-w-4xl'
+    xs: 'max-w-sm',      // 384px - for small alerts
+    sm: 'max-w-md',      // 448px - for confirmations
+    md: 'max-w-lg',      // 512px - default
+    lg: 'max-w-2xl',     // 672px - for forms
+    xl: 'max-w-4xl',     // 896px - for tables/complex content
+    '2xl': 'max-w-5xl',  // 1024px - for large tables
+    '3xl': 'max-w-6xl',  // 1152px - for full-width content
+    full: 'max-w-[95vw]' // Full width with margin
   };
+
+  // Auto-size: let content determine width, with a max limit
+  const widthClass = autoSize ? 'max-w-fit min-w-[320px]' : sizeClasses[size] || sizeClasses.md;
 
   return (
     <div 
@@ -24,15 +32,15 @@ export const Modal = ({ isOpen, onClose, children, size = 'md' }) => {
     >
       {/* Backdrop with fade-in animation */}
       <div 
-        className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm transition-opacity duration-300 ease-out"
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ease-out"
         onClick={onClose}
         aria-hidden="true"
       />
       
       {/* Modal Container - Centered */}
-      <div className="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+      <div className="flex min-h-full items-center justify-center p-4 text-center">
         <div 
-          className={`relative w-full ${sizeClasses[size]} transform overflow-hidden rounded-lg bg-white text-left shadow-2xl transition-all duration-300 ease-out sm:my-8 animate-modal-appear`}
+          className={`relative w-full ${widthClass} transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all duration-300 ease-out animate-modal-appear`}
           onClick={(e) => e.stopPropagation()}
           role="document"
         >
@@ -59,22 +67,37 @@ export const Modal = ({ isOpen, onClose, children, size = 'md' }) => {
   );
 };
 
-export const ModalHeader = ({ children, onClose, icon: Icon, iconColor = 'text-[#7a0000]' }) => {
+export const ModalHeader = ({ children, onClose, icon: Icon, iconColor = 'text-white', variant = 'default' }) => {
+  const variants = {
+    default: 'bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white',
+    danger: 'bg-gradient-to-r from-red-600 to-red-700 text-white',
+    warning: 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white',
+    success: 'bg-gradient-to-r from-green-600 to-green-700 text-white',
+    info: 'bg-gradient-to-r from-blue-600 to-blue-700 text-white',
+    light: 'bg-gradient-to-r from-gray-50 to-white text-gray-900 border-b border-gray-200'
+  };
+
+  const isLight = variant === 'light';
+  
   return (
-    <div className="relative bg-gradient-to-r from-gray-50 to-white border-b border-gray-200 px-6 py-4">
+    <div className={`relative px-6 py-4 rounded-t-2xl ${variants[variant] || variants.default}`}>
       <div className="flex items-center space-x-3">
         {Icon && (
-          <div className={`flex-shrink-0 ${iconColor}`}>
+          <div className={`flex-shrink-0 ${isLight ? iconColor : 'text-white/90'}`}>
             <Icon className="w-6 h-6" />
           </div>
         )}
-        <h3 className="text-xl font-bold text-gray-900">{children}</h3>
+        <h3 className={`text-xl font-bold ${isLight ? 'text-gray-900' : 'text-white'}`}>{children}</h3>
       </div>
       {onClose && (
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 rounded-md p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all"
+          className={`absolute top-4 right-4 rounded-lg p-1.5 transition-all
+            ${isLight 
+              ? 'text-gray-400 hover:text-gray-600 hover:bg-gray-100' 
+              : 'text-white/70 hover:text-white hover:bg-white/10'
+            }`}
           aria-label="Close"
         >
           <X className="w-5 h-5" />

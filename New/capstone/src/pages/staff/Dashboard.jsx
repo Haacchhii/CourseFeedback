@@ -9,6 +9,7 @@ import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/use
 import CompletionTracker from '../../components/staff/CompletionTracker'
 import CourseCompletionTable from '../../components/staff/CourseCompletionTable'
 import { transformPrograms } from '../../utils/programMapping'
+import CustomDropdown from '../../components/CustomDropdown'
 
 const SENTIMENT_COLORS = ['#10b981', '#f59e0b', '#ef4444'] // Green, Yellow, Red
 
@@ -340,31 +341,31 @@ export default function Dashboard() {
           </button>
 
           {showFilters && (
-            <div className="lpu-card p-6">
+            <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
               <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center">
                 <svg className="w-5 h-5 mr-2 text-[#7a0000]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
                 </svg>
                 Filter Dashboard Data
               </h3>
-              <div className="grid md:grid-cols-3 gap-4">
+              <div className="grid md:grid-cols-4 gap-4">
                 {/* Program Filter */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     📚 Academic Program
                   </label>
-                  <select
+                  <CustomDropdown
+                    options={[
+                      { value: 'all', label: 'All Programs' },
+                      ...programOptions.map((program) => ({
+                        value: program.id,
+                        label: `${program.program_code || program.code} - ${program.program_name || program.name}`
+                      }))
+                    ]}
                     value={selectedProgram}
-                    onChange={(e) => setSelectedProgram(e.target.value)}
-                    className="lpu-select"
-                  >
-                    <option value="all">All Programs</option>
-                    {programOptions.map((program) => (
-                      <option key={program.id} value={program.id}>
-                        {program.program_code || program.code} - {program.program_name || program.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(value) => setSelectedProgram(value)}
+                    placeholder="All Programs"
+                  />
                 </div>
 
                 {/* Evaluation Period Filter */}
@@ -372,18 +373,18 @@ export default function Dashboard() {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     📅 Evaluation Period
                   </label>
-                  <select
+                  <CustomDropdown
+                    options={[
+                      { value: '', label: 'Select Period' },
+                      ...evaluationPeriods.map((period) => ({
+                        value: period.id,
+                        label: `${period.name}${period.status === 'Open' || period.status === 'active' || period.status === 'Active' ? ' (Active)' : ''}`
+                      }))
+                    ]}
                     value={selectedPeriod || ''}
-                    onChange={(e) => setSelectedPeriod(e.target.value)}
-                    className="lpu-select"
-                  >
-                    <option value="">Select Period</option>
-                    {evaluationPeriods.map((period) => (
-                      <option key={period.id} value={period.id}>
-                        {period.name} {period.status === 'Open' || period.status === 'active' || period.status === 'Active' ? '(Active)' : ''}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(value) => setSelectedPeriod(value)}
+                    placeholder="Select Period"
+                  />
                 </div>
 
                 {/* Year Level Filter */}
@@ -391,18 +392,18 @@ export default function Dashboard() {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     🎓 Year Level
                   </label>
-                  <select
+                  <CustomDropdown
+                    options={[
+                      { value: 'all', label: 'All Year Levels' },
+                      ...yearLevelOptions.map((yl) => ({
+                        value: yl.value,
+                        label: yl.label
+                      }))
+                    ]}
                     value={selectedYearLevel}
-                    onChange={(e) => setSelectedYearLevel(e.target.value)}
-                    className="lpu-select"
-                  >
-                    <option value="all">All Year Levels</option>
-                    {yearLevelOptions.map((yl) => (
-                      <option key={yl.value} value={yl.value}>
-                        {yl.label}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(value) => setSelectedYearLevel(value)}
+                    placeholder="All Year Levels"
+                  />
                 </div>
 
                 {/* Semester Filter */}
@@ -410,16 +411,17 @@ export default function Dashboard() {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     📅 Semester
                   </label>
-                  <select
+                  <CustomDropdown
+                    options={[
+                      { value: 'all', label: 'All Semesters' },
+                      { value: '1', label: 'First Semester' },
+                      { value: '2', label: 'Second Semester' },
+                      { value: '3', label: 'Summer' }
+                    ]}
                     value={selectedSemester}
-                    onChange={(e) => setSelectedSemester(e.target.value)}
-                    className="lpu-select"
-                  >
-                    <option value="all">All Semesters</option>
-                    <option value="1">First Semester</option>
-                    <option value="2">Second Semester</option>
-                    <option value="3">Summer</option>
-                  </select>
+                    onChange={(value) => setSelectedSemester(value)}
+                    placeholder="All Semesters"
+                  />
                 </div>
               </div>
 
@@ -430,13 +432,13 @@ export default function Dashboard() {
                     setSelectedYearLevel('all')
                     setSelectedSemester('all')
                   }}
-                  className="lpu-btn-secondary"
+                  className="px-4 py-2 border-2 border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl font-semibold transition-all"
                 >
                   Reset Filters
                 </button>
                 <button
                   onClick={() => setShowFilters(false)}
-                  className="lpu-btn-primary"
+                  className="px-4 py-2 bg-gradient-to-r from-[#7a0000] to-[#9a1000] hover:from-[#9a1000] hover:to-[#7a0000] text-white rounded-xl font-semibold transition-all"
                 >
                   Apply Filters
                 </button>
