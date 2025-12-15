@@ -190,15 +190,23 @@ export default function UserManagement() {
 
   const handleEditUser = (user) => {
     setSelectedUser(user)
+    // API returns snake_case: year_level, is_active
+    const yearLevelValue = user.year_level || user.yearLevel || 1
+    const statusValue = user.is_active !== undefined 
+      ? (user.is_active ? 'Active' : 'Inactive') 
+      : (user.status || 'Active')
+    
+    console.log('Editing user:', user.email, 'year_level from API:', user.year_level, 'parsed:', yearLevelValue)
+    
     setFormData({
       name: `${user.first_name || ''} ${user.last_name || ''}`.trim(),
       email: user.email,
       role: user.role,
       program: user.program || 'BSIT',
-      yearLevel: user.yearLevel || 1,
+      yearLevel: yearLevelValue,
       department: user.department || '',
       assignedPrograms: user.assignedPrograms || [],
-      status: user.status || 'Active'
+      status: statusValue
     })
     setShowEditModal(true)
   }

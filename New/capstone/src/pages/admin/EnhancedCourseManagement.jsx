@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend } from 'recharts'
 import { isSystemAdmin } from '../../utils/roleUtils'
@@ -7,6 +7,95 @@ import { adminAPI } from '../../services/api'
 import { useApiWithTimeout, LoadingSpinner, ErrorDisplay } from '../../hooks/useApiWithTimeout'
 import Pagination from '../../components/Pagination'
 import { AlertModal, ConfirmModal } from '../../components/Modal'
+
+// Custom Dropdown Component for modern UI
+const CustomDropdown = ({ 
+  options, 
+  value, 
+  onChange, 
+  placeholder = 'Select...', 
+  disabled = false,
+  required = false,
+  icon = null
+}) => {
+  const [isOpen, setIsOpen] = useState(false)
+  const dropdownRef = useRef(null)
+  
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+  
+  const selectedOption = options.find(opt => opt.value === value)
+  
+  return (
+    <div ref={dropdownRef} className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`w-full px-4 py-3 text-left bg-white border-2 rounded-xl transition-all duration-200 flex items-center justify-between
+          ${disabled 
+            ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' 
+            : isOpen 
+              ? 'border-[#7a0000] ring-2 ring-red-100 shadow-lg' 
+              : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
+          }
+        `}
+      >
+        <span className={`flex items-center gap-2 ${selectedOption ? 'text-gray-900' : 'text-gray-400'}`}>
+          {icon && <span className="text-gray-400">{icon}</span>}
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <svg 
+          className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} 
+          fill="none" 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      
+      {isOpen && !disabled && (
+        <div className="absolute z-50 w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="max-h-60 overflow-y-auto">
+            {options.length === 0 ? (
+              <div className="px-4 py-3 text-gray-400 text-sm">No options available</div>
+            ) : (
+              options.map((option, index) => (
+                <button
+                  key={option.value || index}
+                  type="button"
+                  onClick={() => {
+                    onChange(option.value)
+                    setIsOpen(false)
+                  }}
+                  className={`w-full px-4 py-3 text-left hover:bg-red-50 transition-colors flex items-center gap-3 border-b border-gray-50 last:border-b-0
+                    ${value === option.value ? 'bg-red-50 text-[#7a0000] font-medium' : 'text-gray-700'}
+                  `}
+                >
+                  {value === option.value && (
+                    <svg className="w-4 h-4 text-[#7a0000] flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                  <span className={value === option.value ? '' : 'ml-7'}>{option.label}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function EnhancedCourseManagement() {
   const navigate = useNavigate()
@@ -3420,77 +3509,81 @@ student2@example.com,IT-PROG1-2024,email,
               </div>
 
               {/* Form */}
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">Program *</label>
-                  <select
-                    required
+                  <CustomDropdown
+                    options={[
+                      { value: '', label: 'Select program...' },
+                      ...(apiData?.programs?.map(program => ({
+                        value: program.id,
+                        label: `${program.code} - ${program.name}`
+                      })) || [])
+                    ]}
                     value={quickBulkFormData.program_id}
-                    onChange={(e) => handleQuickBulkFormChange('program_id', e.target.value)}
-                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-red-500"
-                  >
-                    <option value="">Select program...</option>
-                    {apiData?.programs?.map(program => (
-                      <option key={program.id} value={program.id}>{program.code} - {program.name}</option>
-                    ))}
-                  </select>
+                    onChange={(value) => handleQuickBulkFormChange('program_id', value)}
+                    placeholder="Select program..."
+                    required
+                  />
                 </div>
 
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">Year Level *</label>
-                  <select
-                    required
+                  <CustomDropdown
+                    options={[
+                      { value: '', label: 'Select year...' },
+                      { value: '1', label: '1st Year' },
+                      { value: '2', label: '2nd Year' },
+                      { value: '3', label: '3rd Year' },
+                      { value: '4', label: '4th Year' }
+                    ]}
                     value={quickBulkFormData.year_level}
-                    onChange={(e) => handleQuickBulkFormChange('year_level', e.target.value)}
-                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-red-500"
-                  >
-                    <option value="">Select year...</option>
-                    <option value="1">1st Year</option>
-                    <option value="2">2nd Year</option>
-                    <option value="3">3rd Year</option>
-                    <option value="4">4th Year</option>
-                  </select>
+                    onChange={(value) => handleQuickBulkFormChange('year_level', value)}
+                    placeholder="Select year..."
+                    required
+                  />
                 </div>
 
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">Semester *</label>
-                  <select
-                    required
+                  <CustomDropdown
+                    options={[
+                      { value: '', label: 'Select semester...' },
+                      { value: '1', label: '1st Semester' },
+                      { value: '2', label: '2nd Semester' },
+                      { value: '3', label: 'Summer' }
+                    ]}
                     value={quickBulkFormData.semester}
-                    onChange={(e) => handleQuickBulkFormChange('semester', e.target.value)}
-                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-red-500"
-                  >
-                    <option value="">Select semester...</option>
-                    <option value="1">1st Semester</option>
-                    <option value="2">2nd Semester</option>
-                    <option value="3">Summer</option>
-                  </select>
+                    onChange={(value) => handleQuickBulkFormChange('semester', value)}
+                    placeholder="Select semester..."
+                    required
+                  />
                 </div>
 
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">Program Section *</label>
-                  <select
-                    required
+                  <CustomDropdown
+                    options={[
+                      { value: '', label: !quickBulkFormData.program_id ? 'Select program first...' : 'Select program section...' },
+                      ...availableProgramSectionsForBulk.map(section => {
+                        const name = section.sectionName || section.section_name || 'Unnamed'
+                        const prog = section.programCode || section.program_code || ''
+                        const year = section.yearLevel || section.year_level || ''
+                        const sem = section.semester || ''
+                        const count = section.studentCount || 0
+                        return {
+                          value: section.id,
+                          label: `${name} - ${prog} (Yr ${year}, Sem ${sem}) • ${count} students`
+                        }
+                      })
+                    ]}
                     value={quickBulkFormData.program_section_id}
-                    onChange={(e) => handleQuickBulkFormChange('program_section_id', e.target.value)}
-                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-red-500"
+                    onChange={(value) => handleQuickBulkFormChange('program_section_id', value)}
+                    placeholder={!quickBulkFormData.program_id ? 'Select program first...' : 'Select program section...'}
                     disabled={!quickBulkFormData.program_id}
-                  >
-                    <option value="">{!quickBulkFormData.program_id ? 'Select program first...' : 'Select program section...'}</option>
-                    {availableProgramSectionsForBulk.map(section => {
-                      const name = section.sectionName || section.section_name || 'Unnamed'
-                      const prog = section.programCode || section.program_code || ''
-                      const year = section.yearLevel || section.year_level || ''
-                      const sem = section.semester || ''
-                      const count = section.studentCount || 0
-                      return (
-                        <option key={section.id} value={section.id}>
-                          {name} - {prog} (Yr {year}, Sem {sem}) • {count} students
-                        </option>
-                      )
-                    })}
-                  </select>
-                  <p className="text-xs text-gray-500 mt-1">
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-2">
                     {availableProgramSectionsForBulk.length === 0 && quickBulkFormData.program_id 
                       ? 'No program sections found for selected criteria'
                       : 'Class sections will be created for this student group'}
