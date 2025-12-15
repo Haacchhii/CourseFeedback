@@ -810,15 +810,37 @@ export default function EnhancedCourseManagement() {
   // Section Management Functions
   const loadSections = async () => {
     try {
+      // Get all non-archived period IDs for filtering when "All Periods" is selected
+      const nonArchivedPeriodIds = evaluationPeriods
+        .filter(p => !isArchivedPeriod(p.status))
+        .map(p => p.id)
+      
+      // Determine the period filter to send to backend
+      let periodFilter = undefined
+      if (sectionPeriodFilter !== 'all') {
+        periodFilter = parseInt(sectionPeriodFilter)
+      }
+      // Note: When 'all' is selected, we'll filter out archived period sections client-side
+      
       const response = await adminAPI.getSections({
         search: sectionSearchTerm || undefined,
         program_code: sectionProgramFilter !== 'all' ? sectionProgramFilter : undefined,
         program_section_id: sectionProgramSectionFilter !== 'all' && sectionProgramSectionFilter ? parseInt(sectionProgramSectionFilter) : undefined,
         year_level: sectionYearFilter !== 'all' ? parseInt(sectionYearFilter) : undefined,
         semester: sectionSemesterFilter !== 'all' ? parseInt(sectionSemesterFilter) : undefined,
-        period_id: sectionPeriodFilter !== 'all' ? parseInt(sectionPeriodFilter) : undefined
+        period_id: periodFilter
       })
-      setSections(response?.data || [])
+      
+      let sections = response?.data || []
+      
+      // If "All Periods" is selected, filter out sections from archived periods
+      if (sectionPeriodFilter === 'all' && nonArchivedPeriodIds.length > 0) {
+        sections = sections.filter(s => 
+          !s.evaluation_period_id || nonArchivedPeriodIds.includes(s.evaluation_period_id)
+        )
+      }
+      
+      setSections(sections)
     } catch (err) {
       console.error('Error loading sections:', err)
       setSections([]) // Clear sections on error
