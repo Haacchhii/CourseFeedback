@@ -1677,31 +1677,26 @@ student2@example.com,IT-PROG1-2024,email,
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">📚 Program</label>
-                  <select
-                    value={programFilter}
-                    onChange={(e) => setProgramFilter(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-                  >
-                    <option value="all">All Programs</option>
-                    {programs.map(prog => (
-                      <option key={prog} value={prog}>{prog}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">⚡ Status</label>
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-                  >
-                    <option value="all">All Status</option>
-                    <option value="Active">Active</option>
-                    <option value="Archived">Archived</option>
-                  </select>
-                </div>
+                <CustomDropdown
+                  label="📚 Program"
+                  value={programFilter}
+                  onChange={(val) => setProgramFilter(val)}
+                  options={[
+                    { value: 'all', label: 'All Programs' },
+                    ...programs.map(prog => ({ value: prog, label: prog }))
+                  ]}
+                  searchable
+                />
+                <CustomDropdown
+                  label="⚡ Status"
+                  value={statusFilter}
+                  onChange={(val) => setStatusFilter(val)}
+                  options={[
+                    { value: 'all', label: 'All Status' },
+                    { value: 'Active', label: 'Active' },
+                    { value: 'Archived', label: 'Archived' }
+                  ]}
+                />
               </div>
             </div>
 
@@ -1881,101 +1876,95 @@ student2@example.com,IT-PROG1-2024,email,
                 className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-red-500"
               />
               
-              <select
+              <CustomDropdown
+                label="Period"
                 value={sectionPeriodFilter}
-                onChange={(e) => setSectionPeriodFilter(e.target.value)}
-                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-yellow-500"
-                title="Filter sections by evaluation period"
-              >
-                <option value="all">All Periods</option>
-                {/* Show non-archived periods first */}
-                {evaluationPeriods
-                  .filter(period => !isArchivedPeriod(period.status))
-                  .map(period => (
-                    <option key={period.id} value={period.id}>
-                      {period.name} ({isActivePeriod(period.status) ? '🟢 Active' : period.status === 'draft' ? '📝 Draft' : '🔴 Closed'})
-                    </option>
-                  ))}
-                {/* Show archived periods in a separate section if any exist */}
-                {evaluationPeriods.some(period => isArchivedPeriod(period.status)) && (
-                  <option disabled>── Archived Periods ──</option>
-                )}
-                {evaluationPeriods
-                  .filter(period => isArchivedPeriod(period.status))
-                  .map(period => (
-                    <option key={period.id} value={period.id}>
-                      {period.name} (📦 Archived)
-                    </option>
-                  ))}
-              </select>
+                onChange={(val) => setSectionPeriodFilter(val)}
+                options={[
+                  { value: 'all', label: 'All Periods' },
+                  ...evaluationPeriods
+                    .filter(period => !isArchivedPeriod(period.status))
+                    .map(period => ({
+                      value: period.id,
+                      label: `${period.name} (${isActivePeriod(period.status) ? '🟢 Active' : period.status === 'draft' ? '📝 Draft' : '🔴 Closed'})`
+                    })),
+                  ...evaluationPeriods
+                    .filter(period => isArchivedPeriod(period.status))
+                    .map(period => ({
+                      value: period.id,
+                      label: `${period.name} (📦 Archived)`
+                    }))
+                ]}
+                searchable
+              />
               
-              <select
+              <CustomDropdown
+                label="Program"
                 value={sectionProgramFilter}
-                onChange={(e) => {
-                  setSectionProgramFilter(e.target.value)
-                  setSectionProgramSectionFilter('all') // Reset program section when program changes
+                onChange={(val) => {
+                  setSectionProgramFilter(val)
+                  setSectionProgramSectionFilter('all')
                 }}
-                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-red-500"
-              >
-                <option value="all">All Programs</option>
-                {apiData?.programs && apiData.programs.map(prog => (
-                  <option key={prog.id} value={prog.code}>{prog.code}</option>
-                ))}
-              </select>
+                options={[
+                  { value: 'all', label: 'All Programs' },
+                  ...(apiData?.programs || []).map(prog => ({ value: prog.code, label: prog.code }))
+                ]}
+                searchable
+              />
               
-              <select
+              <CustomDropdown
+                label="Section"
                 value={sectionProgramSectionFilter}
-                onChange={(e) => setSectionProgramSectionFilter(e.target.value)}
-                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-red-500"
+                onChange={(val) => setSectionProgramSectionFilter(val)}
                 disabled={sectionProgramFilter === 'all'}
-                title={sectionProgramFilter === 'all' ? 'Please select a program first' : 'Filter by program section'}
-              >
-                <option value="all">{sectionProgramFilter === 'all' ? 'Select a program first...' : 'All Sections'}</option>
-                {sectionProgramFilter !== 'all' && programSections
-                  .filter(ps => {
-                    const psProgram = ps.programCode || ps.program_code || ps.programName || ps.program_name || ''
-                    return psProgram.toLowerCase().includes(sectionProgramFilter.toLowerCase())
-                  })
-                  .map(ps => {
-                    // Handle both camelCase and snake_case field names
-                    const name = ps.sectionName || ps.section_name || ps.name || 'Unnamed Section'
-                    const prog = ps.programCode || ps.program_code || ps.programName || ps.program_name || ''
-                    const year = ps.yearLevel || ps.year_level || ps.year || ''
-                    const sem = ps.semester || ''
-                    const schoolYear = ps.schoolYear || ps.school_year || ''
-                    
-                    // Only show if we have meaningful data
-                    if (!name || name === 'Unnamed Section') return null
-                    
-                    return (
-                      <option key={ps.id} value={ps.id}>
-                        {name} {prog ? `- ${prog}` : ''} {year ? `(Yr ${year}` : '(Yr ?'}{sem ? `, Sem ${sem}` : ''}{schoolYear ? `, ${schoolYear}` : ''})</option>
-                    )
-                  }).filter(Boolean)}
-              </select>
+                options={[
+                  { value: 'all', label: sectionProgramFilter === 'all' ? 'Select a program first...' : 'All Sections' },
+                  ...(sectionProgramFilter !== 'all' ? programSections
+                    .filter(ps => {
+                      const psProgram = ps.programCode || ps.program_code || ps.programName || ps.program_name || ''
+                      return psProgram.toLowerCase().includes(sectionProgramFilter.toLowerCase())
+                    })
+                    .map(ps => {
+                      const name = ps.sectionName || ps.section_name || ps.name || 'Unnamed Section'
+                      const prog = ps.programCode || ps.program_code || ps.programName || ps.program_name || ''
+                      const year = ps.yearLevel || ps.year_level || ps.year || ''
+                      const sem = ps.semester || ''
+                      const schoolYear = ps.schoolYear || ps.school_year || ''
+                      if (!name || name === 'Unnamed Section') return null
+                      return {
+                        value: ps.id,
+                        label: `${name} ${prog ? `- ${prog}` : ''} ${year ? `(Yr ${year}` : '(Yr ?'}${sem ? `, Sem ${sem}` : ''}${schoolYear ? `, ${schoolYear}` : ''})`
+                      }
+                    })
+                    .filter(Boolean) : [])
+                ]}
+                searchable
+              />
 
-              <select
+              <CustomDropdown
+                label="Year Level"
                 value={sectionYearFilter}
-                onChange={(e) => setSectionYearFilter(e.target.value)}
-                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-red-500"
-              >
-                <option value="all">All Year Levels</option>
-                <option value="1">1st Year</option>
-                <option value="2">2nd Year</option>
-                <option value="3">3rd Year</option>
-                <option value="4">4th Year</option>
-              </select>
+                onChange={(val) => setSectionYearFilter(val)}
+                options={[
+                  { value: 'all', label: 'All Year Levels' },
+                  { value: '1', label: '1st Year' },
+                  { value: '2', label: '2nd Year' },
+                  { value: '3', label: '3rd Year' },
+                  { value: '4', label: '4th Year' }
+                ]}
+              />
 
-              <select
+              <CustomDropdown
+                label="Semester"
                 value={sectionSemesterFilter}
-                onChange={(e) => setSectionSemesterFilter(e.target.value)}
-                className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-red-500"
-              >
-                <option value="all">All Semesters</option>
-                <option value="1">First Semester</option>
-                <option value="2">Second Semester</option>
-                <option value="3">Summer</option>
-              </select>
+                onChange={(val) => setSectionSemesterFilter(val)}
+                options={[
+                  { value: 'all', label: 'All Semesters' },
+                  { value: '1', label: 'First Semester' },
+                  { value: '2', label: 'Second Semester' },
+                  { value: '3', label: 'Summer' }
+                ]}
+              />
 
               <div className="text-sm text-gray-600 flex items-center justify-center">
                 <div className="text-center">
@@ -2180,63 +2169,52 @@ student2@example.com,IT-PROG1-2024,email,
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Instructor *</label>
-                <select
-                  value={formData.instructor}
-                  onChange={(e) => setFormData({...formData, instructor: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-                >
-                  <option value="">Select Instructor</option>
-                  {instructors.map(inst => (
-                    <option key={inst.id} value={`${inst.first_name} ${inst.last_name}`}>
-                      {inst.first_name} {inst.last_name}
-                    </option>
-                  ))}
-                </select>
+              <CustomDropdown
+                label="Instructor *"
+                value={formData.instructor}
+                onChange={(val) => setFormData({...formData, instructor: val})}
+                options={[
+                  { value: '', label: 'Select Instructor' },
+                  ...instructors.map(inst => ({
+                    value: `${inst.first_name} ${inst.last_name}`,
+                    label: `${inst.first_name} ${inst.last_name}`
+                  }))
+                ]}
+                searchable
+              />
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <CustomDropdown
+                  label="Program *"
+                  value={formData.program}
+                  onChange={(val) => setFormData({...formData, program: val})}
+                  options={programs.map(prog => ({ value: prog, label: prog }))}
+                  searchable
+                />
+                <CustomDropdown
+                  label="Year Level *"
+                  value={formData.yearLevel}
+                  onChange={(val) => setFormData({...formData, yearLevel: parseInt(val)})}
+                  options={[
+                    { value: 1, label: '1st Year' },
+                    { value: 2, label: '2nd Year' },
+                    { value: 3, label: '3rd Year' },
+                    { value: 4, label: '4th Year' }
+                  ]}
+                />
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Program *</label>
-                  <select
-                    value={formData.program}
-                    onChange={(e) => setFormData({...formData, program: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-                  >
-                    {programs.map(prog => (
-                      <option key={prog} value={prog}>{prog}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Year Level *</label>
-                  <select
-                    value={formData.yearLevel}
-                    onChange={(e) => setFormData({...formData, yearLevel: parseInt(e.target.value)})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-                  >
-                    <option value={1}>1st Year</option>
-                    <option value={2}>2nd Year</option>
-                    <option value={3}>3rd Year</option>
-                    <option value={4}>4th Year</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Semester *</label>
-                  <select
-                    value={formData.semester}
-                    onChange={(e) => setFormData({...formData, semester: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-                  >
-                    <option value="First Semester">First Semester</option>
-                    <option value="Second Semester">Second Semester</option>
-                    <option value="Summer">Summer</option>
-                  </select>
-                </div>
+                <CustomDropdown
+                  label="Semester *"
+                  value={formData.semester}
+                  onChange={(val) => setFormData({...formData, semester: val})}
+                  options={[
+                    { value: 'First Semester', label: 'First Semester' },
+                    { value: 'Second Semester', label: 'Second Semester' },
+                    { value: 'Summer', label: 'Summer' }
+                  ]}
+                />
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Academic Year *</label>
                   <input
@@ -2320,63 +2298,52 @@ student2@example.com,IT-PROG1-2024,email,
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Instructor *</label>
-                <select
-                  value={formData.instructor}
-                  onChange={(e) => setFormData({...formData, instructor: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-                >
-                  <option value="">Select Instructor</option>
-                  {instructors.map(inst => (
-                    <option key={inst.id} value={`${inst.first_name} ${inst.last_name}`}>
-                      {inst.first_name} {inst.last_name}
-                    </option>
-                  ))}
-                </select>
+              <CustomDropdown
+                label="Instructor *"
+                value={formData.instructor}
+                onChange={(val) => setFormData({...formData, instructor: val})}
+                options={[
+                  { value: '', label: 'Select Instructor' },
+                  ...instructors.map(inst => ({
+                    value: `${inst.first_name} ${inst.last_name}`,
+                    label: `${inst.first_name} ${inst.last_name}`
+                  }))
+                ]}
+                searchable
+              />
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <CustomDropdown
+                  label="Program *"
+                  value={formData.program}
+                  onChange={(val) => setFormData({...formData, program: val})}
+                  options={programs.map(prog => ({ value: prog, label: prog }))}
+                  searchable
+                />
+                <CustomDropdown
+                  label="Year Level *"
+                  value={formData.yearLevel}
+                  onChange={(val) => setFormData({...formData, yearLevel: parseInt(val)})}
+                  options={[
+                    { value: 1, label: '1st Year' },
+                    { value: 2, label: '2nd Year' },
+                    { value: 3, label: '3rd Year' },
+                    { value: 4, label: '4th Year' }
+                  ]}
+                />
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Program *</label>
-                  <select
-                    value={formData.program}
-                    onChange={(e) => setFormData({...formData, program: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-                  >
-                    {programs.map(prog => (
-                      <option key={prog} value={prog}>{prog}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Year Level *</label>
-                  <select
-                    value={formData.yearLevel}
-                    onChange={(e) => setFormData({...formData, yearLevel: parseInt(e.target.value)})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-                  >
-                    <option value={1}>1st Year</option>
-                    <option value={2}>2nd Year</option>
-                    <option value={3}>3rd Year</option>
-                    <option value={4}>4th Year</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Semester *</label>
-                  <select
-                    value={formData.semester}
-                    onChange={(e) => setFormData({...formData, semester: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-                  >
-                    <option value="First Semester">First Semester</option>
-                    <option value="Second Semester">Second Semester</option>
-                    <option value="Summer">Summer</option>
-                  </select>
-                </div>
+                <CustomDropdown
+                  label="Semester *"
+                  value={formData.semester}
+                  onChange={(val) => setFormData({...formData, semester: val})}
+                  options={[
+                    { value: 'First Semester', label: 'First Semester' },
+                    { value: 'Second Semester', label: 'Second Semester' },
+                    { value: 'Summer', label: 'Summer' }
+                  ]}
+                />
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Academic Year *</label>
                   <input
@@ -2402,17 +2369,15 @@ student2@example.com,IT-PROG1-2024,email,
                     min="0"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Status *</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({...formData, status: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Archived">Archived</option>
-                  </select>
-                </div>
+                <CustomDropdown
+                  label="Status *"
+                  value={formData.status}
+                  onChange={(val) => setFormData({...formData, status: val})}
+                  options={[
+                    { value: 'Active', label: 'Active' },
+                    { value: 'Archived', label: 'Archived' }
+                  ]}
+                />
               </div>
 
               <div className="flex space-x-4 pt-4">
@@ -2571,21 +2536,19 @@ student2@example.com,IT-PROG1-2024,email,
                 <p className="text-sm text-red-900">Assigning instructor to <strong>{selectedCourses.length} course(s)</strong></p>
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Select Instructor *</label>
-                <select
-                  value={formData.instructor}
-                  onChange={(e) => setFormData({...formData, instructor: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-transparent"
-                >
-                  <option value="">Choose instructor...</option>
-                  {instructors.map(inst => (
-                    <option key={inst.id} value={`${inst.first_name} ${inst.last_name}`}>
-                      {inst.first_name} {inst.last_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <CustomDropdown
+                label="Select Instructor *"
+                value={formData.instructor}
+                onChange={(val) => setFormData({...formData, instructor: val})}
+                options={[
+                  { value: '', label: 'Choose instructor...' },
+                  ...instructors.map(inst => ({
+                    value: `${inst.first_name} ${inst.last_name}`,
+                    label: `${inst.first_name} ${inst.last_name}`
+                  }))
+                ]}
+                searchable
+              />
 
               <div className="flex space-x-4 pt-4">
                 <button
@@ -2794,23 +2757,19 @@ student2@example.com,IT-PROG1-2024,email,
                 </div>
               ) : (
                 <>
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                      Select Program Section *
-                    </label>
-                    <select
-                      value={selectedProgramSectionId}
-                      onChange={(e) => setSelectedProgramSectionId(e.target.value)}
-                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000] focus:border-yellow-500"
-                    >
-                      <option value="">Choose a program section...</option>
-                      {programSections.map(section => (
-                        <option key={section.id} value={section.id}>
-                          {section.sectionName} - {section.programCode} Year {section.yearLevel} Sem {section.semester} ({section.schoolYear}) - {section.studentCount} students
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <CustomDropdown
+                    label="Select Program Section *"
+                    value={selectedProgramSectionId}
+                    onChange={(val) => setSelectedProgramSectionId(val)}
+                    options={[
+                      { value: '', label: 'Choose a program section...' },
+                      ...programSections.map(section => ({
+                        value: section.id,
+                        label: `${section.sectionName} - ${section.programCode} Year ${section.yearLevel} Sem ${section.semester} (${section.schoolYear}) - ${section.studentCount} students`
+                      }))
+                    ]}
+                    searchable
+                  />
 
                   {selectedProgramSectionId && (
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
@@ -2883,115 +2842,100 @@ student2@example.com,IT-PROG1-2024,email,
 
             <form onSubmit={handleCreateSection} className="p-6 space-y-4">
               {/* Program Selection - First */}
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Program *</label>
-                <select
-                  required
-                  value={sectionFormData.program_id}
-                  onChange={(e) => {
-                    const newProgramId = e.target.value
-                    setSectionFormData({ 
-                      ...sectionFormData, 
-                      program_id: newProgramId,
-                      year_level: '', // Reset dependent fields
-                      semester: '',
-                      course_id: ''
-                    })
-                  }}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-yellow-500"
-                >
-                  <option value="">Select a program</option>
-                  {apiData?.programs && apiData.programs.map(program => (
-                    <option key={program.id} value={program.id}>
-                      {program.code} - {program.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <CustomDropdown
+                label="Program *"
+                value={sectionFormData.program_id}
+                onChange={(val) => {
+                  setSectionFormData({ 
+                    ...sectionFormData, 
+                    program_id: val,
+                    year_level: '',
+                    semester: '',
+                    course_id: ''
+                  })
+                }}
+                options={[
+                  { value: '', label: 'Select a program' },
+                  ...(apiData?.programs || []).map(program => ({
+                    value: program.id,
+                    label: `${program.code} - ${program.name}`
+                  }))
+                ]}
+                searchable
+              />
 
               {/* Year Level Selection - Second */}
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Year Level *</label>
-                <select
-                  required
-                  disabled={!sectionFormData.program_id}
-                  value={sectionFormData.year_level}
-                  onChange={(e) => {
-                    const newYearLevel = e.target.value
-                    setSectionFormData({ 
-                      ...sectionFormData, 
-                      year_level: newYearLevel,
-                      semester: '', // Reset dependent fields
-                      course_id: ''
-                    })
-                  }}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-yellow-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                >
-                  <option value="">Select year level</option>
-                  <option value="1">1st Year</option>
-                  <option value="2">2nd Year</option>
-                  <option value="3">3rd Year</option>
-                  <option value="4">4th Year</option>
-                </select>
-                {!sectionFormData.program_id && (
-                  <p className="text-xs text-gray-500 mt-1">Select a program first</p>
-                )}
-              </div>
+              <CustomDropdown
+                label="Year Level *"
+                value={sectionFormData.year_level}
+                onChange={(val) => {
+                  setSectionFormData({ 
+                    ...sectionFormData, 
+                    year_level: val,
+                    semester: '',
+                    course_id: ''
+                  })
+                }}
+                disabled={!sectionFormData.program_id}
+                options={[
+                  { value: '', label: 'Select year level' },
+                  { value: '1', label: '1st Year' },
+                  { value: '2', label: '2nd Year' },
+                  { value: '3', label: '3rd Year' },
+                  { value: '4', label: '4th Year' }
+                ]}
+              />
+              {!sectionFormData.program_id && (
+                <p className="text-xs text-gray-500 mt-1">Select a program first</p>
+              )}
 
               {/* Semester Selection - Third */}
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Semester *</label>
-                <select
-                  required
-                  disabled={!sectionFormData.year_level}
-                  value={sectionFormData.semester}
-                  onChange={(e) => {
-                    const newSemester = e.target.value
-                    setSectionFormData({ 
-                      ...sectionFormData, 
-                      semester: newSemester,
-                      course_id: '' // Reset course selection
-                    })
-                  }}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-yellow-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                >
-                  <option value="">Select semester</option>
-                  <option value="1">First Semester</option>
-                  <option value="2">Second Semester</option>
-                  <option value="3">Summer</option>
-                </select>
-                {!sectionFormData.year_level && (
-                  <p className="text-xs text-gray-500 mt-1">Select year level first</p>
-                )}
-              </div>
+              <CustomDropdown
+                label="Semester *"
+                value={sectionFormData.semester}
+                onChange={(val) => {
+                  setSectionFormData({ 
+                    ...sectionFormData, 
+                    semester: val,
+                    course_id: ''
+                  })
+                }}
+                disabled={!sectionFormData.year_level}
+                options={[
+                  { value: '', label: 'Select semester' },
+                  { value: '1', label: 'First Semester' },
+                  { value: '2', label: 'Second Semester' },
+                  { value: '3', label: 'Summer' }
+                ]}
+              />
+              {!sectionFormData.year_level && (
+                <p className="text-xs text-gray-500 mt-1">Select year level first</p>
+              )}
 
               {/* Course Selection - Fourth (filtered) */}
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Course *</label>
-                <select
-                  required
-                  disabled={!sectionFormData.semester}
-                  value={sectionFormData.course_id}
-                  onChange={(e) => setSectionFormData({ ...sectionFormData, course_id: parseInt(e.target.value) })}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-yellow-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                >
-                  <option value="">Select a course</option>
-                  {filteredCoursesForSection.length === 0 && sectionFormData.semester && (
-                    <option value="" disabled>No courses available for selected criteria</option>
-                  )}
-                  {filteredCoursesForSection.map(course => (
-                    <option key={course.id} value={course.id}>
-                      {course.course_code || course.classCode} - {course.course_name || course.name}
-                    </option>
-                  ))}
-                </select>
-                {!sectionFormData.semester && (
-                  <p className="text-xs text-gray-500 mt-1">Select semester first</p>
-                )}
-                {sectionFormData.semester && filteredCoursesForSection.length === 0 && (
-                  <p className="text-xs text-amber-600 mt-1">⚠️ No courses found for the selected program, year level, and semester</p>
-                )}
-              </div>
+              <CustomDropdown
+                label="Course *"
+                value={sectionFormData.course_id}
+                onChange={(val) => setSectionFormData({ ...sectionFormData, course_id: parseInt(val) })}
+                disabled={!sectionFormData.semester}
+                options={[
+                  { value: '', label: 'Select a course' },
+                  ...(filteredCoursesForSection.length === 0 && sectionFormData.semester
+                    ? [{ value: '', label: 'No courses available for selected criteria', disabled: true }]
+                    : filteredCoursesForSection.map(course => ({
+                        value: course.id,
+                        label: `${course.course_code || course.classCode} - ${course.course_name || course.name}`
+                      }))
+                  )
+                ]}
+                searchable
+              />
+              {!sectionFormData.semester && (
+                <p className="text-xs text-gray-500 mt-1">Select semester first</p>
+              )}
+              {sectionFormData.semester && filteredCoursesForSection.length === 0 && (
+                <p className="text-xs text-amber-600 mt-1">⚠️ No courses found for the selected program, year level, and semester</p>
+              )}
 
               {/* Section Code */}
               <div>

@@ -65,7 +65,7 @@ const CustomDropdown = ({
   }
   
   return (
-    <div ref={dropdownRef} className={`relative ${className}`}>
+    <div ref={dropdownRef} className={`relative min-w-0 ${className}`} style={{ overflow: 'visible' }}>
       {label && (
         <label className="block text-sm font-semibold text-gray-700 mb-2">
           {label}
@@ -103,8 +103,8 @@ const CustomDropdown = ({
       </button>
       
       {isOpen && !disabled && (
-        <div className="absolute z-50 w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden"
-          style={{ animation: 'dropdownFadeIn 0.15s ease-out' }}
+        <div className="absolute z-50 min-w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden left-0"
+          style={{ animation: 'dropdownFadeIn 0.15s ease-out', minWidth: 'max-content' }}
         >
           {/* Search input for searchable dropdowns */}
           {searchable && (
@@ -131,7 +131,7 @@ const CustomDropdown = ({
                   key={option.value ?? index}
                   type="button"
                   onClick={() => handleSelect(option.value)}
-                  className={`w-full px-4 py-3 text-left hover:bg-red-50 transition-colors flex items-center gap-3 border-b border-gray-50 last:border-b-0
+                  className={`w-full px-4 py-3 text-left hover:bg-red-50 transition-colors flex items-center gap-3 border-b border-gray-50 last:border-b-0 whitespace-nowrap
                     ${String(value) === String(option.value) ? 'bg-red-50 text-[#7a0000] font-medium' : 'text-gray-700'}
                   `}
                 >

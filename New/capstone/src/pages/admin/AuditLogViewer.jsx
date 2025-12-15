@@ -6,6 +6,7 @@ import { adminAPI } from '../../services/api'
 import Pagination from '../../components/Pagination'
 import { useDebounce } from '../../hooks/useDebounce'
 import { AlertModal } from '../../components/Modal'
+import CustomDropdown from '../../components/CustomDropdown'
 
 export default function AuditLogViewer() {
   const navigate = useNavigate()
@@ -409,167 +410,133 @@ export default function AuditLogViewer() {
                 placeholder="Search by user, action, IP, or details..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-100 focus:border-[#7a0000] transition-all"
               />
             </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">⚡ Action Type</label>
-              <select
-                value={actionFilter}
-                onChange={(e) => setActionFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-              >
-                <option value="all">All Actions</option>
-                <optgroup label="Authentication">
-                  <option value="LOGIN">LOGIN</option>
-                  <option value="LOGOUT">LOGOUT</option>
-                  <option value="LOGIN_FAILED">LOGIN_FAILED</option>
-                  <option value="PASSWORD_RESET">PASSWORD_RESET</option>
-                  <option value="PASSWORD_CHANGED">PASSWORD_CHANGED</option>
-                </optgroup>
-                <optgroup label="User Management">
-                  <option value="CREATE_USER">CREATE_USER</option>
-                  <option value="UPDATE_USER">UPDATE_USER</option>
-                  <option value="DELETE_USER">DELETE_USER</option>
-                  <option value="USER_ROLE_CHANGED">USER_ROLE_CHANGED</option>
-                  <option value="USER_ACTIVATED">USER_ACTIVATED</option>
-                  <option value="USER_DEACTIVATED">USER_DEACTIVATED</option>
-                </optgroup>
-                <optgroup label="Course Management">
-                  <option value="CREATE_COURSE">CREATE_COURSE</option>
-                  <option value="UPDATE_COURSE">UPDATE_COURSE</option>
-                  <option value="COURSE_UPDATED">COURSE_UPDATED</option>
-                  <option value="DELETE_COURSE">DELETE_COURSE</option>
-                  <option value="COURSE_ARCHIVED">COURSE_ARCHIVED</option>
-                  <option value="COURSE_RESTORED">COURSE_RESTORED</option>
-                </optgroup>
-                <optgroup label="Section Management">
-                  <option value="CREATE_SECTION">CREATE_SECTION</option>
-                  <option value="UPDATE_SECTION">UPDATE_SECTION</option>
-                  <option value="SECTION_UPDATED">SECTION_UPDATED</option>
-                  <option value="DELETE_SECTION">DELETE_SECTION</option>
-                  <option value="SECTION_DELETED">SECTION_DELETED</option>
-                </optgroup>
-                <optgroup label="Enrollment">
-                  <option value="ENROLL_STUDENT">ENROLL_STUDENT</option>
-                  <option value="DROP_STUDENT">DROP_STUDENT</option>
-                  <option value="REMOVE_STUDENT_FROM_SECTION">REMOVE_STUDENT_FROM_SECTION</option>
-                  <option value="BULK_ENROLLMENT">BULK_ENROLLMENT</option>
-                </optgroup>
-                <optgroup label="Questionnaire & Evaluation">
-                  <option value="QUESTIONNAIRE_SUBMITTED">QUESTIONNAIRE_SUBMITTED</option>
-                  <option value="QUESTIONNAIRE_UPDATED">QUESTIONNAIRE_UPDATED</option>
-                  <option value="EVALUATION_SUBMITTED">EVALUATION_SUBMITTED</option>
-                  <option value="EVALUATION_GRADED">EVALUATION_GRADED</option>
-                </optgroup>
-                <optgroup label="Period Management">
-                  <option value="CREATE_PERIOD">CREATE_PERIOD</option>
-                  <option value="UPDATE_PERIOD">UPDATE_PERIOD</option>
-                  <option value="DELETE_PERIOD">DELETE_PERIOD</option>
-                  <option value="PERIOD_ACTIVATED">PERIOD_ACTIVATED</option>
-                  <option value="PERIOD_CLOSED">PERIOD_CLOSED</option>
-                </optgroup>
-                <optgroup label="Data Export">
-                  <option value="EXPORT_USERS">EXPORT_USERS</option>
-                  <option value="EXPORT_COURSES">EXPORT_COURSES</option>
-                  <option value="EXPORT_SECTIONS">EXPORT_SECTIONS</option>
-                  <option value="EXPORT_EVALUATIONS">EXPORT_EVALUATIONS</option>
-                  <option value="EXPORT_AUDIT_LOGS">EXPORT_AUDIT_LOGS</option>
-                </optgroup>
-                <optgroup label="System">
-                  <option value="SYSTEM_CONFIG_CHANGE">SYSTEM_CONFIG_CHANGE</option>
-                  <option value="SETTINGS_UPDATED">SETTINGS_UPDATED</option>
-                  <option value="BACKUP_CREATED">BACKUP_CREATED</option>
-                </optgroup>
-              </select>
-            </div>
+            <CustomDropdown
+              label="⚡ Action Type"
+              value={actionFilter}
+              onChange={(val) => setActionFilter(val)}
+              searchable
+              options={[
+                { value: 'all', label: 'All Actions' },
+                { value: 'LOGIN', label: '🔐 LOGIN' },
+                { value: 'LOGOUT', label: '🔐 LOGOUT' },
+                { value: 'LOGIN_FAILED', label: '🔐 LOGIN_FAILED' },
+                { value: 'PASSWORD_RESET', label: '🔐 PASSWORD_RESET' },
+                { value: 'PASSWORD_CHANGED', label: '🔐 PASSWORD_CHANGED' },
+                { value: 'CREATE_USER', label: '👤 CREATE_USER' },
+                { value: 'UPDATE_USER', label: '👤 UPDATE_USER' },
+                { value: 'DELETE_USER', label: '👤 DELETE_USER' },
+                { value: 'USER_ROLE_CHANGED', label: '👤 USER_ROLE_CHANGED' },
+                { value: 'USER_ACTIVATED', label: '👤 USER_ACTIVATED' },
+                { value: 'USER_DEACTIVATED', label: '👤 USER_DEACTIVATED' },
+                { value: 'CREATE_COURSE', label: '📚 CREATE_COURSE' },
+                { value: 'UPDATE_COURSE', label: '📚 UPDATE_COURSE' },
+                { value: 'COURSE_UPDATED', label: '📚 COURSE_UPDATED' },
+                { value: 'DELETE_COURSE', label: '📚 DELETE_COURSE' },
+                { value: 'COURSE_ARCHIVED', label: '📚 COURSE_ARCHIVED' },
+                { value: 'COURSE_RESTORED', label: '📚 COURSE_RESTORED' },
+                { value: 'CREATE_SECTION', label: '📋 CREATE_SECTION' },
+                { value: 'UPDATE_SECTION', label: '📋 UPDATE_SECTION' },
+                { value: 'SECTION_UPDATED', label: '📋 SECTION_UPDATED' },
+                { value: 'DELETE_SECTION', label: '📋 DELETE_SECTION' },
+                { value: 'SECTION_DELETED', label: '📋 SECTION_DELETED' },
+                { value: 'ENROLL_STUDENT', label: '🎓 ENROLL_STUDENT' },
+                { value: 'DROP_STUDENT', label: '🎓 DROP_STUDENT' },
+                { value: 'REMOVE_STUDENT_FROM_SECTION', label: '🎓 REMOVE_STUDENT' },
+                { value: 'BULK_ENROLLMENT', label: '🎓 BULK_ENROLLMENT' },
+                { value: 'QUESTIONNAIRE_SUBMITTED', label: '📝 QUESTIONNAIRE_SUBMITTED' },
+                { value: 'QUESTIONNAIRE_UPDATED', label: '📝 QUESTIONNAIRE_UPDATED' },
+                { value: 'EVALUATION_SUBMITTED', label: '📝 EVALUATION_SUBMITTED' },
+                { value: 'EVALUATION_GRADED', label: '📝 EVALUATION_GRADED' },
+                { value: 'CREATE_PERIOD', label: '📅 CREATE_PERIOD' },
+                { value: 'UPDATE_PERIOD', label: '📅 UPDATE_PERIOD' },
+                { value: 'DELETE_PERIOD', label: '📅 DELETE_PERIOD' },
+                { value: 'PERIOD_ACTIVATED', label: '📅 PERIOD_ACTIVATED' },
+                { value: 'PERIOD_CLOSED', label: '📅 PERIOD_CLOSED' },
+                { value: 'EXPORT_USERS', label: '📤 EXPORT_USERS' },
+                { value: 'EXPORT_COURSES', label: '📤 EXPORT_COURSES' },
+                { value: 'EXPORT_SECTIONS', label: '📤 EXPORT_SECTIONS' },
+                { value: 'EXPORT_EVALUATIONS', label: '📤 EXPORT_EVALUATIONS' },
+                { value: 'EXPORT_AUDIT_LOGS', label: '📤 EXPORT_AUDIT_LOGS' },
+                { value: 'SYSTEM_CONFIG_CHANGE', label: '⚙️ SYSTEM_CONFIG_CHANGE' },
+                { value: 'SETTINGS_UPDATED', label: '⚙️ SETTINGS_UPDATED' },
+                { value: 'BACKUP_CREATED', label: '⚙️ BACKUP_CREATED' }
+              ]}
+            />
           </div>
 
           {/* Row 2: Category and Status */}
           <div className="grid md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">📂 Category</label>
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-              >
-                <option value="all">All Categories</option>
-                <option value="Authentication">Authentication</option>
-                <option value="User Management">User Management</option>
-                <option value="Course Management">Course Management</option>
-                <option value="Section Management">Section Management</option>
-                <option value="Enrollment">Enrollment</option>
-                <option value="Questionnaire">Questionnaire</option>
-                <option value="Evaluation">Evaluation</option>
-                <option value="Period Management">Period Management</option>
-                <option value="Data Export">Data Export</option>
-                <option value="System Configuration">System Configuration</option>
-                <option value="Program Management">Program Management</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">✓ Status</label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-              >
-                <option value="all">All Statuses</option>
-                <option value="Success">✅ Success</option>
-                <option value="Failed">❌ Failed</option>
-                <option value="Blocked">🚫 Blocked</option>
-                <option value="Pending">⏳ Pending</option>
-              </select>
-            </div>
+            <CustomDropdown
+              label="📂 Category"
+              value={categoryFilter}
+              onChange={(val) => setCategoryFilter(val)}
+              options={[
+                { value: 'all', label: 'All Categories' },
+                { value: 'Authentication', label: 'Authentication' },
+                { value: 'User Management', label: 'User Management' },
+                { value: 'Course Management', label: 'Course Management' },
+                { value: 'Section Management', label: 'Section Management' },
+                { value: 'Enrollment', label: 'Enrollment' },
+                { value: 'Questionnaire', label: 'Questionnaire' },
+                { value: 'Evaluation', label: 'Evaluation' },
+                { value: 'Period Management', label: 'Period Management' },
+                { value: 'Data Export', label: 'Data Export' },
+                { value: 'System Configuration', label: 'System Configuration' },
+                { value: 'Program Management', label: 'Program Management' }
+              ]}
+            />
+            <CustomDropdown
+              label="✓ Status"
+              value={statusFilter}
+              onChange={(val) => setStatusFilter(val)}
+              options={[
+                { value: 'all', label: 'All Statuses' },
+                { value: 'Success', label: '✅ Success' },
+                { value: 'Failed', label: '❌ Failed' },
+                { value: 'Blocked', label: '🚫 Blocked' },
+                { value: 'Pending', label: '⏳ Pending' }
+              ]}
+            />
           </div>
 
           {/* Row 3: User and Date Range */}
           <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">👤 User / Role</label>
-              <select
-                value={userFilter}
-                onChange={(e) => setUserFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-              >
-                <option value="all">All Users</option>
-                <optgroup label="By Role">
-                  <option value="System">🖥️ System</option>
-                  <option value="Admin">👨‍💼 Admin</option>
-                  <option value="Instructor">👩‍🏫 Instructor</option>
-                  <option value="Student">🎓 Student</option>
-                  <option value="Secretary">📋 Secretary</option>
-                  <option value="Department Head">🎯 Department Head</option>
-                </optgroup>
-                {users.length > 0 && (
-                  <optgroup label="Specific Users">
-                    {users.map(user => (
-                      <option key={user} value={user}>{user}</option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">📅 Date Range</label>
-              <select
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-              >
-                <option value="all">All Time</option>
-                <option value="today">Today</option>
-                <option value="yesterday">Yesterday</option>
-                <option value="week">Last 7 Days</option>
-                <option value="2weeks">Last 14 Days</option>
-                <option value="month">Last 30 Days</option>
-                <option value="3months">Last 3 Months</option>
-                <option value="6months">Last 6 Months</option>
-                <option value="year">Last Year</option>
-                <option value="custom">Custom Range</option>
-              </select>
-            </div>
+            <CustomDropdown
+              label="👤 User / Role"
+              value={userFilter}
+              onChange={(val) => setUserFilter(val)}
+              searchable={users.length > 5}
+              options={[
+                { value: 'all', label: 'All Users' },
+                { value: 'System', label: '🖥️ System' },
+                { value: 'Admin', label: '👨‍💼 Admin' },
+                { value: 'Instructor', label: '👩‍🏫 Instructor' },
+                { value: 'Student', label: '🎓 Student' },
+                { value: 'Secretary', label: '📋 Secretary' },
+                { value: 'Department Head', label: '🎯 Department Head' },
+                ...users.map(user => ({ value: user, label: user }))
+              ]}
+            />
+            <CustomDropdown
+              label="📅 Date Range"
+              value={dateFilter}
+              onChange={(val) => setDateFilter(val)}
+              options={[
+                { value: 'all', label: 'All Time' },
+                { value: 'today', label: 'Today' },
+                { value: 'yesterday', label: 'Yesterday' },
+                { value: 'week', label: 'Last 7 Days' },
+                { value: '2weeks', label: 'Last 14 Days' },
+                { value: 'month', label: 'Last 30 Days' },
+                { value: '3months', label: 'Last 3 Months' },
+                { value: '6months', label: 'Last 6 Months' },
+                { value: 'year', label: 'Last Year' },
+                { value: 'custom', label: 'Custom Range' }
+              ]}
+            />
           </div>
 
           {/* Custom Date Range */}

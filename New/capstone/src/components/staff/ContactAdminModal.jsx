@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { adminAPI, secretaryAPI, deptHeadAPI } from '../../services/api';
+import CustomDropdown from '../CustomDropdown';
 
 const ContactAdminModal = ({ isOpen, onClose, prefilledCourse = null, prefilledStudent = null }) => {
   const { user } = useAuth();
@@ -125,25 +126,16 @@ const ContactAdminModal = ({ isOpen, onClose, prefilledCourse = null, prefilledS
         {/* Form Content */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {/* Issue Type */}
-          <div>
-            <label htmlFor="issueType" className="block text-sm font-medium text-gray-700 mb-2">
-              Issue Type *
-            </label>
-            <select
-              id="issueType"
-              name="issueType"
-              value={formData.issueType}
-              onChange={handleInputChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-              disabled={isSubmitting}
-            >
-              {issueTypes.map(type => (
-                <option key={type.value} value={type.value}>
-                  {type.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          <CustomDropdown
+            label="Issue Type *"
+            value={formData.issueType}
+            onChange={(val) => setFormData(prev => ({ ...prev, issueType: val }))}
+            disabled={isSubmitting}
+            options={issueTypes.map(type => ({
+              value: type.value,
+              label: type.label
+            }))}
+          />
 
           {/* Course Information (Optional) */}
           <div className="grid md:grid-cols-2 gap-4">

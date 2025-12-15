@@ -6,6 +6,7 @@ import { adminAPI } from '../../services/api'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { AlertModal } from '../../components/Modal'
+import CustomDropdown from '../../components/CustomDropdown'
 
 export default function DataExportCenter() {
   const navigate = useNavigate()
@@ -840,19 +841,19 @@ export default function DataExportCenter() {
               {/* Date Range */}
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Date Range</h3>
-                <select
+                <CustomDropdown
                   value={dateRange}
-                  onChange={(e) => setDateRange(e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                >
-                  <option value="all">All Time</option>
-                  <option value="today">Today</option>
-                  <option value="week">Last 7 Days</option>
-                  <option value="month">Last 30 Days</option>
-                  <option value="semester">Current Semester</option>
-                  <option value="year">Academic Year</option>
-                  <option value="custom">Custom Range</option>
-                </select>
+                  onChange={(val) => setDateRange(val)}
+                  options={[
+                    { value: 'all', label: 'All Time' },
+                    { value: 'today', label: 'Today' },
+                    { value: 'week', label: 'Last 7 Days' },
+                    { value: 'month', label: 'Last 30 Days' },
+                    { value: 'semester', label: 'Current Semester' },
+                    { value: 'year', label: 'Academic Year' },
+                    { value: 'custom', label: 'Custom Range' }
+                  ]}
+                />
               </div>
 
               {/* Format */}
@@ -1007,45 +1008,38 @@ export default function DataExportCenter() {
                     User Filters
                   </h3>
                   <div className="grid md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
-                      <select
-                        value={exportFilters.userRole}
-                        onChange={(e) => setExportFilters({...exportFilters, userRole: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000]"
-                      >
-                        <option value="all">All Roles</option>
-                        <option value="student">Students</option>
-                        <option value="secretary">Secretaries</option>
-                        <option value="department_head">Department Heads</option>
-                        <option value="admin">Admins</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Program</label>
-                      <select
-                        value={exportFilters.userProgram}
-                        onChange={(e) => setExportFilters({...exportFilters, userProgram: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000]"
-                      >
-                        <option value="all">All Programs</option>
-                        {programs.map(prog => (
-                          <option key={prog.id} value={prog.code}>{prog.code} - {prog.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                      <select
-                        value={exportFilters.userStatus}
-                        onChange={(e) => setExportFilters({...exportFilters, userStatus: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000]"
-                      >
-                        <option value="all">All Status</option>
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                      </select>
-                    </div>
+                    <CustomDropdown
+                      label="Role"
+                      value={exportFilters.userRole}
+                      onChange={(val) => setExportFilters({...exportFilters, userRole: val})}
+                      options={[
+                        { value: 'all', label: 'All Roles' },
+                        { value: 'student', label: 'Students' },
+                        { value: 'secretary', label: 'Secretaries' },
+                        { value: 'department_head', label: 'Department Heads' },
+                        { value: 'admin', label: 'Admins' }
+                      ]}
+                    />
+                    <CustomDropdown
+                      label="Program"
+                      value={exportFilters.userProgram}
+                      onChange={(val) => setExportFilters({...exportFilters, userProgram: val})}
+                      searchable={programs.length > 5}
+                      options={[
+                        { value: 'all', label: 'All Programs' },
+                        ...programs.map(prog => ({ value: prog.code, label: `${prog.code} - ${prog.name}` }))
+                      ]}
+                    />
+                    <CustomDropdown
+                      label="Status"
+                      value={exportFilters.userStatus}
+                      onChange={(val) => setExportFilters({...exportFilters, userStatus: val})}
+                      options={[
+                        { value: 'all', label: 'All Status' },
+                        { value: 'active', label: 'Active' },
+                        { value: 'inactive', label: 'Inactive' }
+                      ]}
+                    />
                   </div>
                 </div>
               )}
@@ -1059,48 +1053,41 @@ export default function DataExportCenter() {
                     Evaluation Filters
                   </h3>
                   <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
-                      <select
-                        value={exportFilters.evalDateRange}
-                        onChange={(e) => setExportFilters({...exportFilters, evalDateRange: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000]"
-                      >
-                        <option value="all">All Time</option>
-                        <option value="current_semester">Current Semester</option>
-                        <option value="last_semester">Last Semester</option>
-                        <option value="current_year">Current Year</option>
-                        <option value="last_30_days">Last 30 Days</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Program</label>
-                      <select
-                        value={exportFilters.evalProgram}
-                        onChange={(e) => setExportFilters({...exportFilters, evalProgram: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000]"
-                      >
-                        <option value="all">All Programs</option>
-                        {programs.map(prog => (
-                          <option key={prog.id} value={prog.code}>{prog.code} - {prog.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Evaluation Period</label>
-                      <select
-                        value={exportFilters.evalPeriod}
-                        onChange={(e) => setExportFilters({...exportFilters, evalPeriod: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000]"
-                      >
-                        <option value="all">All Periods</option>
-                        {evaluationPeriods.map(period => (
-                          <option key={period.id} value={period.id}>
-                            {period.name} ({period.academic_year}, {period.semester === 1 ? 'First' : period.semester === 2 ? 'Second' : 'Summer'} Semester) - {period.status}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    <CustomDropdown
+                      label="Date Range"
+                      value={exportFilters.evalDateRange}
+                      onChange={(val) => setExportFilters({...exportFilters, evalDateRange: val})}
+                      options={[
+                        { value: 'all', label: 'All Time' },
+                        { value: 'current_semester', label: 'Current Semester' },
+                        { value: 'last_semester', label: 'Last Semester' },
+                        { value: 'current_year', label: 'Current Year' },
+                        { value: 'last_30_days', label: 'Last 30 Days' }
+                      ]}
+                    />
+                    <CustomDropdown
+                      label="Program"
+                      value={exportFilters.evalProgram}
+                      onChange={(val) => setExportFilters({...exportFilters, evalProgram: val})}
+                      searchable={programs.length > 5}
+                      options={[
+                        { value: 'all', label: 'All Programs' },
+                        ...programs.map(prog => ({ value: prog.code, label: `${prog.code} - ${prog.name}` }))
+                      ]}
+                    />
+                    <CustomDropdown
+                      label="Evaluation Period"
+                      value={exportFilters.evalPeriod}
+                      onChange={(val) => setExportFilters({...exportFilters, evalPeriod: val})}
+                      searchable={evaluationPeriods.length > 5}
+                      options={[
+                        { value: 'all', label: 'All Periods' },
+                        ...evaluationPeriods.map(period => ({
+                          value: period.id,
+                          label: `${period.name} (${period.academic_year}, ${period.semester === 1 ? 'First' : period.semester === 2 ? 'Second' : 'Summer'} Semester) - ${period.status}`
+                        }))
+                      ]}
+                    />
                   </div>
                 </div>
               )}
@@ -1114,45 +1101,38 @@ export default function DataExportCenter() {
                     Course Filters
                   </h3>
                   <div className="grid md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Program</label>
-                      <select
-                        value={exportFilters.courseProgram}
-                        onChange={(e) => setExportFilters({...exportFilters, courseProgram: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000]"
-                      >
-                        <option value="all">All Programs</option>
-                        {programs.map(prog => (
-                          <option key={prog.id} value={prog.code}>{prog.code} - {prog.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                      <select
-                        value={exportFilters.courseStatus}
-                        onChange={(e) => setExportFilters({...exportFilters, courseStatus: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000]"
-                      >
-                        <option value="all">All Status</option>
-                        <option value="Active">Active</option>
-                        <option value="Archived">Archived</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Year Level</label>
-                      <select
-                        value={exportFilters.courseYearLevel}
-                        onChange={(e) => setExportFilters({...exportFilters, courseYearLevel: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000]"
-                      >
-                        <option value="all">All Years</option>
-                        <option value="1">1st Year</option>
-                        <option value="2">2nd Year</option>
-                        <option value="3">3rd Year</option>
-                        <option value="4">4th Year</option>
-                      </select>
-                    </div>
+                    <CustomDropdown
+                      label="Program"
+                      value={exportFilters.courseProgram}
+                      onChange={(val) => setExportFilters({...exportFilters, courseProgram: val})}
+                      searchable={programs.length > 5}
+                      options={[
+                        { value: 'all', label: 'All Programs' },
+                        ...programs.map(prog => ({ value: prog.code, label: `${prog.code} - ${prog.name}` }))
+                      ]}
+                    />
+                    <CustomDropdown
+                      label="Status"
+                      value={exportFilters.courseStatus}
+                      onChange={(val) => setExportFilters({...exportFilters, courseStatus: val})}
+                      options={[
+                        { value: 'all', label: 'All Status' },
+                        { value: 'Active', label: 'Active' },
+                        { value: 'Archived', label: 'Archived' }
+                      ]}
+                    />
+                    <CustomDropdown
+                      label="Year Level"
+                      value={exportFilters.courseYearLevel}
+                      onChange={(val) => setExportFilters({...exportFilters, courseYearLevel: val})}
+                      options={[
+                        { value: 'all', label: 'All Years' },
+                        { value: '1', label: '1st Year' },
+                        { value: '2', label: '2nd Year' },
+                        { value: '3', label: '3rd Year' },
+                        { value: '4', label: '4th Year' }
+                      ]}
+                    />
                   </div>
                 </div>
               )}
@@ -1166,79 +1146,62 @@ export default function DataExportCenter() {
                     Audit Log Filters
                   </h3>
                   <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
-                      <select
-                        value={exportFilters.auditDateRange}
-                        onChange={(e) => setExportFilters({...exportFilters, auditDateRange: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000]"
-                      >
-                        <option value="all">All Time</option>
-                        <option value="today">Today</option>
-                        <option value="last_7_days">Last 7 Days</option>
-                        <option value="last_30_days">Last 30 Days</option>
-                        <option value="current_month">Current Month</option>
-                        <option value="last_month">Last Month</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Action Type</label>
-                      <select
-                        value={exportFilters.auditAction}
-                        onChange={(e) => setExportFilters({...exportFilters, auditAction: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000]"
-                      >
-                        <option value="all">All Actions</option>
-                        <optgroup label="Authentication">
-                          <option value="LOGIN">Login</option>
-                          <option value="LOGOUT">Logout</option>
-                          <option value="LOGIN_FAILED">Login Failed</option>
-                          <option value="PASSWORD_RESET">Password Reset</option>
-                          <option value="PASSWORD_CHANGED">Password Changed</option>
-                        </optgroup>
-                        <optgroup label="User Management">
-                          <option value="CREATE_USER">Create User</option>
-                          <option value="UPDATE_USER">Update User</option>
-                          <option value="DELETE_USER">Delete User</option>
-                          <option value="USER_ACTIVATED">User Activated</option>
-                          <option value="USER_DEACTIVATED">User Deactivated</option>
-                        </optgroup>
-                        <optgroup label="Course Management">
-                          <option value="CREATE_COURSE">Create Course</option>
-                          <option value="UPDATE_COURSE">Update Course</option>
-                          <option value="DELETE_COURSE">Delete Course</option>
-                        </optgroup>
-                        <optgroup label="Section Management">
-                          <option value="CREATE_SECTION">Create Section</option>
-                          <option value="UPDATE_SECTION">Update Section</option>
-                          <option value="DELETE_SECTION">Delete Section</option>
-                          <option value="ENROLL_STUDENTS">Enroll Students</option>
-                        </optgroup>
-                        <optgroup label="Evaluation">
-                          <option value="SUBMIT_EVALUATION">Submit Evaluation</option>
-                          <option value="CREATE_PERIOD">Create Period</option>
-                          <option value="UPDATE_PERIOD">Update Period</option>
-                        </optgroup>
-                        <optgroup label="System">
-                          <option value="EXPORT_DATA">Export Data</option>
-                          <option value="IMPORT_DATA">Import Data</option>
-                          <option value="SETTINGS_UPDATED">Settings Updated</option>
-                        </optgroup>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Severity</label>
-                      <select
-                        value={exportFilters.auditSeverity}
-                        onChange={(e) => setExportFilters({...exportFilters, auditSeverity: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#7a0000]"
-                      >
-                        <option value="all">All Severities</option>
-                        <option value="Info">Info</option>
-                        <option value="Warning">Warning</option>
-                        <option value="Critical">Critical</option>
-                      </select>
-                    </div>
+                    <CustomDropdown
+                      label="Date Range"
+                      value={exportFilters.auditDateRange}
+                      onChange={(val) => setExportFilters({...exportFilters, auditDateRange: val})}
+                      options={[
+                        { value: 'all', label: 'All Time' },
+                        { value: 'today', label: 'Today' },
+                        { value: 'last_7_days', label: 'Last 7 Days' },
+                        { value: 'last_30_days', label: 'Last 30 Days' },
+                        { value: 'current_month', label: 'Current Month' },
+                        { value: 'last_month', label: 'Last Month' }
+                      ]}
+                    />
+                    <CustomDropdown
+                      label="Action Type"
+                      value={exportFilters.auditAction}
+                      onChange={(val) => setExportFilters({...exportFilters, auditAction: val})}
+                      searchable
+                      options={[
+                        { value: 'all', label: 'All Actions' },
+                        { value: 'LOGIN', label: '🔐 Login' },
+                        { value: 'LOGOUT', label: '🔐 Logout' },
+                        { value: 'LOGIN_FAILED', label: '🔐 Login Failed' },
+                        { value: 'PASSWORD_RESET', label: '🔐 Password Reset' },
+                        { value: 'PASSWORD_CHANGED', label: '🔐 Password Changed' },
+                        { value: 'CREATE_USER', label: '👤 Create User' },
+                        { value: 'UPDATE_USER', label: '👤 Update User' },
+                        { value: 'DELETE_USER', label: '👤 Delete User' },
+                        { value: 'USER_ACTIVATED', label: '👤 User Activated' },
+                        { value: 'USER_DEACTIVATED', label: '👤 User Deactivated' },
+                        { value: 'CREATE_COURSE', label: '📚 Create Course' },
+                        { value: 'UPDATE_COURSE', label: '📚 Update Course' },
+                        { value: 'DELETE_COURSE', label: '📚 Delete Course' },
+                        { value: 'CREATE_SECTION', label: '📋 Create Section' },
+                        { value: 'UPDATE_SECTION', label: '📋 Update Section' },
+                        { value: 'DELETE_SECTION', label: '📋 Delete Section' },
+                        { value: 'ENROLL_STUDENTS', label: '📋 Enroll Students' },
+                        { value: 'SUBMIT_EVALUATION', label: '📝 Submit Evaluation' },
+                        { value: 'CREATE_PERIOD', label: '📅 Create Period' },
+                        { value: 'UPDATE_PERIOD', label: '📅 Update Period' },
+                        { value: 'EXPORT_DATA', label: '⚙️ Export Data' },
+                        { value: 'IMPORT_DATA', label: '⚙️ Import Data' },
+                        { value: 'SETTINGS_UPDATED', label: '⚙️ Settings Updated' }
+                      ]}
+                    />
+                    <CustomDropdown
+                      label="Severity"
+                      value={exportFilters.auditSeverity}
+                      onChange={(val) => setExportFilters({...exportFilters, auditSeverity: val})}
+                      options={[
+                        { value: 'all', label: 'All Severities' },
+                        { value: 'Info', label: 'Info' },
+                        { value: 'Warning', label: 'Warning' },
+                        { value: 'Critical', label: 'Critical' }
+                      ]}
+                    />
 
                   </div>
                 </div>

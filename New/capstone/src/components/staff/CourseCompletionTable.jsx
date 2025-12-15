@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import { adminAPI, secretaryAPI, deptHeadAPI } from '../../services/api'
 import { isAdmin } from '../../utils/roleUtils'
 import Pagination from '../Pagination'
+import CustomDropdown from '../CustomDropdown'
 
 export default function CourseCompletionTable({ selectedPeriod = null }) {
   const { user: currentUser } = useAuth()
@@ -155,25 +156,25 @@ export default function CourseCompletionTable({ selectedPeriod = null }) {
           </div>
 
           {/* Sort */}
-          <select
+          <CustomDropdown
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="lpu-select"
-          >
-            <option value="completion_rate">Sort by: Completion Rate</option>
-            <option value="course_name">Sort by: Course Name</option>
-          </select>
+            onChange={(val) => setSortBy(val)}
+            options={[
+              { value: 'completion_rate', label: 'Sort by: Completion Rate' },
+              { value: 'course_name', label: 'Sort by: Course Name' }
+            ]}
+          />
 
           {/* Filter */}
-          <select
+          <CustomDropdown
             value={filterThreshold}
-            onChange={(e) => setFilterThreshold(e.target.value)}
-            className="lpu-select"
-          >
-            <option value="all">Show: All Courses</option>
-            <option value="below70">Show: Below 70%</option>
-            <option value="below50">Show: Below 50%</option>
-          </select>
+            onChange={(val) => setFilterThreshold(val)}
+            options={[
+              { value: 'all', label: 'Show: All Courses' },
+              { value: 'below70', label: 'Show: Below 70%' },
+              { value: 'below50', label: 'Show: Below 50%' }
+            ]}
+          />
         </div>
       </div>
 

@@ -4,6 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { isAdmin } from '../utils/roleUtils'
 import { useAuth } from '../context/AuthContext'
 import { courses, evaluations } from '../../data/mock'
+import CustomDropdown from './CustomDropdown'
 
 export default function EnhancedDashboard() {
   const navigate = useNavigate()
@@ -225,50 +226,43 @@ export default function EnhancedDashboard() {
           
           <div className="grid md:grid-cols-3 gap-6">
             {isAdmin(currentUser) && (
-              <div>
-                <label className="block text-sm font-semibold text-[#1e293b] mb-3">Academic Program</label>
-                <select 
-                  className="lpu-select"
-                  value={selectedProgram} 
-                  onChange={e => setSelectedProgram(e.target.value)}
-                >
-                  <option value="all">All Programs</option>
-                  <option value="Computer Science">Computer Science</option>
-                  <option value="Information Technology">Information Technology</option>
-                  <option value="Business Administration">Business Administration</option>
-                  <option value="Engineering">Engineering</option>
-                </select>
-              </div>
+              <CustomDropdown
+                label="Academic Program"
+                value={selectedProgram}
+                onChange={(val) => setSelectedProgram(val)}
+                options={[
+                  { value: 'all', label: 'All Programs' },
+                  { value: 'Computer Science', label: 'Computer Science' },
+                  { value: 'Information Technology', label: 'Information Technology' },
+                  { value: 'Business Administration', label: 'Business Administration' },
+                  { value: 'Engineering', label: 'Engineering' }
+                ]}
+              />
             )}
             
-            <div>
-              <label className="block text-sm font-semibold text-[#1e293b] mb-3">Year Level</label>
-              <select 
-                className="lpu-select"
-                value={selectedYearLevel} 
-                onChange={e => setSelectedYearLevel(e.target.value)}
-              >
-                <option value="all">All Year Levels</option>
-                <option value="1">1st Year</option>
-                <option value="2">2nd Year</option>
-                <option value="3">3rd Year</option>
-                <option value="4">4th Year</option>
-              </select>
-            </div>
+            <CustomDropdown
+              label="Year Level"
+              value={selectedYearLevel}
+              onChange={(val) => setSelectedYearLevel(val)}
+              options={[
+                { value: 'all', label: 'All Year Levels' },
+                { value: '1', label: '1st Year' },
+                { value: '2', label: '2nd Year' },
+                { value: '3', label: '3rd Year' },
+                { value: '4', label: '4th Year' }
+              ]}
+            />
             
-            <div>
-              <label className="block text-sm font-semibold text-[#1e293b] mb-3">Course Focus</label>
-              <select 
-                className="lpu-select"
-                value={selectedCourses} 
-                onChange={e => setSelectedCourses(e.target.value)}
-              >
-                <option value="all">All Courses</option>
-                {filteredCourses.map(course => (
-                  <option key={course.id} value={course.id}>{course.name}</option>
-                ))}
-              </select>
-            </div>
+            <CustomDropdown
+              label="Course Focus"
+              value={selectedCourses}
+              onChange={(val) => setSelectedCourses(val)}
+              searchable={filteredCourses.length > 5}
+              options={[
+                { value: 'all', label: 'All Courses' },
+                ...filteredCourses.map(course => ({ value: course.id, label: course.name }))
+              ]}
+            />
           </div>
         </div>
 
