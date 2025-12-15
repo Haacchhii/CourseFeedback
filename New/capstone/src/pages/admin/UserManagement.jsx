@@ -1740,7 +1740,11 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
                             <div key={idx} className="flex items-start space-x-2 pb-2 border-b border-red-100 last:border-0">
                               <span className="text-red-600 font-bold text-xs mt-0.5">•</span>
                               <p className="text-sm text-red-800 flex-1">
-                                <span className="font-bold">Row {err.row}:</span> {err.errors.join(', ')}
+                                {typeof err === 'string' ? (
+                                  err
+                                ) : (
+                                  <><span className="font-bold">Row {err.row}:</span> {(err.errors || []).join(', ')}</>
+                                )}
                               </p>
                             </div>
                           ))}
