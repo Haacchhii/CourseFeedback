@@ -732,12 +732,6 @@ export default function Evaluations() {
                     Sentiment Analysis
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">
-                    Submission Date
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">
-                    Student Feedback
-                  </th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">
                     Status Indicator
                   </th>
                 </tr>
@@ -794,15 +788,6 @@ export default function Evaluations() {
                         {evaluation.sentiment === 'negative' && '😔'}
                         <span className="ml-1 capitalize">{evaluation.sentiment}</span>
                       </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{evaluation.submittedDate}</div>
-                      <div className="text-xs text-gray-500">Academic Year 2025</div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
-                      <div className="truncate" title={evaluation.comment}>
-                        {evaluation.comment}
-                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {evaluation.anomaly ? (

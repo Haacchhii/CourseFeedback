@@ -139,7 +139,13 @@ export default function StudentCourses(){
           <div>
             <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">My Courses</h1>
             <p className="text-sm md:text-base text-gray-600">
-              {currentStudent.name} • {toDisplayCode(currentStudent.program)} • Year {currentStudent.year_level || currentStudent.yearLevel}
+              {currentStudent.first_name && currentStudent.last_name 
+                ? `${currentStudent.first_name} ${currentStudent.last_name}` 
+                : currentStudent.name || currentStudent.email}
+              {(currentStudent.program || currentStudent.program_code) && 
+                ` • ${toDisplayCode(currentStudent.program || currentStudent.program_code)}`}
+              {(currentStudent.year_level || currentStudent.yearLevel) && 
+                ` • Year ${currentStudent.year_level || currentStudent.yearLevel}`}
             </p>
           </div>
         </div>
@@ -256,7 +262,11 @@ export default function StudentCourses(){
                         <span className="text-sm font-medium text-gray-900">{c.name}</span>
                       </td>
                       <td className="px-6 py-4 text-center whitespace-nowrap">
-                        <span className="text-sm text-gray-600">{c.semester}</span>
+                        <span className="text-sm text-gray-600">
+                          {c.semester === 1 || c.semester === '1' ? '1st Semester' : 
+                           c.semester === 2 || c.semester === '2' ? '2nd Semester' : 
+                           c.semester || 'N/A'}
+                        </span>
                       </td>
                       <td className="px-6 py-4 text-center whitespace-nowrap">
                         {c.already_evaluated ? (
