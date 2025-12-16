@@ -134,11 +134,6 @@ export default function Login(){
       <div className="relative w-full max-w-md z-20">
         {/* LPU Brand Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 lg:w-24 lg:h-24 bg-white rounded-full shadow-card mb-6">
-            <div className="w-12 h-12 lg:w-14 lg:h-14 bg-gradient-to-br from-[#7a0000] to-[#a31111] rounded-full flex items-center justify-center">
-              <span className="text-white font-bold text-xl lg:text-2xl">LPU</span>
-            </div>
-          </div>
           <h1 className="text-white text-2xl lg:text-3xl font-bold mb-3 tracking-tight">Course Insight Guardian</h1>
           <p className="text-[#ffd700] text-sm lg:text-base font-medium">Academic Excellence Through Feedback</p>
         </div>
@@ -275,18 +270,6 @@ export default function Login(){
                 Empowering Academic Excellence Through Technology
               </p>
             </div>
-          </div>
-        </div>
-
-        {/* Academic Achievement Badges */}
-        <div className="flex flex-col sm:flex-row justify-center items-center space-y-3 sm:space-y-0 sm:space-x-5 mt-8">
-          <div className="flex items-center space-x-2 bg-white/20 backdrop-blur-sm rounded-full px-5 py-2.5">
-            <div className="w-2 h-2 bg-[#ffd700] rounded-full"></div>
-            <span className="text-white text-sm font-medium">Academic Excellence</span>
-          </div>
-          <div className="flex items-center space-x-2 bg-white/20 backdrop-blur-sm rounded-full px-5 py-2.5">
-            <div className="w-2 h-2 bg-[#ffd700] rounded-full"></div>
-            <span className="text-white text-sm font-medium">Innovation Hub</span>
           </div>
         </div>
       </div>

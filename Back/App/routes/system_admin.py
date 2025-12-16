@@ -28,18 +28,34 @@ import json
 import asyncio
 from config import now_local
 from services.welcome_email_service import send_welcome_email, send_bulk_welcome_emails
-from services.resend_email_service import send_welcome_email_resend
 from utils.validation import InputValidator, validate_export_filters, ValidationError
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Helper function for background email sending
+# Global counter for rate limiting emails
+import asyncio
+_email_queue_position = 0
+_email_queue_lock = asyncio.Lock()
+
+# Helper function for background email sending with rate limiting (uses Gmail SMTP)
 async def send_email_background_async(email: str, first_name: str, last_name: str, school_id: str, role: str, temp_password: str):
-    """Async wrapper for background email sending via Resend (fast and reliable)"""
+    """Async wrapper for background email sending via Gmail SMTP with rate limiting"""
+    global _email_queue_position
     try:
-        # Use Resend for faster, more reliable email delivery
-        result = await send_welcome_email_resend(
+        # Get queue position and increment for next email
+        async with _email_queue_lock:
+            position = _email_queue_position
+            _email_queue_position += 1
+        
+        # Wait based on queue position (1 second between emails to avoid Gmail rate limits)
+        delay = position * 1.0
+        if delay > 0:
+            logger.info(f"📧 Queuing email for {email} (delay: {delay:.1f}s)")
+            await asyncio.sleep(delay)
+        
+        # Use Gmail SMTP for reliable email delivery
+        result = send_welcome_email(
             email=email,
             first_name=first_name,
             last_name=last_name,
@@ -500,11 +516,16 @@ async def bulk_import_users(
     """
     Bulk import multiple users in a single transaction for better performance.
     Processes all users in one database session with batch commits.
-    Sends welcome emails asynchronously in the background.
+    Sends welcome emails asynchronously in the background with rate limiting.
     """
+    global _email_queue_position
     try:
         from services.enrollment_validation import EnrollmentValidationService
         current_user_id = current_user['id']
+        
+        # Reset email queue position for this bulk import
+        async with _email_queue_lock:
+            _email_queue_position = 0
         
         # Pre-fetch programs once for all users
         programs = db.query(Program).all()
