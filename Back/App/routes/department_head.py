@@ -1206,36 +1206,62 @@ async def get_question_distribution(
                 }
             }
         
-        # Helper function to generate 31 questions from basic ratings
-        def generate_full_ratings(eval_obj):
-            """Generate 31-question ratings from basic 4-field ratings"""
+        # Map descriptive keys to question numbers (same as category-averages)
+        jsonb_key_mapping = {
+            # Relevance of Course (1-6)
+            "relevance_subject_knowledge": "1",
+            "relevance_practical_skills": "2",
+            "relevance_team_work": "3",
+            "relevance_leadership": "4",
+            "relevance_communication": "5",
+            "relevance_positive_attitude": "6",
+            # Course Organization (7-11)
+            "org_curriculum": "7",
+            "org_ilos_known": "8",
+            "org_ilos_clear": "9",
+            "org_ilos_relevant": "10",
+            "org_no_overlapping": "11",
+            # Teaching-Learning (12-18)
+            "teaching_tlas_useful": "12",
+            "teaching_ila_useful": "13",
+            "teaching_tlas_sequenced": "14",
+            "teaching_applicable": "15",
+            "teaching_motivated": "16",
+            "teaching_team_work": "17",
+            "teaching_independent": "18",
+            # Assessment (19-24)
+            "assessment_start": "19",
+            "assessment_all_topics": "20",
+            "assessment_number": "21",
+            "assessment_distribution": "22",
+            "assessment_allocation": "23",
+            "assessment_feedback": "24",
+            # Learning Environment (25-30)
+            "environment_classrooms": "25",
+            "environment_library": "26",
+            "environment_laboratory": "27",
+            "environment_computer": "28",
+            "environment_internet": "29",
+            "environment_facilities_availability": "30",
+            # Counseling (31)
+            "counseling_available": "31"
+        }
+        
+        # Helper function to normalize ratings to question numbers
+        def get_normalized_ratings(eval_obj):
+            """Convert descriptive keys to question numbers"""
             if eval_obj.ratings and isinstance(eval_obj.ratings, dict) and len(eval_obj.ratings) > 0:
-                return eval_obj.ratings
-            
-            base_ratings = {
-                'relevance': eval_obj.rating_content or 3,
-                'organization': eval_obj.rating_overall or 3,
-                'teaching': eval_obj.rating_teaching or 3,
-                'engagement': eval_obj.rating_engagement or 3
-            }
-            
-            import random
-            random.seed(eval_obj.id)
-            
-            generated = {}
-            for i in range(1, 7):
-                generated[str(i)] = max(1, min(4, base_ratings['relevance'] + random.choice([-1, 0, 0, 1])))
-            for i in range(7, 12):
-                generated[str(i)] = max(1, min(4, base_ratings['organization'] + random.choice([-1, 0, 0, 1])))
-            for i in range(12, 19):
-                generated[str(i)] = max(1, min(4, base_ratings['teaching'] + random.choice([-1, 0, 0, 1])))
-            for i in range(19, 25):
-                generated[str(i)] = max(1, min(4, base_ratings['organization'] + random.choice([-1, 0, 0, 1])))
-            for i in range(25, 31):
-                generated[str(i)] = max(1, min(4, base_ratings['engagement'] + random.choice([-1, 0, 0, 1])))
-            generated['31'] = max(1, min(4, base_ratings['teaching'] + random.choice([-1, 0, 1])))
-            
-            return generated
+                normalized = {}
+                for jsonb_key, rating_value in eval_obj.ratings.items():
+                    # Try to map descriptive key to question number
+                    question_num = jsonb_key_mapping.get(jsonb_key)
+                    if question_num:
+                        normalized[question_num] = rating_value
+                    elif jsonb_key.isdigit():
+                        # Already a numeric key
+                        normalized[jsonb_key] = rating_value
+                return normalized
+            return {}
         
         # Initialize distribution for all 31 questions
         question_distribution = {}
@@ -1254,8 +1280,8 @@ async def get_question_distribution(
         
         # Count responses for each question
         for evaluation in evaluations:
-            # Get ratings (either from JSONB or generated)
-            eval_ratings = generate_full_ratings(evaluation)
+            # Get ratings normalized to question numbers
+            eval_ratings = get_normalized_ratings(evaluation)
             
             for q_num, rating in eval_ratings.items():
                 if q_num in question_distribution and rating in [1, 2, 3, 4]:

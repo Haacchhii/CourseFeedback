@@ -608,6 +608,41 @@ async def get_question_distribution(
                 }
             }
         
+        # Map descriptive keys to question numbers
+        jsonb_key_mapping = {
+            "relevance_subject_knowledge": "1",
+            "relevance_practical_skills": "2",
+            "relevance_team_work": "3",
+            "relevance_leadership": "4",
+            "relevance_communication": "5",
+            "relevance_positive_attitude": "6",
+            "org_curriculum": "7",
+            "org_ilos_known": "8",
+            "org_ilos_clear": "9",
+            "org_ilos_relevant": "10",
+            "org_no_overlapping": "11",
+            "teaching_tlas_useful": "12",
+            "teaching_ila_useful": "13",
+            "teaching_tlas_sequenced": "14",
+            "teaching_applicable": "15",
+            "teaching_motivated": "16",
+            "teaching_team_work": "17",
+            "teaching_independent": "18",
+            "assessment_start": "19",
+            "assessment_all_topics": "20",
+            "assessment_number": "21",
+            "assessment_distribution": "22",
+            "assessment_allocation": "23",
+            "assessment_feedback": "24",
+            "environment_classrooms": "25",
+            "environment_library": "26",
+            "environment_laboratory": "27",
+            "environment_computer": "28",
+            "environment_internet": "29",
+            "environment_facilities_availability": "30",
+            "counseling_available": "31"
+        }
+        
         # Initialize distribution for all 31 questions
         question_distribution = {}
         for q_num in range(1, 32):
@@ -626,8 +661,10 @@ async def get_question_distribution(
         # Count responses for each question
         for evaluation in evaluations:
             if evaluation.ratings and isinstance(evaluation.ratings, dict):
-                for q_num, rating in evaluation.ratings.items():
-                    if q_num in question_distribution and rating in [1, 2, 3, 4]:
+                for key, rating in evaluation.ratings.items():
+                    # Convert descriptive key to question number if needed
+                    q_num = jsonb_key_mapping.get(key) if key in jsonb_key_mapping else (key if key.isdigit() else None)
+                    if q_num and q_num in question_distribution and rating in [1, 2, 3, 4]:
                         question_distribution[q_num]["distribution"][str(rating)]["count"] += 1
                         question_distribution[q_num]["total_responses"] += 1
         

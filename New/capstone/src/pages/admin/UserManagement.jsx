@@ -551,21 +551,28 @@ depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
 
     try {
       const response = await apiClient.get(`/admin/enrollment-list/student/${formData.school_id}`)
-      if (response) {
-        setEnrollmentInfo(response)
+      // Extract data from response (API returns {success: true, data: {...}})
+      const enrollmentData = response?.data || response
+      
+      if (enrollmentData) {
+        setEnrollmentInfo(enrollmentData)
         setEnrollmentLookupDone(true)
         
         // Auto-fill form with enrollment data
-        const fullName = `${response.first_name} ${response.middle_name ? response.middle_name + ' ' : ''}${response.last_name}`.trim()
+        const firstName = enrollmentData.first_name || ''
+        const middleName = enrollmentData.middle_name || ''
+        const lastName = enrollmentData.last_name || ''
+        const fullName = `${firstName} ${middleName ? middleName + ' ' : ''}${lastName}`.trim()
+        
         setFormData(prev => ({
           ...prev,
-          name: fullName,
-          email: response.email || prev.email,
-          program: response.program_code,
-          yearLevel: response.year_level
+          name: fullName || prev.name,
+          email: enrollmentData.email || prev.email,
+          program: enrollmentData.program_code || prev.program,
+          yearLevel: prev.yearLevel // Keep existing as enrollment_list doesn't have year_level
         }))
         
-        showAlert(`✅ Student found in enrollment list!\n\nName: ${fullName}\nProgram: ${response.program_code} - ${response.program_name}\nYear Level: ${response.year_level}\n\nForm has been auto-filled with enrollment data.`, 'Success', 'success')
+        showAlert(`✅ Student found in enrollment list!\n\nName: ${fullName || 'N/A'}\nProgram: ${enrollmentData.program_code || 'N/A'} - ${enrollmentData.program_name || 'N/A'}\n\nForm has been auto-filled with enrollment data.`, 'Success', 'success')
       }
     } catch (err) {
       if (err.response?.status === 404) {

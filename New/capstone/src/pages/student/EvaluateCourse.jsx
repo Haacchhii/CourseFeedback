@@ -223,13 +223,21 @@ export default function EvaluateCourse(){
             <p className="text-sm text-gray-600 mt-1">{questionnaireCategories[currentCategory].description}</p>
             
             {/* Rating Scale Legend - shown once per category */}
-            <div className="mt-4 flex items-center gap-3 bg-gray-50 p-3 rounded-lg">
-              <span className="text-xs font-medium text-gray-600">Rating Scale:</span>
-              <div className="flex items-center gap-4">
-                <span className="text-xs text-gray-600">1 = Strongly Disagree</span>
-                <span className="text-xs text-gray-600">2 = Disagree</span>
-                <span className="text-xs text-gray-600">3 = Agree</span>
-                <span className="text-xs text-gray-600">4 = Strongly Agree</span>
+            <div className="mt-4 flex flex-wrap items-center gap-4 bg-gradient-to-r from-gray-50 to-gray-100 p-4 rounded-xl border border-gray-200">
+              <span className="text-sm font-semibold text-gray-700">Rating Scale:</span>
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-medium">
+                  <span>😞</span> 1 = Strongly Disagree
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-xs font-medium">
+                  <span>😕</span> 2 = Disagree
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-medium">
+                  <span>🙂</span> 3 = Agree
+                </span>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium">
+                  <span>😊</span> 4 = Strongly Agree
+                </span>
               </div>
             </div>
           </div>
@@ -241,34 +249,30 @@ export default function EvaluateCourse(){
                   <div className="font-semibold text-gray-900 text-base">{question.text}</div>
                   <div className="text-sm text-gray-500 mt-1">{question.shortLabel}</div>
                 </div>
-                {/* Left-aligned ratings */}
-                <div className="flex items-center gap-4">
-                  {[1, 2, 3, 4].map(value => (
-                    <label key={value} className="cursor-pointer" onClick={(e) => e.preventDefault()}>
-                      <input
-                        type="radio"
-                        name={question.id}
-                        value={value}
-                        checked={ratings[question.id] === value}
-                        onChange={(e) => {
-                          e.preventDefault()
-                          setRating(question.id, e.target.value)
-                        }}
-                        className="sr-only"
-                      />
-                      <span
-                        onClick={(e) => {
-                          e.preventDefault()
-                          setRating(question.id, value)
-                        }}
-                        className={`w-16 h-16 flex items-center justify-center rounded-full border-2 font-bold text-lg transition-all duration-200 ${
-                          ratings[question.id] === value
-                            ? 'bg-[#7a0000] text-white border-[#7a0000] shadow-lg'
-                            : 'bg-white text-gray-700 border-gray-300 hover:border-[#7a0000] hover:bg-gray-50 shadow-sm'
-                        }`}>
-                        {value}
+                {/* Enhanced Rating Buttons */}
+                <div className="flex flex-wrap items-center gap-3">
+                  {[
+                    { value: 1, label: 'Strongly Disagree', emoji: '😞', color: 'from-red-500 to-red-600', hoverBg: 'hover:bg-red-50', borderColor: 'border-red-300', textColor: 'text-red-600' },
+                    { value: 2, label: 'Disagree', emoji: '😕', color: 'from-orange-500 to-orange-600', hoverBg: 'hover:bg-orange-50', borderColor: 'border-orange-300', textColor: 'text-orange-600' },
+                    { value: 3, label: 'Agree', emoji: '🙂', color: 'from-blue-500 to-blue-600', hoverBg: 'hover:bg-blue-50', borderColor: 'border-blue-300', textColor: 'text-blue-600' },
+                    { value: 4, label: 'Strongly Agree', emoji: '😊', color: 'from-green-500 to-green-600', hoverBg: 'hover:bg-green-50', borderColor: 'border-green-300', textColor: 'text-green-600' }
+                  ].map(option => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setRating(question.id, option.value)}
+                      className={`flex flex-col items-center justify-center px-4 py-3 rounded-xl border-2 transition-all duration-200 min-w-[90px] ${
+                        ratings[question.id] === option.value
+                          ? `bg-gradient-to-br ${option.color} text-white border-transparent shadow-lg scale-105`
+                          : `bg-white ${option.borderColor} ${option.textColor} ${option.hoverBg} hover:border-opacity-100 hover:shadow-md`
+                      }`}
+                    >
+                      <span className="text-2xl mb-1">{option.emoji}</span>
+                      <span className="font-bold text-lg">{option.value}</span>
+                      <span className={`text-xs mt-0.5 ${ratings[question.id] === option.value ? 'text-white/90' : 'text-gray-500'}`}>
+                        {option.label}
                       </span>
-                    </label>
+                    </button>
                   ))}
                 </div>
               </div>
