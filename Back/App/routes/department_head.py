@@ -1263,11 +1263,47 @@ async def get_question_distribution(
                 return normalized
             return {}
         
+        # Question texts for all 31 questions
+        question_texts = {
+            "1": "The course helped me to develop relevant subject knowledge",
+            "2": "The course helped me to develop related practical skills",
+            "3": "The course helped me to develop team working skills",
+            "4": "The course helped me to develop leadership skills",
+            "5": "The course helped me to develop communication skills",
+            "6": "The course helped me to develop positive attitude on my program of study",
+            "7": "The course was implemented according to the approved curriculum",
+            "8": "Intended Learning Outcomes (ILOs) of the course were made known from the beginning",
+            "9": "Intended Learning Outcomes (ILOs) of the course were clear",
+            "10": "Intended Learning Outcomes (ILOs) of the course were relevant",
+            "11": "There were no overlapping of contents within a course",
+            "12": "Teaching - Learning Activities (TLAs) such as practical, educational tour etc. were useful and relevant",
+            "13": "Independent Learning (ILs) activities such as journal reading, research work, project, etc. were useful and relevant",
+            "14": "The TLAs within a course were sequenced in a logical manner",
+            "15": "Team teaching is done applicable",
+            "16": "The teachers motivated the students to learn",
+            "17": "The teachers provided adequate opportunities for team work",
+            "18": "The teachers provided adequate opportunities for independent learning",
+            "19": "Assessment methods to be used were told at the beginning of the course",
+            "20": "Assessments covered all the topics taught in the course",
+            "21": "The number of assessments was appropriate and adequate",
+            "22": "Distribution of assessments over a semester was appropriate",
+            "23": "Allocation of marks/grade among assessments was satisfactory",
+            "24": "The teachers provided timely feedback on student performance",
+            "25": "Available facilities in the classrooms were satisfactory",
+            "26": "Available library facilities were adequate",
+            "27": "Available laboratory facilities were adequate",
+            "28": "Access to computer facilities were sufficient",
+            "29": "There was sufficient access to internet and electronic databases",
+            "30": "Availability of facilities for recreation was adequate",
+            "31": "The teachers were available for consultation whenever needed"
+        }
+        
         # Initialize distribution for all 31 questions
         question_distribution = {}
         for q_num in range(1, 32):
             question_distribution[str(q_num)] = {
                 "question_number": q_num,
+                "question_text": question_texts[str(q_num)],
                 "distribution": {
                     "1": {"count": 0, "percentage": 0.0},
                     "2": {"count": 0, "percentage": 0.0},
