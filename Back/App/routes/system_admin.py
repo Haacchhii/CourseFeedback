@@ -54,8 +54,8 @@ async def send_email_background_async(email: str, first_name: str, last_name: st
             logger.info(f"📧 Queuing email for {email} (delay: {delay:.1f}s)")
             await asyncio.sleep(delay)
         
-        # Use Gmail SMTP for reliable email delivery
-        result = send_welcome_email(
+        # Use Gmail SMTP for reliable email delivery (await since it's async)
+        result = await send_welcome_email(
             email=email,
             first_name=first_name,
             last_name=last_name,
