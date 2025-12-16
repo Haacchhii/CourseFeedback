@@ -169,7 +169,8 @@ async def get_department_head_dashboard(
         ).scalar() or 0
         
         # Calculate participation rate for THIS PERIOD ONLY
-        total_enrolled_students = db.query(func.count(Enrollment.id.distinct())).filter(
+        # Count UNIQUE students enrolled (not enrollment records)
+        total_enrolled_students = db.query(func.count(Enrollment.student_id.distinct())).filter(
             Enrollment.status == 'active',
             Enrollment.evaluation_period_id == period.id
         ).scalar() or 0

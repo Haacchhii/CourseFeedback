@@ -216,8 +216,9 @@ export default function Courses() {
         
         const filters = {}
         if (selectedProgram !== 'all') filters.program = selectedProgram
-        // Use selectedPeriod if set, otherwise backend will use active period
-        if (selectedPeriod) filters.period_id = selectedPeriod
+        // Use selectedPeriod if set, otherwise use active period ID
+        const periodIdToUse = selectedPeriod || (activePeriod?.id)
+        if (periodIdToUse) filters.period_id = periodIdToUse
         
         let coursesData, evaluationsData
         
@@ -288,7 +289,7 @@ export default function Courses() {
       isMounted = false
       abortController.abort()
     }
-  }, [currentUser, selectedProgram, selectedPeriod])
+  }, [currentUser, selectedProgram, selectedPeriod, activePeriod])
 
   // Enhance courses with evaluation data
   const enhancedCourses = useMemo(() => {

@@ -122,13 +122,16 @@ export default function Evaluations() {
       if (sentimentFilter !== 'all') filters.sentiment = sentimentFilter
       if (semesterFilter !== 'all') filters.semester = semesterFilter
       if (yearLevelFilter !== 'all') filters.yearLevel = yearLevelFilter
-      if (selectedPeriod) filters.period_id = selectedPeriod
+      // Use selectedPeriod if set, otherwise use active period ID
+      const periodIdToUse = selectedPeriod || activePeriod?.id
+      if (periodIdToUse) filters.period_id = periodIdToUse
       
-      // Fetch all evaluations for chart (1000 max)
+      // Fetch all evaluations for chart (1000 max) - also filter by period
       const allEvaluationsFilters = {
         page: 1,
         page_size: 1000
       }
+      if (periodIdToUse) allEvaluationsFilters.period_id = periodIdToUse
       
       let evaluationsData, allEvaluationsData, coursesData, dashboardData
       
@@ -167,7 +170,7 @@ export default function Evaluations() {
       
       return { evaluations, allEvaluations, courses, dashboard, pagination: evalPagination }
     },
-    [currentUser?.id, currentUser?.role, currentPage, programFilter, sentimentFilter, semesterFilter, yearLevelFilter, selectedPeriod]
+    [currentUser?.id, currentUser?.role, currentPage, programFilter, sentimentFilter, semesterFilter, yearLevelFilter, selectedPeriod, activePeriod]
   )
 
   // Update state when data changes

@@ -812,7 +812,6 @@ export default function SentimentAnalysis() {
                       <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Course</th>
                       <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Anomaly Type</th>
                       <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Rating</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider">Date</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -824,22 +823,20 @@ export default function SentimentAnalysis() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                            anomaly.anomalyReason?.includes('straight') ? 'bg-red-100 text-red-800' :
-                            anomaly.anomalyReason?.includes('outlier') ? 'bg-orange-100 text-orange-800' :
+                            anomaly.severity === 'high' ? 'bg-red-100 text-red-800' :
+                            anomaly.severity === 'medium' ? 'bg-orange-100 text-orange-800' :
                             'bg-yellow-100 text-yellow-800'
                           }`}>
-                            {anomaly.anomalyReason || 'Detected'}
+                            {anomaly.severity === 'high' ? 'High Risk' : 
+                             anomaly.severity === 'medium' ? 'Medium Risk' : 'Detected'}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                           <div className="flex items-center">
-                            <span className="font-medium">{anomaly.ratingOverall || 'N/A'}</span>
+                            <span className="font-medium">{anomaly.rating || anomaly.rating_overall || 'N/A'}</span>
                             <span className="text-gray-400 mx-1">/</span>
                             <span className="text-gray-500">4.0</span>
                           </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {anomaly.submissionDate ? new Date(anomaly.submissionDate).toLocaleDateString() : 'N/A'}
                         </td>
                       </tr>
                     ))}

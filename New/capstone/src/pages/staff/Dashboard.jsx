@@ -117,7 +117,9 @@ export default function Dashboard() {
       if (selectedProgram !== 'all') filters.program_id = selectedProgram
       if (selectedYearLevel !== 'all') filters.year_level = selectedYearLevel
       if (selectedSemester !== 'all') filters.semester = selectedSemester
-      if (selectedPeriod) filters.period_id = selectedPeriod
+      // Use selectedPeriod if set, otherwise use active period ID
+      const periodIdToUse = selectedPeriod || activePeriod
+      if (periodIdToUse) filters.period_id = periodIdToUse
       
       let dashboardResponse, evaluationsResponse
       if (currentUser.role === 'secretary') {
@@ -139,7 +141,7 @@ export default function Dashboard() {
         evaluations: Array.isArray(evaluationsResponse) ? evaluationsResponse : (evaluationsResponse?.data || [])
       }
     },
-    [currentUser?.id, currentUser?.role, selectedProgram, selectedYearLevel, selectedSemester, selectedPeriod]
+    [currentUser?.id, currentUser?.role, selectedProgram, selectedYearLevel, selectedSemester, selectedPeriod, activePeriod]
   )
 
   // Update dashboardData when apiData changes
@@ -556,36 +558,6 @@ export default function Dashboard() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
               </svg>
               Review Evaluations
-            </button>
-          </div>
-        </div>
-
-        {/* Recent Feedback Table */}
-        <div className="lpu-card">
-          <div className="flex items-center justify-between border-b border-gray-200 pb-4 mb-6">
-            <div className="flex items-center">
-              <svg className="w-6 h-6 text-[#7a0000] mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-              </svg>
-              <h3 className="text-xl font-bold text-gray-900">Recent Student Feedback</h3>
-            </div>
-            <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-              No recent responses (API limitation)
-            </span>
-          </div>
-          
-          {/* Note: Recent evaluations table hidden - API doesn't provide this data */}
-          <div className="text-center py-12">
-            <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-            </svg>
-            <h4 className="text-lg font-medium text-gray-900 mb-2">Recent Feedback</h4>
-            <p className="text-gray-500">View detailed evaluations in the Evaluations page.</p>
-            <button 
-              onClick={() => navigate('/evaluations')}
-              className="mt-4 px-6 py-2 bg-[#7a0000] text-white rounded-lg hover:bg-[#5a0000] transition-colors"
-            >
-              View All Evaluations
             </button>
           </div>
         </div>

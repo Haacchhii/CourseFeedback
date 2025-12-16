@@ -6,6 +6,7 @@ and anomaly detection data to reflect in staff dashboards.
 
 import os
 import sys
+import json
 import random
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -255,7 +256,7 @@ def generate_evaluations():
                     ) VALUES (
                         :student_id, :class_section_id, :period_id,
                         :rating_teaching, :rating_content, :rating_engagement, :rating_overall,
-                        :text_feedback, :suggestions, :ratings::jsonb,
+                        :text_feedback, :suggestions, CAST(:ratings AS jsonb),
                         :sentiment, :sentiment_score, :sentiment_confidence,
                         :is_anomaly, :anomaly_score, :anomaly_reason,
                         'completed', 'completed', NOW(), :submission_date
@@ -270,7 +271,7 @@ def generate_evaluations():
                     "rating_overall": rating_overall,
                     "text_feedback": comment,
                     "suggestions": suggestion if suggestion else None,
-                    "ratings": str(ratings_json).replace("'", '"'),
+                    "ratings": json.dumps(ratings_json),
                     "sentiment": sentiment,
                     "sentiment_score": sentiment_score,
                     "sentiment_confidence": round(random.uniform(0.75, 0.95), 2),
