@@ -103,7 +103,7 @@ const CustomDropdown = ({
       </button>
       
       {isOpen && !disabled && (
-        <div className="absolute z-50 min-w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden left-0"
+        <div className="absolute z-[9999] min-w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden left-0"
           style={{ animation: 'dropdownFadeIn 0.15s ease-out', minWidth: 'max-content' }}
         >
           {/* Search input for searchable dropdowns */}

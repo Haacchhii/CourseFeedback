@@ -379,7 +379,7 @@ export default function StudentManagement() {
         {/* Year Advancement Tab */}
         {activeTab === 'advance' && (
           <div className="space-y-6">
-            <div className="bg-white rounded-xl shadow-lg p-8 overflow-visible">
+            <div className="bg-white rounded-xl shadow-lg p-8 overflow-visible relative z-30">
               <h2 className="text-2xl font-bold text-gray-800 mb-6">🎓 Advance Students to Next Year Level</h2>
               
               {/* Info Box */}
@@ -529,7 +529,7 @@ export default function StudentManagement() {
         {/* Enrollment Transition Tab */}
         {activeTab === 'transition' && (
           <div className="space-y-6">
-            <div className="bg-white rounded-xl shadow-lg p-8 overflow-visible">
+            <div className="bg-white rounded-xl shadow-lg p-8 overflow-visible relative z-30">
               <h2 className="text-2xl font-bold text-gray-800 mb-6">🔄 Transition Enrollments to New Period</h2>
               
               {/* Info Box */}
@@ -690,7 +690,7 @@ export default function StudentManagement() {
         {/* Rollback/Undo Tab */}
         {activeTab === 'rollback' && (
           <div className="space-y-6">
-            <div className="bg-white rounded-xl shadow-lg p-8">
+            <div className="bg-white rounded-xl shadow-lg p-8 overflow-visible relative z-30">
               <h2 className="text-2xl font-bold text-gray-800 mb-6">⏪ Rollback Student Year Level Advancement</h2>
               
               {/* Warning Box */}

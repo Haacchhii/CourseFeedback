@@ -347,7 +347,7 @@ const EnrollmentListManagement = () => {
 
         {/* Statistics Cards */}
         {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 lg:mb-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 lg:mb-12">
             <div className="bg-white rounded-card shadow-card p-6 lg:p-8 hover:shadow-lg transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
@@ -360,28 +360,10 @@ const EnrollmentListManagement = () => {
             <div className="bg-white rounded-card shadow-card p-6 lg:p-8 hover:shadow-lg transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Active Students</p>
-                  <p className="text-2xl lg:text-3xl font-bold text-[#7a0000] mt-2">{stats.by_status?.active || 0}</p>
-                </div>
-                <CheckCircle className="w-10 h-10 text-[#7a0000]" />
-              </div>
-            </div>
-            <div className="bg-white rounded-card shadow-card p-6 lg:p-8 hover:shadow-lg transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
                   <p className="text-sm font-medium text-gray-600">Programs</p>
                   <p className="text-2xl lg:text-3xl font-bold text-[#7a0000] mt-2">{Object.keys(stats.by_program || {}).length}</p>
                 </div>
                 <TrendingUp className="w-10 h-10 text-[#7a0000]" />
-              </div>
-            </div>
-            <div className="bg-white rounded-card shadow-card p-6 lg:p-8 hover:shadow-lg transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Inactive Students</p>
-                  <p className="text-2xl lg:text-3xl font-bold text-[#7a0000] mt-2">{stats.by_status?.inactive || 0}</p>
-                </div>
-                <Filter className="w-10 h-10 text-[#7a0000]" />
               </div>
             </div>
           </div>
