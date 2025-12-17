@@ -2137,6 +2137,7 @@ async def get_non_respondents(
                         WHERE ev.student_id = :student_id
                             AND ev.class_section_id = cs.id
                             AND ev.evaluation_period_id = :period_id
+                            AND ev.status = 'completed'
                     )
                 ORDER BY c.subject_code
             """)

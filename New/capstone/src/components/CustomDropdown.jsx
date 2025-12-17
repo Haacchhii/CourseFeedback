@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 
 /**
  * Modern Custom Dropdown Component
  * Replaces native <select> elements with a beautiful, consistent UI
+ * Uses React Portal to render dropdown menu outside of parent overflow constraints
  */
 const CustomDropdown = ({ 
   options = [], 
@@ -19,13 +21,38 @@ const CustomDropdown = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 })
   const dropdownRef = useRef(null)
+  const buttonRef = useRef(null)
   const searchInputRef = useRef(null)
+  const menuRef = useRef(null)
+  
+  // Calculate dropdown position when opening
+  const updatePosition = () => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect()
+      const viewportHeight = window.innerHeight
+      const spaceBelow = viewportHeight - rect.bottom
+      const spaceAbove = rect.top
+      const menuHeight = 280 // max-h-60 = 240px + padding
+      
+      // Determine if dropdown should open upward or downward
+      const openUpward = spaceBelow < menuHeight && spaceAbove > spaceBelow
+      
+      setDropdownPosition({
+        top: openUpward ? rect.top - menuHeight + window.scrollY : rect.bottom + window.scrollY + 4,
+        left: rect.left + window.scrollX,
+        width: Math.max(rect.width, 200),
+        openUpward
+      })
+    }
+  }
   
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target) &&
+          menuRef.current && !menuRef.current.contains(event.target)) {
         setIsOpen(false)
         setSearchTerm('')
       }
@@ -34,10 +61,26 @@ const CustomDropdown = ({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  // Update position on scroll or resize
+  useEffect(() => {
+    if (isOpen) {
+      updatePosition()
+      const handleScrollResize = () => {
+        updatePosition()
+      }
+      window.addEventListener('scroll', handleScrollResize, true)
+      window.addEventListener('resize', handleScrollResize)
+      return () => {
+        window.removeEventListener('scroll', handleScrollResize, true)
+        window.removeEventListener('resize', handleScrollResize)
+      }
+    }
+  }, [isOpen])
+
   // Focus search input when dropdown opens
   useEffect(() => {
     if (isOpen && searchable && searchInputRef.current) {
-      searchInputRef.current.focus()
+      setTimeout(() => searchInputRef.current?.focus(), 50)
     }
   }, [isOpen, searchable])
   
@@ -65,7 +108,7 @@ const CustomDropdown = ({
   }
   
   return (
-    <div ref={dropdownRef} className={`relative min-w-0 ${className}`} style={{ overflow: 'visible' }}>
+    <div ref={dropdownRef} className={`relative min-w-0 ${className}`}>
       {label && (
         <label className="block text-sm font-semibold text-gray-700 mb-2">
           {label}
@@ -74,9 +117,15 @@ const CustomDropdown = ({
       )}
       
       <button
+        ref={buttonRef}
         type="button"
         disabled={disabled}
-        onClick={() => !disabled && setIsOpen(!isOpen)}
+        onClick={() => {
+          if (!disabled) {
+            if (!isOpen) updatePosition()
+            setIsOpen(!isOpen)
+          }
+        }}
         onKeyDown={handleKeyDown}
         className={`w-full px-4 py-3 text-left bg-white border-2 rounded-xl transition-all duration-200 flex items-center justify-between min-h-[50px]
           ${error
@@ -89,7 +138,7 @@ const CustomDropdown = ({
           }
         `}
       >
-        <span className={`flex-1 ${selectedOption ? 'text-gray-900' : 'text-gray-400'}`}>
+        <span className={`flex-1 truncate ${selectedOption ? 'text-gray-900' : 'text-gray-400'}`}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
         <svg 
@@ -102,9 +151,20 @@ const CustomDropdown = ({
         </svg>
       </button>
       
-      {isOpen && !disabled && (
-        <div className="absolute z-[9999] min-w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden left-0"
-          style={{ animation: 'dropdownFadeIn 0.15s ease-out', minWidth: 'max-content' }}
+      {/* Portal-rendered dropdown menu */}
+      {isOpen && !disabled && createPortal(
+        <div 
+          ref={menuRef}
+          className="fixed bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden"
+          style={{ 
+            top: dropdownPosition.top,
+            left: dropdownPosition.left,
+            width: dropdownPosition.width,
+            minWidth: 'max-content',
+            maxWidth: '90vw',
+            zIndex: 99999,
+            animation: 'dropdownFadeIn 0.15s ease-out'
+          }}
         >
           {/* Search input for searchable dropdowns */}
           {searchable && (
@@ -131,7 +191,7 @@ const CustomDropdown = ({
                   key={option.value ?? index}
                   type="button"
                   onClick={() => handleSelect(option.value)}
-                  className={`w-full px-4 py-3 text-left hover:bg-red-50 transition-colors flex items-center gap-3 border-b border-gray-50 last:border-b-0 whitespace-nowrap
+                  className={`w-full px-4 py-3 text-left hover:bg-red-50 transition-colors flex items-center gap-3 border-b border-gray-50 last:border-b-0
                     ${String(value) === String(option.value) ? 'bg-red-50 text-[#7a0000] font-medium' : 'text-gray-700'}
                   `}
                 >
@@ -140,12 +200,13 @@ const CustomDropdown = ({
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                   )}
-                  <span className={String(value) === String(option.value) ? '' : 'ml-7'}>{option.label}</span>
+                  <span className={`truncate ${String(value) === String(option.value) ? '' : 'ml-7'}`}>{option.label}</span>
                 </button>
               ))
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
       
       {helpText && !error && (
@@ -155,19 +216,6 @@ const CustomDropdown = ({
       {error && (
         <p className="mt-1.5 text-xs text-red-500">{error}</p>
       )}
-
-      <style>{`
-        @keyframes dropdownFadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(-8px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
     </div>
   )
 }
