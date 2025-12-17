@@ -32,9 +32,9 @@ if not DATABASE_URL:
 # - pool_size: Number of permanent connections to maintain (5-10 recommended)
 # - max_overflow: Additional connections during high load (10-20 recommended)
 # - Total max connections = pool_size + max_overflow (15-30 typical)
-# - pool_recycle: Recycle connections after 600s to prevent stale connections
+# - pool_recycle: Recycle connections after 300s to prevent stale connections on Railway
 # - pool_pre_ping: Test connections before use to handle network issues
-# - pool_timeout: Wait max 30s for connection before failing
+# - pool_timeout: Wait max 20s for connection before failing
 #
 # For production with 100+ concurrent users:
 # - Increase pool_size to 10-15
@@ -44,10 +44,10 @@ if not DATABASE_URL:
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,      # Verify connections before use (detect stale connections)
-    pool_recycle=600,        # Recycle connections every 10 minutes (prevents timeout issues)
-    pool_size=10,            # Permanent connections (optimized for 50-100 concurrent users)
-    max_overflow=20,         # Maximum temporary connections during peak load
-    pool_timeout=30,         # Wait up to 30s for connection (prevents immediate failures)
+    pool_recycle=300,        # Recycle connections every 5 minutes (Railway-optimized)
+    pool_size=5,             # Reduced for Railway (each worker gets its own pool)
+    max_overflow=10,         # Maximum temporary connections during peak load
+    pool_timeout=20,         # Wait up to 20s for connection
     echo=False,              # Set to True for SQL debugging (logs all queries)
     connect_args={
         "prepare_threshold": None,  # Disable prepared statement cache (Supabase compatibility)

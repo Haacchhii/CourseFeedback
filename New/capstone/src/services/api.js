@@ -7,13 +7,17 @@ import { rateLimiter } from '../utils/rateLimiter'
 // API Base URL - change this for production
 const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'
 
+// Retry configuration for Railway cold starts
+const MAX_RETRIES = 2
+const RETRY_DELAY = 3000 // 3 seconds
+
 // Create axios instance with default config
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 30000, // 30 second timeout for complex queries
+  timeout: 45000, // 45 second timeout for Railway cold starts
 })
 
 // Request interceptor - Add auth token and rate limiting
@@ -55,7 +59,7 @@ apiClient.interceptors.response.use(
   (response) => {
     return response.data
   },
-  (error) => {
+  async (error) => {
     if (error.response) {
       // Server responded with error status
       const { status, data } = error.response
@@ -77,9 +81,23 @@ apiClient.interceptors.response.use(
       errorObj.response = error.response // Preserve response for debugging
       return Promise.reject(errorObj)
     } else if (error.request) {
-      // Request was made but no response received
-      console.error('No response from server:', error.request)
-      return Promise.reject(new Error('No response from server. Please check your connection.'))
+      // Request was made but no response received - likely Railway cold start
+      const config = error.config
+      config._retryCount = config._retryCount || 0
+      
+      // Retry logic for Railway cold starts (server may be waking up)
+      if (config._retryCount < MAX_RETRIES) {
+        config._retryCount++
+        console.log(`Server not responding. Retrying... (${config._retryCount}/${MAX_RETRIES})`)
+        
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY))
+        
+        return apiClient.request(config)
+      }
+      
+      console.error('No response from server after retries:', error.request)
+      return Promise.reject(new Error('Server is not responding. It may be starting up - please try again in a few seconds.'))
     } else {
       // Something else happened
       console.error('Request error:', error.message)
@@ -1304,11 +1322,17 @@ export const studentAPI = {
 export const deptHeadAPI = {
   /**
    * Get department dashboard data
+   * @param {Object} filters - Query parameters (period_id, etc.)
    * @returns {Promise} Dashboard data with stats
    */
-  getDashboard: async () => {
+  getDashboard: async (filters = {}) => {
     const currentUser = authAPI.getCurrentUser()
-    return apiClient.get(`/dept-head/dashboard?department=${currentUser?.department}`)
+    const queryParams = new URLSearchParams({ 
+      department: currentUser?.department,
+      user_id: currentUser?.id,
+      ...filters 
+    })
+    return apiClient.get(`/dept-head/dashboard?${queryParams.toString()}`)
   },
 
   /**
@@ -1572,11 +1596,16 @@ export const deptHeadAPI = {
 export const secretaryAPI = {
   /**
    * Get secretary dashboard data
+   * @param {Object} filters - Query parameters (period_id, etc.)
    * @returns {Promise} Dashboard data
    */
-  getDashboard: async () => {
+  getDashboard: async (filters = {}) => {
     const currentUser = authAPI.getCurrentUser()
-    return apiClient.get(`/secretary/dashboard?user_id=${currentUser?.id}`)
+    const queryParams = new URLSearchParams({ 
+      user_id: currentUser?.id,
+      ...filters 
+    })
+    return apiClient.get(`/secretary/dashboard?${queryParams.toString()}`)
   },
 
   /**

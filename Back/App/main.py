@@ -8,6 +8,7 @@ import threading
 import logging
 from logging.handlers import RotatingFileHandler
 import os
+import asyncio
 from datetime import datetime
 
 # Import database components
@@ -145,6 +146,30 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
+
+# Request timeout middleware (60 seconds max per request)
+REQUEST_TIMEOUT = 60  # seconds
+
+@app.middleware("http")
+async def timeout_middleware(request: Request, call_next):
+    """Prevent requests from hanging indefinitely"""
+    try:
+        response = await asyncio.wait_for(
+            call_next(request),
+            timeout=REQUEST_TIMEOUT
+        )
+        return response
+    except asyncio.TimeoutError:
+        logger.error(f"Request timeout: {request.method} {request.url.path}")
+        return JSONResponse(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            content={
+                "success": False,
+                "error": "Request timeout",
+                "message": "The request took too long to process. Please try again.",
+                "timestamp": datetime.now().isoformat()
+            }
+        )
 
 # Rate limiting middleware
 try:
