@@ -39,9 +39,10 @@ const CustomDropdown = ({
       // Determine if dropdown should open upward or downward
       const openUpward = spaceBelow < menuHeight && spaceAbove > spaceBelow
       
+      // Use viewport-relative positioning (fixed position)
       setDropdownPosition({
-        top: openUpward ? rect.top - menuHeight + window.scrollY : rect.bottom + window.scrollY + 4,
-        left: rect.left + window.scrollX,
+        top: openUpward ? rect.top - menuHeight : rect.bottom + 4,
+        left: rect.left,
         width: Math.max(rect.width, 200),
         openUpward
       })
@@ -61,18 +62,33 @@ const CustomDropdown = ({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Update position on scroll or resize
+  // Update position on scroll or resize, close on scroll in scrollable containers
   useEffect(() => {
     if (isOpen) {
       updatePosition()
-      const handleScrollResize = () => {
+      
+      let scrollTimeout = null
+      const handleScroll = (e) => {
+        // If scrolling happens in a parent container (not the dropdown itself), update position
+        if (menuRef.current && !menuRef.current.contains(e.target)) {
+          // Debounce position updates during scroll
+          if (scrollTimeout) clearTimeout(scrollTimeout)
+          scrollTimeout = setTimeout(() => {
+            updatePosition()
+          }, 10)
+        }
+      }
+      
+      const handleResize = () => {
         updatePosition()
       }
-      window.addEventListener('scroll', handleScrollResize, true)
-      window.addEventListener('resize', handleScrollResize)
+      
+      window.addEventListener('scroll', handleScroll, true)
+      window.addEventListener('resize', handleResize)
       return () => {
-        window.removeEventListener('scroll', handleScrollResize, true)
-        window.removeEventListener('resize', handleScrollResize)
+        window.removeEventListener('scroll', handleScroll, true)
+        window.removeEventListener('resize', handleResize)
+        if (scrollTimeout) clearTimeout(scrollTimeout)
       }
     }
   }, [isOpen])

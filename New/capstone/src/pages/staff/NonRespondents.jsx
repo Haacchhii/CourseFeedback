@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { secretaryAPI, deptHeadAPI } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
-import { Search, Users, AlertCircle, ChevronDown, ChevronRight, GraduationCap, BookOpen } from 'lucide-react'
+import { Search, Users, AlertCircle, ChevronDown, ChevronRight, GraduationCap, BookOpen, ChevronLeft } from 'lucide-react'
 import CustomDropdown from '../../components/CustomDropdown'
 
 export default function NonRespondents() {
@@ -10,6 +10,10 @@ export default function NonRespondents() {
   const [error, setError] = useState(null)
   const [data, setData] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1)
+  const [sectionsPerPage, setSectionsPerPage] = useState(10)
 
   // Evaluation Period states
   const [evaluationPeriods, setEvaluationPeriods] = useState([])
@@ -173,6 +177,34 @@ export default function NonRespondents() {
 
   const filteredGroupedData = data?.groupedData ? filterGroupedData(data.groupedData) : {}
 
+  // Pagination logic
+  const sortedSectionKeys = useMemo(() => {
+    return Object.keys(filteredGroupedData).sort((a, b) => {
+      const aSection = filteredGroupedData[a]
+      const bSection = filteredGroupedData[b]
+      // Sort by program, then by section name
+      if (aSection.program !== bSection.program) {
+        return aSection.program.localeCompare(bSection.program)
+      }
+      return (aSection.section || '').localeCompare(bSection.section || '')
+    })
+  }, [filteredGroupedData])
+
+  const totalSections = sortedSectionKeys.length
+  const totalPages = Math.ceil(totalSections / sectionsPerPage)
+  
+  // Get current page sections
+  const paginatedSectionKeys = useMemo(() => {
+    const startIndex = (currentPage - 1) * sectionsPerPage
+    const endIndex = startIndex + sectionsPerPage
+    return sortedSectionKeys.slice(startIndex, endIndex)
+  }, [sortedSectionKeys, currentPage, sectionsPerPage])
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery, selectedPeriod])
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] flex items-center justify-center">
@@ -302,20 +334,49 @@ export default function NonRespondents() {
                   Retry
                 </button>
               </div>
-            ) : Object.keys(filteredGroupedData).length === 0 ? (
+            ) : totalSections === 0 ? (
               <div className="lpu-card p-8 text-center">
                 <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-600">No non-respondents found</p>
                 <p className="text-sm text-gray-500 mt-2">All students have completed their evaluations!</p>
               </div>
             ) : (
-              <div className="space-y-4">
-                {Object.entries(filteredGroupedData).map(([programKey, programSection]) => (
-                  <div key={programKey} className="lpu-card overflow-hidden">
-                    {/* Program Section Header */}
-                    <button
-                      onClick={() => toggleProgramSection(programKey)}
-                      className="w-full flex items-center justify-between p-5 bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white hover:from-[#8a1000] hover:to-[#aa2000] transition-all"
+              <>
+                {/* Results summary and per-page selector */}
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm text-gray-600">
+                    Showing <span className="font-semibold">{((currentPage - 1) * sectionsPerPage) + 1}</span> to{' '}
+                    <span className="font-semibold">{Math.min(currentPage * sectionsPerPage, totalSections)}</span> of{' '}
+                    <span className="font-semibold">{totalSections}</span> program sections
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">Sections per page:</span>
+                    <select
+                      value={sectionsPerPage}
+                      onChange={(e) => {
+                        setSectionsPerPage(Number(e.target.value))
+                        setCurrentPage(1)
+                      }}
+                      className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#7a0000]/20 focus:border-[#7a0000]"
+                    >
+                      <option value={5}>5</option>
+                      <option value={10}>10</option>
+                      <option value={15}>15</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {paginatedSectionKeys.map((programKey) => {
+                    const programSection = filteredGroupedData[programKey]
+                    return (
+                      <div key={programKey} className="lpu-card overflow-hidden">
+                        {/* Program Section Header */}
+                        <button
+                          onClick={() => toggleProgramSection(programKey)}
+                          className="w-full flex items-center justify-between p-5 bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white hover:from-[#8a1000] hover:to-[#aa2000] transition-all"
                     >
                       <div className="flex items-center gap-4">
                         <GraduationCap className="w-6 h-6" />
@@ -402,8 +463,74 @@ export default function NonRespondents() {
                       </div>
                     )}
                   </div>
-                ))}
-              </div>
+                    )
+                  })}
+                </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center gap-2 mt-6">
+                    <button
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                      className="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    >
+                      First
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                      className="p-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    
+                    {/* Page Numbers */}
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNum
+                        if (totalPages <= 5) {
+                          pageNum = i + 1
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNum = totalPages - 4 + i
+                        } else {
+                          pageNum = currentPage - 2 + i
+                        }
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => setCurrentPage(pageNum)}
+                            className={`min-w-[40px] h-10 rounded-lg text-sm font-semibold transition-all ${
+                              currentPage === pageNum
+                                ? 'bg-gradient-to-r from-[#7a0000] to-[#9a1000] text-white shadow-md'
+                                : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                      className="p-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    >
+                      Last
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </>
         )}

@@ -140,13 +140,20 @@ async def get_secretary_dashboard(
         ).scalar() or 0
         
         # Calculate participation rate for this period only
-        # Count UNIQUE students enrolled (only those in sections that are part of period_enrollments)
+        # Count UNIQUE students enrolled (only those in program sections enrolled in this period)
         total_enrolled_students = db.execute(text("""
-            SELECT COUNT(DISTINCT e.student_id)
-            FROM enrollments e
+            SELECT COUNT(DISTINCT s.id)
+            FROM students s
+            JOIN users u ON s.user_id = u.id
+            JOIN section_students ss ON s.user_id = ss.student_id
+            JOIN program_sections ps ON ss.section_id = ps.id
+            JOIN period_program_sections pps ON pps.program_section_id = ps.id
+                AND pps.evaluation_period_id = :period_id
+            JOIN enrollments e ON s.id = e.student_id
+                AND e.evaluation_period_id = :period_id
             JOIN period_enrollments pe ON e.class_section_id = pe.class_section_id
                 AND pe.evaluation_period_id = :period_id
-            WHERE e.status = 'active' AND e.evaluation_period_id = :period_id
+            WHERE u.is_active = true AND ps.is_active = true
         """), {"period_id": period.id}).scalar() or 0
         
         students_who_evaluated = db.query(func.count(Evaluation.student_id.distinct())).filter(
@@ -2044,9 +2051,9 @@ async def get_non_respondents(
         # Build query for non-respondents (filtered by secretary's programs)
         # If secretary has multiple programs, filter by all of them
         if len(program_ids) > 1:
-            program_filter = f"AND COALESCE(ps.program_id, s.program_id) IN ({','.join(str(p) for p in program_ids)})"
+            program_filter = f"AND ps.program_id IN ({','.join(str(p) for p in program_ids)})"
         else:
-            program_filter = "AND COALESCE(ps.program_id, s.program_id) = :program_id"
+            program_filter = "AND ps.program_id = :program_id"
         
         # Handle year_level filter - build it in Python to avoid PostgreSQL type ambiguity
         year_level_filter = ""
@@ -2067,14 +2074,17 @@ async def get_non_respondents(
                     COUNT(DISTINCT e.class_section_id) as total_courses
                 FROM students s
                 JOIN users u ON s.user_id = u.id
-                LEFT JOIN section_students ss ON s.user_id = ss.student_id
-                LEFT JOIN program_sections ps ON ss.section_id = ps.id
-                LEFT JOIN programs p ON COALESCE(ps.program_id, s.program_id) = p.id
+                JOIN section_students ss ON s.user_id = ss.student_id
+                JOIN program_sections ps ON ss.section_id = ps.id
+                JOIN period_program_sections pps ON pps.program_section_id = ps.id
+                    AND pps.evaluation_period_id = :period_id
+                JOIN programs p ON ps.program_id = p.id
                 JOIN enrollments e ON s.id = e.student_id
                     AND e.evaluation_period_id = :period_id
                 JOIN period_enrollments pe ON pe.class_section_id = e.class_section_id
                     AND pe.evaluation_period_id = :period_id
                 WHERE u.is_active = true
+                    AND ps.is_active = true
                     {program_filter}
                     {year_level_filter}
                 GROUP BY s.id, s.student_number, u.first_name, u.last_name, 
@@ -2176,21 +2186,24 @@ async def get_non_respondents(
         
         # Handle program filter for total count
         if len(program_ids) > 1:
-            total_program_filter = f"AND COALESCE(ps.program_id, s.program_id) IN ({','.join(str(p) for p in program_ids)})"
+            total_program_filter = f"AND ps.program_id IN ({','.join(str(p) for p in program_ids)})"
         else:
-            total_program_filter = "AND COALESCE(ps.program_id, s.program_id) = :program_id"
+            total_program_filter = "AND ps.program_id = :program_id"
         
         total_query = text(f"""
             SELECT COUNT(DISTINCT s.id) as total
             FROM students s
             JOIN users u ON s.user_id = u.id
-            LEFT JOIN section_students ss ON s.user_id = ss.student_id
-            LEFT JOIN program_sections ps ON ss.section_id = ps.id
+            JOIN section_students ss ON s.user_id = ss.student_id
+            JOIN program_sections ps ON ss.section_id = ps.id
+            JOIN period_program_sections pps ON pps.program_section_id = ps.id
+                AND pps.evaluation_period_id = :period_id
             JOIN enrollments e ON s.id = e.student_id
                 AND e.evaluation_period_id = :period_id
             JOIN period_enrollments pe ON pe.class_section_id = e.class_section_id
                 AND pe.evaluation_period_id = :period_id
             WHERE u.is_active = true
+                AND ps.is_active = true
                 {total_program_filter}
                 {total_year_filter}
         """)

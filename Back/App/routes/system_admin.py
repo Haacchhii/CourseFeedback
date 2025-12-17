@@ -5517,11 +5517,11 @@ async def get_non_respondents(
             evaluation_period_id = active_period.id
         
         # Build WHERE conditions dynamically to avoid NULL parameter issues
-        where_conditions = ["u.is_active = true"]
+        where_conditions = ["u.is_active = true", "ps.is_active = true"]
         params = {"period_id": evaluation_period_id}
         
         if program_id is not None:
-            where_conditions.append("COALESCE(ps.program_id, s.program_id) = :program_id")
+            where_conditions.append("ps.program_id = :program_id")
             params["program_id"] = program_id
         
         if year_level is not None:
@@ -5531,7 +5531,7 @@ async def get_non_respondents(
         where_clause = " AND ".join(where_conditions)
         
         # Build query for non-respondents
-        # Only include enrollments where class_section is in period_enrollments for this period
+        # Only include students whose program section is enrolled in the period
         query = text(f"""
             WITH enrolled_students AS (
                 SELECT DISTINCT
@@ -5546,9 +5546,11 @@ async def get_non_respondents(
                     COUNT(DISTINCT e.class_section_id) as total_courses
                 FROM students s
                 JOIN users u ON s.user_id = u.id
-                LEFT JOIN section_students ss ON s.id = ss.student_id
-                LEFT JOIN program_sections ps ON ss.section_id = ps.id
-                LEFT JOIN programs p ON COALESCE(ps.program_id, s.program_id) = p.id
+                JOIN section_students ss ON s.user_id = ss.student_id
+                JOIN program_sections ps ON ss.section_id = ps.id
+                JOIN period_program_sections pps ON pps.program_section_id = ps.id
+                    AND pps.evaluation_period_id = :period_id
+                JOIN programs p ON ps.program_id = p.id
                 JOIN enrollments e ON s.id = e.student_id
                     AND e.evaluation_period_id = :period_id
                 JOIN period_enrollments pe ON pe.class_section_id = e.class_section_id
@@ -5639,11 +5641,11 @@ async def get_non_respondents(
             })
         
         # Calculate statistics - build dynamic query to avoid NULL parameter issues
-        stats_conditions = ["u.is_active = true"]
+        stats_conditions = ["u.is_active = true", "ps.is_active = true"]
         stats_params = {}
         
         if program_id is not None:
-            stats_conditions.append("COALESCE(ps.program_id, s.program_id) = :program_id")
+            stats_conditions.append("ps.program_id = :program_id")
             stats_params["program_id"] = program_id
         
         if year_level is not None:
@@ -5656,8 +5658,10 @@ async def get_non_respondents(
             SELECT COUNT(DISTINCT s.id) as total
             FROM students s
             JOIN users u ON s.user_id = u.id
-            LEFT JOIN section_students ss ON s.id = ss.student_id
-            LEFT JOIN program_sections ps ON ss.section_id = ps.id
+            JOIN section_students ss ON s.user_id = ss.student_id
+            JOIN program_sections ps ON ss.section_id = ps.id
+            JOIN period_program_sections pps ON pps.program_section_id = ps.id
+                AND pps.evaluation_period_id = :period_id
             JOIN enrollments e ON s.id = e.student_id
                 AND e.evaluation_period_id = :period_id
             JOIN period_enrollments pe ON pe.class_section_id = e.class_section_id
