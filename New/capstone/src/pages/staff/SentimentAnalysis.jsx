@@ -375,11 +375,11 @@ export default function SentimentAnalysis() {
         <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-8 lg:py-10 max-w-screen-2xl">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center shadow-md">
-                <svg className="w-7 h-7 text-[#7a0000]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                </svg>
-              </div>
+              <img 
+                src="/lpu-logo.png" 
+                alt="University Logo" 
+                className="w-32 h-32 object-contain"
+              />
               <div>
                 <h1 className="text-2xl font-bold text-white">Sentiment Analysis Dashboard</h1>
                 <p className="text-[#ffd700] text-sm">
@@ -404,7 +404,23 @@ export default function SentimentAnalysis() {
             <h3 className="text-xl font-semibold text-gray-700 mb-2">No Active Evaluation Period</h3>
             <p className="text-gray-500 mb-4">There is currently no active evaluation period.</p>
             {evaluationPeriods.length > 0 ? (
-              <p className="text-gray-500">Click "Show Filters" below and select a past evaluation period to view historical data.</p>
+              <>
+                <p className="text-gray-500 mb-6">Select a past evaluation period to view historical data:</p>
+                <div className="max-w-xs mx-auto">
+                  <CustomDropdown
+                    options={[
+                      { value: '', label: 'Select Period' },
+                      ...evaluationPeriods.map((period) => ({
+                        value: period.id,
+                        label: `${period.name} (${period.academic_year || ''})${period.status === 'Open' || period.status === 'active' || period.status === 'Active' ? ' - Active' : ''}`
+                      }))
+                    ]}
+                    value={selectedPeriod || ''}
+                    onChange={(value) => setSelectedPeriod(value)}
+                    placeholder="Select Period"
+                  />
+                </div>
+              </>
             ) : (
               <p className="text-gray-500">Please contact the administrator to create and activate an evaluation period.</p>
             )}

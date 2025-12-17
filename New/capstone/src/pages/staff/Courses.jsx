@@ -895,17 +895,17 @@ export default function Courses() {
           <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-semibold text-white/90 mb-2">Total Students</h3>
+                <h3 className="text-sm font-semibold text-white/90 mb-2">Evaluations</h3>
                 <p className="text-4xl lg:text-5xl font-bold text-white">
                   {enhancedCourses.reduce((sum, course) => sum + (course.evaluationCount || 0), 0)}
                 </p>
-                <p className="text-xs text-blue-100 mt-1">
-                  who evaluated / {enhancedCourses.reduce((sum, course) => sum + (course.enrollmentCount || 0), 0)} enrolled
+                <p className="text-xs text-white/80 mt-1">
+                  evaluated / {enhancedCourses.reduce((sum, course) => sum + (course.enrollmentCount || 0), 0)} enrolled
                 </p>
               </div>
               <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
                 <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
                 </svg>
               </div>
             </div>
