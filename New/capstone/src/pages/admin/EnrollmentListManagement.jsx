@@ -255,13 +255,25 @@ const EnrollmentListManagement = () => {
   const downloadSampleCSV = () => {
     // Generate sample using actual program codes from the system
     const samplePrograms = programs.slice(0, 3).map(p => p.code || p.program_code).filter(Boolean);
-    const programCodes = samplePrograms.length > 0 ? samplePrograms : ['PROGRAM1', 'PROGRAM2', 'PROGRAM3'];
+    const programCodes = samplePrograms.length > 0 ? samplePrograms : ['BSCS', 'BSIT', 'BSCS-DS'];
     
     // This list validates which students are eligible to create accounts in the system
+    // Include valid program format examples in comments
     const csvContent = `student_number,first_name,last_name,middle_name,program_code
 2024-00001,Juan,Dela Cruz,Santos,${programCodes[0]}
 2024-00002,Maria,Santos,Lopez,${programCodes[1] || programCodes[0]}
-2024-00003,Pedro,Garcia,Martinez,${programCodes[2] || programCodes[0]}`;
+2024-00003,Pedro,Garcia,Martinez,${programCodes[2] || programCodes[0]}
+
+# ========== VALID PROGRAM CODE FORMAT ==========
+# Use the EXACT program code as registered in the system:
+# BSCS - Bachelor of Science in Computer Science
+# BSCS-DS - Bachelor of Science in Computer Science Major in Data Science  
+# BSIT - Bachelor of Science in Information Technology
+# BSCYBER - Bachelor of Science in Cybersecurity
+# BSPSY - Bachelor of Science in Psychology
+# BAPSY - Bachelor of Arts in Psychology
+# BMA - Bachelor of Multimedia Arts
+# (Check System Admin for complete list of valid program codes)`;
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -427,7 +439,8 @@ const EnrollmentListManagement = () => {
               <ul className="list-disc list-inside space-y-2 text-sm text-[#9a1000]">
                 <li><strong>Required columns:</strong> student_number, first_name, last_name, program_code</li>
                 <li><strong>Optional column:</strong> middle_name</li>
-                <li><strong>Program codes:</strong> Must exist in the system {programs.length > 0 && `(${programs.slice(0, 5).map(p => p.code || p.program_code).join(', ')}${programs.length > 5 ? ', etc.' : ''})`}</li>
+                <li><strong>Program codes:</strong> Use exact format (e.g., BSCS, BSCS-DS, BSIT, BSCYBER, BSPSY, BAPSY, BMA)</li>
+                <li><strong>Important:</strong> Program code must match EXACTLY as registered in the system</li>
                 <li><strong>Purpose:</strong> This list validates which students are eligible to create accounts in the system</li>
                 <li><strong>Behavior:</strong> Existing student records will be updated, new records will be inserted</li>
               </ul>

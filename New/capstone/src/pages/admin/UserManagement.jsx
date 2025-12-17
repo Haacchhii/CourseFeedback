@@ -439,15 +439,25 @@ export default function UserManagement() {
   const downloadCSVTemplate = () => {
     const template = `email,first_name,last_name,school_id,role,program,year_level
 iturraldejose@lpubatangas.edu.ph,Jose,Iturralde,23130778,student,BSIT,1
-juandelacruz@lpubatangas.edu.ph,Juan,Dela Cruz,23140001,student,BSCS,2
-mariasantos@lpubatangas.edu.ph,Maria,Santos,23150001,student,BAPSY,3
+juandelacruz@lpubatangas.edu.ph,Juan,Dela Cruz,23140001,student,BSCS-DS,2
+mariasantos@lpubatangas.edu.ph,Maria,Santos,23150001,student,BSPSY,3
 secretary@lpubatangas.edu.ph,Ana,Reyes,20100001,secretary,,
 depthead@lpubatangas.edu.ph,Pedro,Garcia,19050001,department_head,,
 
-# IMPORTANT: school_id is REQUIRED for all users
-# For students: Password will be auto-generated as lpub@{school_id}
-# Example: school_id "23130778" → password "lpub@23130778"
-# Students must change this password on first login
+# ========== IMPORTANT INSTRUCTIONS ==========
+# school_id: REQUIRED for all users
+# Password: Auto-generated as lpub@{school_id} (e.g., school_id "23130778" → password "lpub@23130778")
+#
+# ========== VALID PROGRAM CODES ==========
+# Use the EXACT program code format as shown below:
+# BSCS - Bachelor of Science in Computer Science
+# BSCS-DS - Bachelor of Science in Computer Science Major in Data Science
+# BSIT - Bachelor of Science in Information Technology
+# BSCYBER - Bachelor of Science in Cybersecurity
+# BSPSY - Bachelor of Science in Psychology
+# BAPSY - Bachelor of Arts in Psychology
+# BMA - Bachelor of Multimedia Arts
+# (Check System Admin for complete list of valid program codes)
 `
     const blob = new Blob([template], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)

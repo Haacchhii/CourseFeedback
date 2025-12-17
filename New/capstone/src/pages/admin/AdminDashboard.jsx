@@ -97,10 +97,6 @@ export default function AdminDashboard() {
                 <p className="lpu-header-subtitle text-base lg:text-lg mt-1">System Administration Panel</p>
               </div>
             </div>
-            <div className="bg-white/20 backdrop-blur-sm rounded-xl px-6 lg:px-8 py-4 lg:py-5 text-left lg:text-right w-full lg:w-auto">
-              <p className="text-[#ffd700] text-sm font-medium">Welcome back,</p>
-              <p className="text-white font-bold text-lg lg:text-xl mt-1">{currentUser?.first_name || currentUser?.name || 'Admin'} {currentUser?.last_name || ''}</p>
-            </div>
           </div>
         </div>
       </header>

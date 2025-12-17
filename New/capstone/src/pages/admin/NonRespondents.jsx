@@ -40,7 +40,7 @@ export default function NonRespondents() {
     if (selectedPeriod || activePeriod) {
       fetchNonRespondents()
     }
-  }, [selectedProgram, selectedYearLevel, selectedPeriod])
+  }, [selectedProgram, selectedYearLevel, selectedPeriod, activePeriod])
 
   const fetchPrograms = async () => {
     try {

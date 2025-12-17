@@ -33,7 +33,6 @@ export default function Layout({ children }) {
     { path: '/admin/student-management', label: 'Student Advancement', icon: '🎓' },
     { path: '/admin/periods', label: 'Evaluation Periods', icon: '📅' },
     { path: '/admin/courses', label: 'Course Management', icon: '📚' },
-    { path: '/admin/non-respondents', label: 'Non-Respondents', icon: '⚠️' },
     { path: '/admin/export', label: 'Data Export', icon: '📤' },
     { path: '/admin/audit-logs', label: 'Audit Logs', icon: '📋' }
   ]

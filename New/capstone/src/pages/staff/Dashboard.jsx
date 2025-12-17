@@ -94,7 +94,7 @@ export default function Dashboard() {
     }
     
     if (currentUser.role === 'student') {
-      navigate('/student-evaluation')
+      navigate('/student/courses')
       return
     }
     
@@ -186,34 +186,18 @@ export default function Dashboard() {
 
   // Year level sentiment data - calculate from evaluations
   const yearLevelSentiment = useMemo(() => {
-    console.log('[DASHBOARD] apiData:', apiData)
-    console.log('[DASHBOARD] apiData?.evaluations:', apiData?.evaluations)
-    
     if (!apiData || !apiData.evaluations || apiData.evaluations.length === 0) {
-      console.log('[DASHBOARD] No evaluations data - apiData structure:', JSON.stringify(apiData, null, 2))
       return []
     }
     
     const evaluations = apiData.evaluations
-    console.log('[DASHBOARD] Evaluations count:', evaluations.length)
-    console.log('[DASHBOARD] First evaluation sample:', evaluations[0])
-    console.log('[DASHBOARD] First eval fields:', Object.keys(evaluations[0] || {}))
-    
     const yearLevels = [1, 2, 3, 4]
     
     const result = yearLevels.map(level => {
       const levelEvals = evaluations.filter(e => e.yearLevel === level || e.year_level === level)
-      console.log(`[DASHBOARD] Year ${level}: found ${levelEvals.length} evaluations`)
-      if (levelEvals.length > 0) {
-        console.log(`[DASHBOARD] Sample eval for Year ${level}:`, levelEvals[0])
-        console.log(`[DASHBOARD] Sample eval sentiment value:`, levelEvals[0].sentiment)
-        console.log(`[DASHBOARD] All sentiments for Year ${level}:`, levelEvals.map(e => e.sentiment))
-      }
       const positive = levelEvals.filter(e => e.sentiment === 'positive').length
       const neutral = levelEvals.filter(e => e.sentiment === 'neutral').length
       const negative = levelEvals.filter(e => e.sentiment === 'negative').length
-      
-      console.log(`[DASHBOARD] Year ${level} sentiments - P:${positive} N:${neutral} Neg:${negative}`)
       
       return {
         name: `Year ${level}`,
@@ -224,8 +208,6 @@ export default function Dashboard() {
       }
     }).filter(level => level.total > 0)
     
-    console.log('[DASHBOARD] Year level sentiment result:', JSON.stringify(result, null, 2))
-    console.log('[DASHBOARD] Result array length:', result.length)
     return result
   }, [apiData])
 
@@ -252,14 +234,6 @@ export default function Dashboard() {
                 <p className="lpu-header-subtitle text-base lg:text-lg mt-1">
                   {isAdmin(currentUser) ? 'Academic Excellence Dashboard' : `${currentUser.department} Analytics Hub`}
                 </p>
-              </div>
-            </div>
-            <div className="bg-white/20 backdrop-blur-sm rounded-xl px-6 lg:px-8 py-4 lg:py-5 text-left lg:text-right w-full lg:w-auto">
-              <p className="text-[#ffd700] text-sm font-medium">Welcome back,</p>
-              <p className="text-white font-bold text-lg lg:text-xl mt-1">{currentUser?.first_name || currentUser?.name || 'User'} {currentUser?.last_name || ''}</p>
-              <div className="flex items-center justify-start lg:justify-end space-x-2 mt-2">
-                <div className="w-2 h-2 bg-[#ffd700] rounded-full animate-pulse"></div>
-                <span className="text-white text-xs font-medium">Online</span>
               </div>
             </div>
           </div>

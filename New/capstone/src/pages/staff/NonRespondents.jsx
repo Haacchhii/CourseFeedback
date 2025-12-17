@@ -46,7 +46,7 @@ export default function NonRespondents() {
     if (selectedPeriod || activePeriod) {
       fetchNonRespondents()
     }
-  }, [selectedPeriod])
+  }, [selectedPeriod, activePeriod])
 
   const fetchNonRespondents = async () => {
     try {
@@ -54,7 +54,8 @@ export default function NonRespondents() {
       setError(null)
       
       const params = {}
-      if (selectedPeriod) params.evaluation_period_id = selectedPeriod
+      const periodIdToUse = selectedPeriod || activePeriod
+      if (periodIdToUse) params.evaluation_period_id = periodIdToUse
 
       const response = await api.getNonRespondents(params)
       const rawData = response.data || response

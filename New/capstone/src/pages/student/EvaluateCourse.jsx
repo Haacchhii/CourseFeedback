@@ -70,6 +70,7 @@ export default function EvaluateCourse(){
 
   function getCategoryProgress(categoryIndex) {
     const category = questionnaireCategories[categoryIndex]
+    if (!category?.questions?.length) return 0
     const answered = category.questions.filter(q => ratings[q.id] !== null).length
     return (answered / category.questions.length) * 100
   }
@@ -176,7 +177,7 @@ export default function EvaluateCourse(){
           <div className="w-full bg-gray-300 rounded-full h-3 shadow-inner">
             <div
               className="bg-gradient-to-r from-[#7a0000] to-[#a31111] h-3 rounded-full transition-all duration-500 shadow-sm"
-              style={{width: `${(Object.values(ratings).filter(r => r !== null).length / Object.keys(ratings).length) * 100}%`}}
+              style={{width: `${Object.keys(ratings).length > 0 ? (Object.values(ratings).filter(r => r !== null).length / Object.keys(ratings).length) * 100 : 0}%`}}
             ></div>
           </div>
         </div>
