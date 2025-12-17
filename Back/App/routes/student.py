@@ -212,9 +212,12 @@ async def get_student_evaluation_history(
         
         actual_student_id = student_data[0]
         
-        # Build query to show ONLY COMPLETED evaluations from CLOSED periods
-        # Active period evaluations should appear in pending-evaluations, not history
-        query = """
+        # Build query to show ALL enrollments from CLOSED periods
+        # This includes both completed evaluations AND missed evaluations (where student didn't submit)
+        # Active period enrollments should appear in pending-evaluations, not history
+        
+        # First, get completed evaluations
+        completed_query = """
             SELECT 
                 e.id as evaluation_id,
                 e.submission_date as submission_date,
@@ -234,7 +237,8 @@ async def get_student_evaluation_history(
                 ep.start_date as period_start,
                 ep.end_date as period_end,
                 ep.status as period_status,
-                p.program_name
+                p.program_name,
+                'completed' as history_status
             FROM evaluations e
             JOIN enrollments enr ON e.student_id = enr.student_id 
                 AND e.class_section_id = enr.class_section_id
@@ -248,16 +252,62 @@ async def get_student_evaluation_history(
             AND ep.status != 'active'
         """
         
+        # Second, get missed evaluations (enrollments in closed periods where no evaluation was submitted)
+        missed_query = """
+            SELECT 
+                NULL as evaluation_id,
+                NULL as submission_date,
+                NULL as rating_overall,
+                NULL as text_feedback,
+                c.id as course_id,
+                c.subject_code,
+                c.subject_name,
+                cs.id as class_section_id,
+                cs.class_code,
+                cs.semester,
+                cs.academic_year,
+                ep.id as period_id,
+                ep.name as period_name,
+                ep.semester as period_semester,
+                ep.academic_year as period_academic_year,
+                ep.start_date as period_start,
+                ep.end_date as period_end,
+                ep.status as period_status,
+                p.program_name,
+                'missed' as history_status
+            FROM enrollments enr
+            JOIN class_sections cs ON enr.class_section_id = cs.id
+            JOIN courses c ON cs.course_id = c.id
+            JOIN evaluation_periods ep ON enr.evaluation_period_id = ep.id
+            LEFT JOIN programs p ON c.program_id = p.id
+            WHERE enr.student_id = :student_id
+            AND ep.status != 'active'
+            AND NOT EXISTS (
+                SELECT 1 FROM evaluations e
+                WHERE e.student_id = enr.student_id
+                AND e.class_section_id = enr.class_section_id
+                AND e.evaluation_period_id = enr.evaluation_period_id
+                AND e.status = 'completed'
+            )
+        """
+        
         params = {"student_id": actual_student_id}
         
         # Add period filter if specified
+        period_filter = ""
         if period_id is not None:
-            query += " AND ep.id = :period_id"
+            period_filter = " AND ep.id = :period_id"
             params["period_id"] = period_id
         
-        query += " ORDER BY ep.start_date DESC, cs.class_code, e.created_at DESC"
+        # Combine both queries with UNION and sort
+        full_query = f"""
+            ({completed_query}{period_filter})
+            UNION ALL
+            ({missed_query}{period_filter})
+            ORDER BY period_start DESC, class_code, history_status
+        """
         
-        evaluations_result = db.execute(text(query), params)
+        evaluations_result = db.execute(text(full_query), params)
         
         evaluations = []
         for row in evaluations_result:
@@ -265,8 +315,9 @@ async def get_student_evaluation_history(
                 "evaluation_id": row[0],
                 "submission_date": row[1].strftime("%Y-%m-%d %H:%M:%S") if row[1] else None,
                 "rating_overall": row[2],
-                "has_feedback": bool(row[3] and row[3].strip()),
+                "has_feedback": bool(row[3] and str(row[3]).strip()) if row[3] else False,
                 "text_feedback": row[3] if row[3] else None,
+                "status": row[19],  # 'completed' or 'missed'
                 "course": {
                     "id": row[4],
                     "subject_code": row[5],

@@ -169,11 +169,14 @@ async def get_department_head_dashboard(
         ).scalar() or 0
         
         # Calculate participation rate for THIS PERIOD ONLY
-        # Count UNIQUE students enrolled (not enrollment records)
-        total_enrolled_students = db.query(func.count(Enrollment.student_id.distinct())).filter(
-            Enrollment.status == 'active',
-            Enrollment.evaluation_period_id == period.id
-        ).scalar() or 0
+        # Count UNIQUE students enrolled (only those in sections that are part of period_enrollments)
+        total_enrolled_students = db.execute(text("""
+            SELECT COUNT(DISTINCT e.student_id)
+            FROM enrollments e
+            JOIN period_enrollments pe ON e.class_section_id = pe.class_section_id
+                AND pe.evaluation_period_id = :period_id
+            WHERE e.status = 'active' AND e.evaluation_period_id = :period_id
+        """), {"period_id": period.id}).scalar() or 0
         
         students_who_evaluated = db.query(func.count(Evaluation.student_id.distinct())).filter(
             Evaluation.evaluation_period_id == period.id,
@@ -1721,6 +1724,7 @@ async def get_non_respondents(
             year_level_filter = "AND s.year_level = :year_level"
         
         # Build query for non-respondents
+        # Only include enrollments where class_section is in period_enrollments for this period
         query = text(f"""
             WITH enrolled_students AS (
                 SELECT DISTINCT
@@ -1735,11 +1739,13 @@ async def get_non_respondents(
                     COUNT(DISTINCT e.class_section_id) as total_courses
                 FROM students s
                 JOIN users u ON s.user_id = u.id
-                LEFT JOIN section_students ss ON s.id = ss.student_id
+                LEFT JOIN section_students ss ON s.user_id = ss.student_id
                 LEFT JOIN program_sections ps ON ss.section_id = ps.id
                 LEFT JOIN programs p ON COALESCE(ps.program_id, s.program_id) = p.id
                 JOIN enrollments e ON s.id = e.student_id
-                    AND (e.evaluation_period_id = :period_id OR e.evaluation_period_id IS NULL)
+                    AND e.evaluation_period_id = :period_id
+                JOIN period_enrollments pe ON pe.class_section_id = e.class_section_id
+                    AND pe.evaluation_period_id = :period_id
                 WHERE u.is_active = true
                     {program_filter}
                     {year_level_filter}
@@ -1752,6 +1758,7 @@ async def get_non_respondents(
                     COUNT(DISTINCT e.class_section_id) as completed_courses
                 FROM evaluations e
                 WHERE e.evaluation_period_id = :period_id
+                    AND e.status = 'completed'
                 GROUP BY e.student_id
             )
             SELECT 
@@ -1792,8 +1799,10 @@ async def get_non_respondents(
                 FROM enrollments e
                 JOIN class_sections cs ON e.class_section_id = cs.id
                 JOIN courses c ON cs.course_id = c.id
+                JOIN period_enrollments pe ON pe.class_section_id = e.class_section_id
+                    AND pe.evaluation_period_id = :period_id
                 WHERE e.student_id = :student_id
-                    AND (e.evaluation_period_id = :period_id OR e.evaluation_period_id IS NULL)
+                    AND e.evaluation_period_id = :period_id
                     AND NOT EXISTS (
                         SELECT 1 FROM evaluations ev
                         WHERE ev.student_id = :student_id
@@ -1834,10 +1843,12 @@ async def get_non_respondents(
             SELECT COUNT(DISTINCT s.id) as total
             FROM students s
             JOIN users u ON s.user_id = u.id
-            LEFT JOIN section_students ss ON s.id = ss.student_id
+            LEFT JOIN section_students ss ON s.user_id = ss.student_id
             LEFT JOIN program_sections ps ON ss.section_id = ps.id
             JOIN enrollments e ON s.id = e.student_id
-                AND (e.evaluation_period_id = :period_id OR e.evaluation_period_id IS NULL)
+                AND e.evaluation_period_id = :period_id
+            JOIN period_enrollments pe ON pe.class_section_id = e.class_section_id
+                AND pe.evaluation_period_id = :period_id
             WHERE u.is_active = true
                 {program_filter}
                 {year_level_filter}

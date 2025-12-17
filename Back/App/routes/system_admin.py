@@ -5531,6 +5531,7 @@ async def get_non_respondents(
         where_clause = " AND ".join(where_conditions)
         
         # Build query for non-respondents
+        # Only include enrollments where class_section is in period_enrollments for this period
         query = text(f"""
             WITH enrolled_students AS (
                 SELECT DISTINCT
@@ -5549,7 +5550,9 @@ async def get_non_respondents(
                 LEFT JOIN program_sections ps ON ss.section_id = ps.id
                 LEFT JOIN programs p ON COALESCE(ps.program_id, s.program_id) = p.id
                 JOIN enrollments e ON s.id = e.student_id
-                    AND (e.evaluation_period_id = :period_id OR e.evaluation_period_id IS NULL)
+                    AND e.evaluation_period_id = :period_id
+                JOIN period_enrollments pe ON pe.class_section_id = e.class_section_id
+                    AND pe.evaluation_period_id = :period_id
                 WHERE {where_clause}
                 GROUP BY s.id, s.student_number, u.first_name, u.last_name, 
                          s.year_level, p.program_code, ps.section_name, ps.id
@@ -5560,6 +5563,7 @@ async def get_non_respondents(
                     COUNT(DISTINCT e.class_section_id) as completed_courses
                 FROM evaluations e
                 WHERE e.evaluation_period_id = :period_id
+                    AND e.status = 'completed'
                 GROUP BY e.student_id
             )
             SELECT 
@@ -5584,7 +5588,7 @@ async def get_non_respondents(
         # Get pending courses for each non-respondent
         non_respondents = []
         for row in result:
-            # Get list of courses they haven't evaluated
+            # Get list of courses they haven't evaluated (only from period_enrollments)
             courses_query = text("""
                 SELECT DISTINCT
                     c.subject_code,
@@ -5594,8 +5598,10 @@ async def get_non_respondents(
                 FROM enrollments e
                 JOIN class_sections cs ON e.class_section_id = cs.id
                 JOIN courses c ON cs.course_id = c.id
+                JOIN period_enrollments pe ON pe.class_section_id = e.class_section_id
+                    AND pe.evaluation_period_id = :period_id
                 WHERE e.student_id = :student_id
-                    AND (e.evaluation_period_id = :period_id OR e.evaluation_period_id IS NULL)
+                    AND e.evaluation_period_id = :period_id
                     AND NOT EXISTS (
                         SELECT 1 FROM evaluations ev
                         WHERE ev.student_id = :student_id
@@ -5652,7 +5658,9 @@ async def get_non_respondents(
             LEFT JOIN section_students ss ON s.id = ss.student_id
             LEFT JOIN program_sections ps ON ss.section_id = ps.id
             JOIN enrollments e ON s.id = e.student_id
-                AND (e.evaluation_period_id = :period_id OR e.evaluation_period_id IS NULL)
+                AND e.evaluation_period_id = :period_id
+            JOIN period_enrollments pe ON pe.class_section_id = e.class_section_id
+                AND pe.evaluation_period_id = :period_id
             WHERE {stats_where}
         """)
         

@@ -46,14 +46,14 @@ async def get_dashboard_stats(
                 (SELECT COUNT(*) FROM users WHERE role = 'secretary') as total_secretaries,
                 (SELECT COUNT(*) FROM users WHERE role = 'admin') as total_admins,
                 (SELECT COUNT(*) FROM courses) as total_courses,
-                (SELECT COUNT(*) FROM evaluations WHERE evaluation_period_id = :period_id) as total_evaluations,
+                (SELECT COUNT(*) FROM evaluations WHERE evaluation_period_id = :period_id AND status = 'completed') as total_evaluations,
                 (SELECT COUNT(*) FROM programs) as total_programs,
                 (SELECT COUNT(*) FROM class_sections) as total_class_sections
         """)
         
         counts_result = db.execute(counts_query, {"period_id": period_id}).fetchone()
         
-        # Get program statistics (filtered by period)
+        # Get program statistics (filtered by period) - only completed evaluations
         program_stats_query = text("""
             SELECT 
                 p.program_code,
@@ -65,7 +65,9 @@ async def get_dashboard_stats(
             LEFT JOIN courses c ON p.id = c.program_id
             LEFT JOIN students s ON p.id = s.program_id
             LEFT JOIN enrollments en ON s.id = en.student_id AND (:period_id IS NULL OR en.evaluation_period_id = :period_id)
-            LEFT JOIN evaluations e ON en.class_section_id = e.class_section_id AND en.student_id = e.student_id AND (:period_id IS NULL OR e.evaluation_period_id = :period_id)
+            LEFT JOIN evaluations e ON en.class_section_id = e.class_section_id AND en.student_id = e.student_id 
+                AND (:period_id IS NULL OR e.evaluation_period_id = :period_id)
+                AND e.status = 'completed'
             GROUP BY p.id, p.program_code, p.program_name
             ORDER BY p.program_code
         """)
@@ -214,7 +216,7 @@ async def get_department_overview(
             SELECT 
                 (SELECT COUNT(*) FROM students) as total_students,
                 (SELECT COUNT(*) FROM courses) as total_courses,
-                (SELECT COUNT(*) FROM evaluations WHERE :period_id IS NULL OR evaluation_period_id = :period_id) as total_evaluations,
+                (SELECT COUNT(*) FROM evaluations WHERE (:period_id IS NULL OR evaluation_period_id = :period_id) AND status = 'completed') as total_evaluations,
                 (SELECT COUNT(*) FROM programs) as total_departments
         """)
         
