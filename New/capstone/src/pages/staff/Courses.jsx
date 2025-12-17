@@ -852,7 +852,27 @@ export default function Courses() {
             </svg>
             <h3 className="text-xl font-semibold text-gray-700 mb-2">No Active Evaluation Period</h3>
             <p className="text-gray-500 mb-4">There is currently no active evaluation period.</p>
-            <p className="text-gray-500">Please contact the administrator to activate an evaluation period, or select a specific period from the filter above.</p>
+            {evaluationPeriods.length > 0 ? (
+              <>
+                <p className="text-gray-500 mb-6">Select a past evaluation period to view historical data:</p>
+                <div className="max-w-xs mx-auto">
+                  <CustomDropdown
+                    options={[
+                      { value: '', label: 'Select Period' },
+                      ...evaluationPeriods.map((period) => ({
+                        value: period.id,
+                        label: `${period.name} (${period.academic_year || ''})${period.status === 'Open' || period.status === 'active' || period.status === 'Active' ? ' - Active' : ''}`
+                      }))
+                    ]}
+                    value={selectedPeriod || ''}
+                    onChange={(value) => setSelectedPeriod(value)}
+                    placeholder="Select Period"
+                  />
+                </div>
+              </>
+            ) : (
+              <p className="text-gray-500">Please contact the administrator to create and activate an evaluation period.</p>
+            )}
           </div>
         ) : (
           <>

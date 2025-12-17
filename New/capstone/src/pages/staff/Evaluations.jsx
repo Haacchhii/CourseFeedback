@@ -136,6 +136,10 @@ export default function Evaluations() {
       let evaluationsData, allEvaluationsData, coursesData, dashboardData
       
       // Use appropriate API based on user role
+      // Build dashboard filters with period_id so stats update when period changes
+      const dashboardFilters = {}
+      if (periodIdToUse) dashboardFilters.period_id = periodIdToUse
+      
       if (isAdmin(currentUser)) {
         [evaluationsData, allEvaluationsData, coursesData] = await Promise.all([
           adminAPI.getEvaluations(filters),
@@ -148,14 +152,14 @@ export default function Evaluations() {
           secretaryAPI.getEvaluations(filters),
           secretaryAPI.getEvaluations(allEvaluationsFilters),
           secretaryAPI.getCourses(),
-          secretaryAPI.getDashboard()
+          secretaryAPI.getDashboard(dashboardFilters)
         ])
       } else if (currentUser.role === 'department_head') {
         [evaluationsData, allEvaluationsData, coursesData, dashboardData] = await Promise.all([
           deptHeadAPI.getEvaluations(filters),
           deptHeadAPI.getEvaluations(allEvaluationsFilters),
           deptHeadAPI.getCourses(),
-          deptHeadAPI.getDashboard()
+          deptHeadAPI.getDashboard(dashboardFilters)
         ])
       } else {
         throw new Error(`Unsupported role: ${currentUser.role}`)
@@ -431,6 +435,39 @@ export default function Evaluations() {
       </header>
 
       <div className="w-full mx-auto px-6 sm:px-8 lg:px-10 py-10 lg:py-12 max-w-screen-2xl">
+        
+        {/* Show warning if no active period and no selection */}
+        {!activePeriod && !selectedPeriod ? (
+          <div className="lpu-card text-center py-16 mb-10">
+            <svg className="w-20 h-20 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <h3 className="text-xl font-semibold text-gray-700 mb-2">No Active Evaluation Period</h3>
+            <p className="text-gray-500 mb-4">There is currently no active evaluation period.</p>
+            {evaluationPeriods.length > 0 ? (
+              <>
+                <p className="text-gray-500 mb-6">Select a past evaluation period to view historical data:</p>
+                <div className="max-w-xs mx-auto">
+                  <CustomDropdown
+                    options={[
+                      { value: '', label: 'Select Period' },
+                      ...evaluationPeriods.map((period) => ({
+                        value: period.id,
+                        label: `${period.name} (${period.academic_year || ''})${period.status === 'Open' || period.status === 'active' || period.status === 'Active' ? ' - Active' : ''}`
+                      }))
+                    ]}
+                    value={selectedPeriod || ''}
+                    onChange={(value) => setSelectedPeriod(value)}
+                    placeholder="Select Period"
+                  />
+                </div>
+              </>
+            ) : (
+              <p className="text-gray-500">Please contact the administrator to create and activate an evaluation period.</p>
+            )}
+          </div>
+        ) : (
+          <>
         {/* Enhanced Evaluation Statistics */}
         <div className="grid md:grid-cols-2 lg:grid-cols-6 gap-5 lg:gap-6 mb-12">
           <div className="bg-gradient-to-br from-[#7a0000] to-[#9a1000] rounded-card shadow-card p-7 lg:p-8 transform hover:scale-105 transition-all duration-250">

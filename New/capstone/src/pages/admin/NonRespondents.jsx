@@ -188,7 +188,27 @@ export default function NonRespondents() {
             <AlertCircle className="w-20 h-20 mx-auto text-gray-300 mb-4" />
             <h3 className="text-xl font-semibold text-gray-700 mb-2">No Active Evaluation Period</h3>
             <p className="text-gray-500 mb-4">There is currently no active evaluation period.</p>
-            <p className="text-gray-500">Please activate an evaluation period, or select a specific period from the filter below.</p>
+            {evaluationPeriods.length > 0 ? (
+              <>
+                <p className="text-gray-500 mb-6">Select a past evaluation period to view historical data:</p>
+                <div className="max-w-xs mx-auto">
+                  <CustomDropdown
+                    options={[
+                      { value: '', label: 'Select Period' },
+                      ...evaluationPeriods.map((period) => ({
+                        value: period.id.toString(),
+                        label: `${period.name} (${period.academic_year || ''})${period.status === 'Open' || period.status === 'active' || period.status === 'Active' ? ' - Active' : ''}`
+                      }))
+                    ]}
+                    value={selectedPeriod?.toString() || ''}
+                    onChange={(value) => setSelectedPeriod(value)}
+                    placeholder="Select Period"
+                  />
+                </div>
+              </>
+            ) : (
+              <p className="text-gray-500">Please activate an evaluation period from Evaluation Period Management.</p>
+            )}
           </div>
         ) : (
           <>

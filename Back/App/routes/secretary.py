@@ -2068,6 +2068,7 @@ async def get_non_respondents(
                 LEFT JOIN program_sections ps ON ss.section_id = ps.id
                 LEFT JOIN programs p ON COALESCE(ps.program_id, s.program_id) = p.id
                 JOIN enrollments e ON s.id = e.student_id
+                    AND (e.evaluation_period_id = :period_id OR e.evaluation_period_id IS NULL)
                 WHERE u.is_active = true
                     {program_filter}
                     {year_level_filter}
@@ -2122,6 +2123,7 @@ async def get_non_respondents(
                 JOIN class_sections cs ON e.class_section_id = cs.id
                 JOIN courses c ON cs.course_id = c.id
                 WHERE e.student_id = :student_id
+                    AND (e.evaluation_period_id = :period_id OR e.evaluation_period_id IS NULL)
                     AND NOT EXISTS (
                         SELECT 1 FROM evaluations ev
                         WHERE ev.student_id = :student_id
@@ -2176,13 +2178,14 @@ async def get_non_respondents(
             LEFT JOIN section_students ss ON s.id = ss.student_id
             LEFT JOIN program_sections ps ON ss.section_id = ps.id
             JOIN enrollments e ON s.id = e.student_id
+                AND (e.evaluation_period_id = :period_id OR e.evaluation_period_id IS NULL)
             WHERE u.is_active = true
                 {total_program_filter}
                 {total_year_filter}
         """)
         
         # Build parameters for total query
-        total_params = {}
+        total_params = {"period_id": evaluation_period_id}
         if len(program_ids) == 1:
             total_params["program_id"] = program_id
         if year_level is not None:
